@@ -161,7 +161,7 @@ function parseLegacyCsv(text: string): { rows: CsvImportRow[]; errors: string[] 
     const legacyMemos = [55, 56, 57, 58, 59, 60, 61, 62, 63]
       .map(i => cols[i]?.trim() ?? '')
       .filter(Boolean)
-    const baseNotes = cols[47]?.trim() ?? ''
+    const baseNotes = cols[46]?.trim() ?? ''
     const combinedNotes = legacyMemos.length > 0
       ? [baseNotes, '【旧メモ】' + legacyMemos.join(' / ')].filter(Boolean).join('\n')
       : baseNotes
@@ -175,7 +175,7 @@ function parseLegacyCsv(text: string): { rows: CsvImportRow[]; errors: string[] 
       customer_address: cols[6]?.trim() ?? '',
       project_name: projectName,
       project_number: '',
-      key_number: cols[46]?.trim() ?? '',
+      key_number: cols[45]?.trim() ?? '',
       site_address: siteAddress,
       grid_id: cols[20]?.trim() ?? '',
       grid_certified_at: cols[21]?.trim() ?? '',
@@ -184,14 +184,14 @@ function parseLegacyCsv(text: string): { rows: CsvImportRow[]; errors: string[] 
       fit_end_date: '',
       generation_point_id: cols[25]?.trim() ?? '',
       customer_number: cols[24]?.trim() ?? '',
-      handover_date: cols[36]?.trim() ?? '',
+      handover_date: cols[35]?.trim() ?? '',
       abolition_date: '',
-      sales_company: cols[33]?.trim() ?? '',
-      referrer: cols[34]?.trim() ?? '',
-      sales_price: cleanNumStr(cols[38]?.trim() ?? ''),
-      reference_price: cleanNumStr(cols[39]?.trim() ?? ''),
-      land_cost: cleanNumStr(cols[40]?.trim() ?? ''),
-      amuras_member_no: cols[48]?.trim() ?? '',
+      sales_company: cols[32]?.trim() ?? '',
+      referrer: cols[33]?.trim() ?? '',
+      sales_price: cleanNumStr(cols[37]?.trim() ?? ''),
+      reference_price: cleanNumStr(cols[38]?.trim() ?? ''),
+      land_cost: cleanNumStr(cols[39]?.trim() ?? ''),
+      amuras_member_no: cols[47]?.trim() ?? '',
       monitoring_system: cols[26]?.trim() ?? '',
       notes: combinedNotes,
       latitude: lat,

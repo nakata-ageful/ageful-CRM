@@ -88,8 +88,8 @@ function parseFitNum(v: string): string {
 function detectLegacyFormat(text: string): boolean {
   const firstLine = text.split(/\r?\n/)[0].replace(/^\uFEFF/, '')
   const cols = firstLine.split(',').map(c => c.trim().replace(/^"|"$/g, ''))
-  // col0="", col1="案件名" がレガシー形式の特徴
-  return cols[1] === '案件名'
+  // col0="案件名" がレガシー形式の特徴
+  return cols[0] === '案件名'
 }
 
 /**
@@ -97,14 +97,14 @@ function detectLegacyFormat(text: string): boolean {
  * エイジフル既存データ（2行ヘッダー）に対応
  *
  * 列マッピング:
- *   1=案件名, 2=顧客名, 3=email, 4=電話, 5=顧客郵便番号, 6=顧客住所
- *   7=発電所名(省略可), 8=発電所郵便番号(無視), 9=都道府県, 10=市区町村以降
- *   11=座標, 12=パネルkW, 13=パネル説明(枚数パース), 14=パネルメーカー, 15=パネル型番
- *   16=パワコンkW, 17=パワコン説明(台数パース), 18=パワコンメーカー, 19=パワコン型番
- *   20=経産ID, 21=経産認定日, 22=FIT, 23=需給開始日, 24=お客さま番号, 25=受電地点番号
- *   26=遠隔監視, 33=販売会社, 34=紹介者, 36=引渡日
- *   38=販売価格, 39=価格備考, 40=土地代, 46=カギNo, 47=備考, 48=アプラス会員番号
- *   末尾4列: パネルkW, パネルメーカー, パワコンkW, パワコンメーカー(col12が空の場合フォールバック)
+ *   0=案件名, 1=顧客名, 2=email, 3=電話, 4=顧客郵便番号, 5=顧客住所
+ *   6=発電所名(省略可), 7=発電所郵便番号(無視), 8=都道府県, 9=市区町村以降
+ *   10=座標, 11=パネルkW, 12=パネル説明(枚数パース), 13=パネルメーカー, 14=パネル型番
+ *   15=パワコンkW, 16=パワコン説明(台数パース), 17=パワコンメーカー, 18=パワコン型番
+ *   19=経産ID, 20=経産認定日, 21=FIT, 22=需給開始日, 23=お客さま番号, 24=受電地点番号
+ *   25=遠隔監視, 31=販売会社, 32=紹介者, 34=引渡日
+ *   36=販売価格, 37=価格備考, 38=土地代, 44=カギNo, 45=備考, 46=アプラス会員番号
+ *   54-57=パネルkW/メーカー/パワコンkW/メーカー(col11が空の場合フォールバック)
  */
 function parseLegacyCsv(text: string): { rows: CsvImportRow[]; errors: string[] } {
   const lines = text.split(/\r?\n/).filter(l => l.trim() !== '')
@@ -117,8 +117,8 @@ function parseLegacyCsv(text: string): { rows: CsvImportRow[]; errors: string[] 
   for (let i = 2; i < lines.length; i++) {
     const cols = splitCsvLine(lines[i])
 
-    const projectName = cols[1]?.trim() ?? ''
-    const customerName = cols[2]?.trim() ?? ''
+    const projectName = cols[0]?.trim() ?? ''
+    const customerName = cols[1]?.trim() ?? ''
 
     // 空行スキップ
     if (!projectName && !customerName) continue
@@ -132,68 +132,59 @@ function parseLegacyCsv(text: string): { rows: CsvImportRow[]; errors: string[] 
     }
 
     // 座標パース
-    const { lat, lng } = parseCoords(cols[11]?.trim() ?? '')
+    const { lat, lng } = parseCoords(cols[10]?.trim() ?? '')
 
-    // パネル/パワコンデータ（col12-19優先、空の場合は末尾4列フォールバック）
-    let panelKw = cols[12]?.trim() ?? ''
-    const panelDesc = cols[13]?.trim() ?? ''
-    let panelMfr = cols[14]?.trim() ?? ''
-    let panelModel = cols[15]?.trim() ?? ''
-    let pcsKw = cols[16]?.trim() ?? ''
-    const pcsDesc = cols[17]?.trim() ?? ''
-    let pcsMfr = cols[18]?.trim() ?? ''
-    const pcsModel = cols[19]?.trim() ?? ''
+    // パネル/パワコンデータ（col11-18優先、空の場合はcol54-57フォールバック）
+    let panelKw = cols[11]?.trim() ?? ''
+    const panelDesc = cols[12]?.trim() ?? ''
+    let panelMfr = cols[13]?.trim() ?? ''
+    let panelModel = cols[14]?.trim() ?? ''
+    let pcsKw = cols[15]?.trim() ?? ''
+    const pcsDesc = cols[16]?.trim() ?? ''
+    let pcsMfr = cols[17]?.trim() ?? ''
+    const pcsModel = cols[18]?.trim() ?? ''
 
-    // col12が空の場合、BM〜BP列（code 64〜67）のパネルデータを使う
-    if (!panelKw && cols.length >= 65) {
-      panelKw = cols[64]?.trim() ?? ''
-      panelMfr = panelMfr || (cols[65]?.trim() ?? '')
-      pcsKw = cols[66]?.trim() ?? ''
-      pcsMfr = pcsMfr || (cols[67]?.trim() ?? '')
+    // col11が空の場合、末尾パネル列（54〜57）を使う
+    if (!panelKw && cols.length >= 55) {
+      panelKw = cols[54]?.trim() ?? ''
+      panelMfr = panelMfr || (cols[55]?.trim() ?? '')
+      pcsKw = cols[56]?.trim() ?? ''
+      pcsMfr = pcsMfr || (cols[57]?.trim() ?? '')
     }
 
     // 設置住所 = 都道府県 + 市区町村以降
-    const prefecture = cols[9]?.trim() ?? ''
-    const cityStreet = cols[10]?.trim() ?? ''
+    const prefecture = cols[8]?.trim() ?? ''
+    const cityStreet = cols[9]?.trim() ?? ''
     const siteAddress = [prefecture, cityStreet].filter(Boolean).join('')
-
-    // BD〜BL列（code 55〜63）の保守管理メモを収集して notes に追加
-    const legacyMemos = [55, 56, 57, 58, 59, 60, 61, 62, 63]
-      .map(i => cols[i]?.trim() ?? '')
-      .filter(Boolean)
-    const baseNotes = cols[46]?.trim() ?? ''
-    const combinedNotes = legacyMemos.length > 0
-      ? [baseNotes, '【旧メモ】' + legacyMemos.join(' / ')].filter(Boolean).join('\n')
-      : baseNotes
 
     const row: CsvImportRow = {
       customer_name: customerName,
       company_name: isCorporateName(customerName) ? customerName : '',
-      email: cols[3]?.trim() ?? '',
-      phone: cols[4]?.trim() ?? '',
-      postal_code: cols[5]?.trim() ?? '',
-      customer_address: cols[6]?.trim() ?? '',
+      email: cols[2]?.trim() ?? '',
+      phone: cols[3]?.trim() ?? '',
+      postal_code: cols[4]?.trim() ?? '',
+      customer_address: cols[5]?.trim() ?? '',
       project_name: projectName,
       project_number: '',
-      key_number: cols[45]?.trim() ?? '',
+      key_number: cols[44]?.trim() ?? '',
       site_address: siteAddress,
-      grid_id: cols[20]?.trim() ?? '',
-      grid_certified_at: cols[21]?.trim() ?? '',
-      fit_period: parseFitNum(cols[22]?.trim() ?? ''),
-      power_supply_start_date: cols[23]?.trim() ?? '',
+      grid_id: cols[19]?.trim() ?? '',
+      grid_certified_at: cols[20]?.trim() ?? '',
+      fit_period: parseFitNum(cols[21]?.trim() ?? ''),
+      power_supply_start_date: cols[22]?.trim() ?? '',
       fit_end_date: '',
-      generation_point_id: cols[25]?.trim() ?? '',
-      customer_number: cols[24]?.trim() ?? '',
-      handover_date: cols[35]?.trim() ?? '',
+      generation_point_id: cols[24]?.trim() ?? '',
+      customer_number: cols[23]?.trim() ?? '',
+      handover_date: cols[34]?.trim() ?? '',
       abolition_date: '',
-      sales_company: cols[32]?.trim() ?? '',
-      referrer: cols[33]?.trim() ?? '',
-      sales_price: cleanNumStr(cols[37]?.trim() ?? ''),
-      reference_price: cleanNumStr(cols[38]?.trim() ?? ''),
-      land_cost: cleanNumStr(cols[39]?.trim() ?? ''),
-      amuras_member_no: cols[47]?.trim() ?? '',
-      monitoring_system: cols[26]?.trim() ?? '',
-      notes: combinedNotes,
+      sales_company: cols[31]?.trim() ?? '',
+      referrer: cols[32]?.trim() ?? '',
+      sales_price: cleanNumStr(cols[36]?.trim() ?? ''),
+      reference_price: cleanNumStr(cols[37]?.trim() ?? ''),
+      land_cost: cleanNumStr(cols[38]?.trim() ?? ''),
+      amuras_member_no: cols[46]?.trim() ?? '',
+      monitoring_system: cols[25]?.trim() ?? '',
+      notes: cols[45]?.trim() ?? '',
       latitude: lat,
       longitude: lng,
       panel_kw: panelKw,

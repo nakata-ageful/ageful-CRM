@@ -67,10 +67,12 @@ export type Project = {
   created_at: string
 }
 
+export type MaintenancePlanLevel = 'なし' | '年1回' | '年2回' | '年3回' | '無制限'
+
 export type Contract = {
   id: number
   project_id: number
-  billing_method: string | null  // 請求書 / ROBOT
+  billing_method: string | null  // 請求書 / 口座振替
   billing_due_day: string | null // 例: "12月1日"
   billing_amount_ex: number | null
   billing_amount_inc: number | null
@@ -79,27 +81,58 @@ export type Contract = {
   land_cost_monthly: number | null
   insurance_fee: number | null
   other_fee: number | null
+  transfer_fee: number | null    // 振替手数料
   transfer_account: number | null
+  // 契約日
+  sale_contract_date: string | null       // 売買契約日
+  equipment_contract_date: string | null  // 設備契約日
+  land_contract_date: string | null       // 土地契約日
+  maintenance_contract_date: string | null // 保守契約日
+  // 販売経路
+  sales_to_neosys: string | null    // 販売店→ネオシス
+  neosys_to_referrer: string | null // ネオシス→紹介者
+  contractor_name: string | null    // 契約者名
+  // 請求回数
+  billing_count: number | null   // 年間請求回数（1=年1回, 2=年2回...）
+  // 保守委託
   subcontractor: string | null   // 委託先
   subcontract_fee_ex: number | null
   subcontract_fee_inc: number | null
   subcontract_billing_day: string | null
   subcontract_start_date: string | null
   maintenance_start_date: string | null
+  // 保守プラン
+  plan_inspection: MaintenancePlanLevel | null  // 点検
+  plan_weeding: MaintenancePlanLevel | null     // 除草
+  plan_emergency: MaintenancePlanLevel | null   // 駆けつけ
   notes: string | null
   created_at: string
 }
 
-export type AnnualRecordStatus = '未入金' | '請求済' | '入金済'
+export type AnnualRecordStatus = '' | '請求済' | '入金済'
+
+export type BillingLineItem = { name: string; amount: number }
+
+export type PaymentEntry = {
+  seq: number              // 第N回（1-based）
+  scheduled_date: string | null  // 請求予定日
+  billing_date: string | null    // 請求日
+  received_date: string | null   // 入金日
+}
 
 export type AnnualRecord = {
   id: number
   contract_id: number
   year: number
+  billing_scheduled_date: string | null  // 請求予定日
   billing_date: string | null   // 請求日
-  received_date: string | null  // 入金日
+  payment_due_date: string | null  // 入金予定日
+  received_date: string | null  // 入金日（単回の場合 or 最終入金日）
+  line_items: BillingLineItem[] | null   // 請求明細
+  payments: PaymentEntry[] | null  // 分割入金記録
   maintenance_record: string | null // 保守記録メモ
   escort_record: string | null  // 駆付記録
+  transfer_failed: boolean | null  // 振替不能フラグ（口座振替のみ）
   status: AnnualRecordStatus
 }
 
@@ -199,6 +232,8 @@ export type BillingDetail = {
   customer: Customer
   contract: Contract
   annualRecords: AnnualRecord[]
+  maintenanceResponses: MaintenanceResponse[]
+  periodicMaintenance: PeriodicMaintenance[]
 }
 
 // ──────────────────────────────────────────────────────────
@@ -217,7 +252,6 @@ export type CustomerInput = {
 
 export type MaintenanceResponseInput = {
   project_id: number
-  response_no: string
   inquiry_date: string
   occurrence_date: string
   target_area: string
@@ -241,6 +275,56 @@ export type AnnualRecordInput = {
   maintenance_record: string
   escort_record: string
   status: AnnualRecordStatus
+}
+
+// ──────────────────────────────────────────────────────────
+// Prospect types（見込み管理）
+// ──────────────────────────────────────────────────────────
+
+export type ProspectApplyStatus = '未' | '提出済' | '通過' | '不通' | '不可'
+export type ProspectContractStatus = '未' | '完了' | '不可'
+
+export type Prospect = {
+  id: number
+  customer_name: string
+  project_name: string
+  loan_company: string | null       // アプラス / ジャックス
+  equipment: number | null          // 設備費（円）
+  land_cost: number | null          // 土地費（円）
+  loan_amount: number | null        // 融資額（円）
+  apply_status: ProspectApplyStatus
+  contract_status: ProspectContractStatus
+  apply_tasks: Record<string, boolean>
+  contract_tasks: Record<string, boolean>
+  apply_sub_tasks: Record<string, Record<string, boolean>>
+  contract_sub_tasks: Record<string, Record<string, boolean>>
+  apply_memo: string | null
+  contract_memo: string | null
+  site_address: string | null
+  panel_kw: number | null
+  referrer: string | null
+  lead_date: string | null
+  apply_submit_date: string | null
+  apply_result_date: string | null
+  sale_contract_date: string | null
+  land_contract_date: string | null
+  handover_date: string | null
+  converted_customer_id: number | null
+  converted_at: string | null
+  created_at: string
+}
+
+export type ProspectInput = {
+  customer_name: string
+  project_name: string
+  loan_company: string
+  equipment: string
+  land_cost: string
+  loan_amount: string
+  site_address: string
+  panel_kw: string
+  referrer: string
+  lead_date: string
 }
 
 // ──────────────────────────────────────────────────────────
@@ -304,10 +388,50 @@ export type CsvImportRow = {
   land_cost_monthly?: string   // 土地賃料（col59）
   insurance_fee?: string       // 保険料（col60）
   other_fee?: string           // その他（col61）
+  transfer_fee?: string        // 振替手数料（col62）
   contract_notes?: string      // 契約備考（col63）
+  sale_contract_date?: string       // 売買契約日（col45）
+  equipment_contract_date?: string  // 設備契約日（col46）
+  land_contract_date?: string       // 土地契約日（col47）
+  maintenance_contract_date?: string // 保守契約日（col48）
+  sales_to_neosys?: string     // 販売店→ネオシス（col50）
+  neosys_to_referrer?: string  // ネオシス→紹介者（col51）
+  contractor_name?: string     // 契約者名（col52）
   maintenance_start_date?: string
   subcontractor?: string
   subcontract_fee_ex?: string
   subcontract_fee_inc?: string
   subcontract_start_date?: string
+}
+
+/** 請求CSVインポート行 */
+export type BillingImportRow = {
+  customer_name: string       // 事業主
+  project_name: string        // 案件名
+  billing_method: string      // 請求方法
+  billing_due_day: string     // 請求予定日
+  billing_amount_ex: string   // 請求金額(税別)
+  billing_amount_inc: string  // 請求金額(税込)
+  annual_maintenance_ex: string  // 年間保守料(税別)
+  annual_maintenance_inc: string // 年間保守料(税込)
+  land_cost_monthly: string   // 土地賃料
+  transfer_fee: string        // 振替手数料
+  insurance_fee: string       // 保険料
+  work_fee: string            // 作業費
+  notes: string               // 備考
+  maintenance_start: string   // 保守開始日/年
+  subcontractor: string       // 委託先
+  subcontract_fee_ex: string  // 委託料(税別)
+  subcontract_fee_inc: string // 委託料(税込)
+  subcontract_billing_day: string // 委託支払日
+  subcontract_start_date: string  // 委託開始日
+  auto_recovery: string       // 自動復旧
+  // 年度別データ
+  years: {
+    year: number
+    received_date: string      // 入金日
+    billing_date: string       // 請求日
+    maintenance_record: string // 保守記録
+    escort_record: string      // 駆付記録
+  }[]
 }

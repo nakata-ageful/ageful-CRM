@@ -3,6 +3,7 @@ import type { ProjectRow, Customer, CustomerInput } from '../types'
 import type { ProjectInput } from '../lib/actions'
 import { Modal } from '../components/Modal'
 import { createCustomer, createProject } from '../lib/actions'
+import { useToast } from '../components/Toast'
 
 type Props = {
   projects: ProjectRow[]
@@ -67,6 +68,7 @@ const emptyProjectForm: Omit<ProjectInput, 'customer_id'> = {
 }
 
 export function Projects({ projects, customers, onReload, onViewDetail }: Props) {
+  const toast = useToast()
   const [search, setSearch] = useState('')
   const [modal, setModal] = useState(false)
   const [customerMode, setCustomerMode] = useState<CustomerMode>('existing')
@@ -112,6 +114,7 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
       await createProject({ ...projectForm, customer_id: customerId })
       setModal(false)
       onReload()
+      toast('案件を追加しました')
     } catch (e) {
       setError(String(e))
     } finally {
@@ -142,7 +145,7 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
         <table>
           <thead>
             <tr>
-              <th>案件名</th><th>顧客</th><th>都道府県</th><th>FIT期間</th>
+              <th>案件名</th><th>顧客</th><th>都道府県</th><th>FIT</th>
               <th>委託先</th><th>引渡日</th><th>監視</th>
             </tr>
           </thead>
@@ -163,7 +166,7 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
                   }
                 </td>
                 <td>{p.site_prefecture ?? '-'}</td>
-                <td>{p.fit_period != null ? `${p.fit_period}年` : '-'}</td>
+                <td>{p.fit_period != null ? `${p.fit_period}円` : '-'}</td>
                 <td>{p.subcontractor ?? '-'}</td>
                 <td>{p.handover_date ?? '-'}</td>
                 <td>{p.monitoring_system ?? '-'}</td>
@@ -261,7 +264,7 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
               <input className="form-input" type="date" value={projectForm.grid_certified_at} onChange={pf('grid_certified_at')} />
             </label>
             <label className="form-label">
-              FIT期間（年）
+              FIT（円）
               <input className="form-input" type="number" min="0" value={projectForm.fit_period} onChange={pf('fit_period')} />
             </label>
             <label className="form-label">

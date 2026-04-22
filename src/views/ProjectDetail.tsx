@@ -1,12 +1,14 @@
 import { useState } from 'react'
-import type { ProjectDetail, AnnualRecordInput, PeriodicMaintenanceInput, MaintenanceResponseInput } from '../types'
+import type { ProjectDetail, AnnualRecordInput, PeriodicMaintenanceInput, MaintenanceResponseInput, MaintenancePlanLevel } from '../types'
 import { StatusBadge } from '../components/StatusBadge'
 import { Modal } from '../components/Modal'
 import {
   createMaintenanceResponse, deleteMaintenanceResponse,
   createPeriodicMaintenance, deletePeriodicMaintenance,
-  upsertAnnualRecord, updateAnnualRecordStatus, updateContract, updateProject,
+  upsertAnnualRecord, updateAnnualRecordStatus, deleteAnnualRecord, createContract, updateContract, updateProject,
 } from '../lib/actions'
+import { fmtYen } from '../lib/utils'
+import { useToast } from '../components/Toast'
 
 type Tab = '基本情報' | '保守対応' | '定期保守' | '請求'
 
@@ -21,13 +23,14 @@ type Props = {
 const WORK_TYPES = ['点検', '除草', '巡回', 'その他']
 
 export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, onViewMaintenance }: Props) {
+  const toast = useToast()
   const { project, customer, contract, annualRecords, maintenanceResponses, periodicMaintenance } = detail
   const [tab, setTab] = useState<Tab>('基本情報')
 
   // 保守対応フォーム
   const [mrModal, setMrModal] = useState(false)
   const [mrForm, setMrForm] = useState<Omit<MaintenanceResponseInput, 'project_id'>>({
-    response_no: '', inquiry_date: '', occurrence_date: '',
+    inquiry_date: '', occurrence_date: '',
     target_area: '', situation: '', response_content: '', report: '',
   })
 
@@ -46,7 +49,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
     received_date: '',
     maintenance_record: '',
     escort_record: '',
-    status: '未入金',
+    status: '',
   })
 
   // 案件基本情報編集フォーム
@@ -98,13 +101,32 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
   const [contractModal, setContractModal] = useState(false)
   const [contractForm, setContractForm] = useState({
     billing_method: contract?.billing_method ?? '',
+    billing_due_day: contract?.billing_due_day ?? '',
     billing_amount_ex: contract?.billing_amount_ex != null ? String(contract.billing_amount_ex) : '',
     billing_amount_inc: contract?.billing_amount_inc != null ? String(contract.billing_amount_inc) : '',
     annual_maintenance_ex: contract?.annual_maintenance_ex != null ? String(contract.annual_maintenance_ex) : '',
     annual_maintenance_inc: contract?.annual_maintenance_inc != null ? String(contract.annual_maintenance_inc) : '',
+    billing_count: contract?.billing_count != null ? String(contract.billing_count) : '',
+    land_cost_monthly: contract?.land_cost_monthly != null ? String(contract.land_cost_monthly) : '',
+    insurance_fee: contract?.insurance_fee != null ? String(contract.insurance_fee) : '',
+    other_fee: contract?.other_fee != null ? String(contract.other_fee) : '',
+    transfer_fee: contract?.transfer_fee != null ? String(contract.transfer_fee) : '',
+    sale_contract_date: contract?.sale_contract_date ?? '',
+    equipment_contract_date: contract?.equipment_contract_date ?? '',
+    land_contract_date: contract?.land_contract_date ?? '',
+    maintenance_contract_date: contract?.maintenance_contract_date ?? '',
+    sales_to_neosys: contract?.sales_to_neosys ?? '',
+    neosys_to_referrer: contract?.neosys_to_referrer ?? '',
+    contractor_name: contract?.contractor_name ?? '',
     subcontractor: contract?.subcontractor ?? '',
     subcontract_fee_ex: contract?.subcontract_fee_ex != null ? String(contract.subcontract_fee_ex) : '',
+    subcontract_fee_inc: contract?.subcontract_fee_inc != null ? String(contract.subcontract_fee_inc) : '',
+    subcontract_billing_day: contract?.subcontract_billing_day ?? '',
+    subcontract_start_date: contract?.subcontract_start_date ?? '',
     maintenance_start_date: contract?.maintenance_start_date ?? '',
+    plan_inspection: contract?.plan_inspection ?? '',
+    plan_weeding: contract?.plan_weeding ?? '',
+    plan_emergency: contract?.plan_emergency ?? '',
     notes: contract?.notes ?? '',
   })
 
@@ -126,6 +148,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       })
       setProjModal(false)
       onReload()
+      toast('案件情報を保存しました')
     } catch (e) { setErr(String(e)) } finally { setSaving(false) }
   }
 
@@ -184,6 +207,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       await createMaintenanceResponse({ ...mrForm, project_id: project.id })
       setMrModal(false)
       onReload()
+      toast('保守対応を追加しました')
     } catch (e) { setErr(String(e)) } finally { setSaving(false) }
   }
 
@@ -191,6 +215,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
     if (!confirm('この保守対応記録を削除しますか？')) return
     await deleteMaintenanceResponse(id)
     onReload()
+    toast('保守対応を削除しました')
   }
 
   // ── 定期保守 ─────────────────────────────────────────────
@@ -202,6 +227,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       await createPeriodicMaintenance({ ...pmForm, project_id: project.id })
       setPmModal(false)
       onReload()
+      toast('定期保守を追加しました')
     } catch (e) { setErr(String(e)) } finally { setSaving(false) }
   }
 
@@ -209,6 +235,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
     if (!confirm('この定期保守記録を削除しますか？')) return
     await deletePeriodicMaintenance(id)
     onReload()
+    toast('定期保守を削除しました')
   }
 
   // ── 年次記録 ─────────────────────────────────────────────
@@ -221,7 +248,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       received_date: existing?.received_date ?? '',
       maintenance_record: existing?.maintenance_record ?? '',
       escort_record: existing?.escort_record ?? '',
-      status: existing?.status ?? '未入金',
+      status: existing?.status ?? '',
     })
     setArModal(true)
     setErr('')
@@ -234,34 +261,66 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       await upsertAnnualRecord({ ...arForm, contract_id: contract.id })
       setArModal(false)
       onReload()
+      toast('年次記録を保存しました')
     } catch (e) { setErr(String(e)) } finally { setSaving(false) }
   }
 
-  async function handleARStatusChange(id: number, status: '未入金' | '請求済' | '入金済') {
+  async function handleARStatusChange(id: number, status: '' | '請求済' | '入金済') {
     await updateAnnualRecordStatus(id, status)
     onReload()
+  }
+
+  async function handleDeleteAR(id: number, year: number) {
+    if (!confirm(`${year}年度の年次記録を削除しますか？`)) return
+    await deleteAnnualRecord(id)
+    onReload()
+    toast(`${year}年度の年次記録を削除しました`)
   }
 
   // ── 契約 ─────────────────────────────────────────────────
 
   async function handleSaveContract() {
-    if (!contract) return
     setSaving(true); setErr('')
     try {
       const toNum = (v: string) => v ? parseInt(v.replace(/,/g, ''), 10) : null
-      await updateContract(contract.id, {
+      const payload = {
         billing_method: contractForm.billing_method || null,
+        billing_due_day: contractForm.billing_due_day || null,
         billing_amount_ex: toNum(contractForm.billing_amount_ex),
         billing_amount_inc: toNum(contractForm.billing_amount_inc),
         annual_maintenance_ex: toNum(contractForm.annual_maintenance_ex),
         annual_maintenance_inc: toNum(contractForm.annual_maintenance_inc),
+        billing_count: toNum(contractForm.billing_count),
+        land_cost_monthly: toNum(contractForm.land_cost_monthly),
+        insurance_fee: toNum(contractForm.insurance_fee),
+        other_fee: toNum(contractForm.other_fee),
+        transfer_fee: toNum(contractForm.transfer_fee),
+        sale_contract_date: contractForm.sale_contract_date || null,
+        equipment_contract_date: contractForm.equipment_contract_date || null,
+        land_contract_date: contractForm.land_contract_date || null,
+        maintenance_contract_date: contractForm.maintenance_contract_date || null,
+        sales_to_neosys: contractForm.sales_to_neosys || null,
+        neosys_to_referrer: contractForm.neosys_to_referrer || null,
+        contractor_name: contractForm.contractor_name || null,
         subcontractor: contractForm.subcontractor || null,
         subcontract_fee_ex: toNum(contractForm.subcontract_fee_ex),
+        subcontract_fee_inc: toNum(contractForm.subcontract_fee_inc),
+        subcontract_billing_day: contractForm.subcontract_billing_day || null,
+        subcontract_start_date: contractForm.subcontract_start_date || null,
         maintenance_start_date: contractForm.maintenance_start_date || null,
+        plan_inspection: (contractForm.plan_inspection || null) as MaintenancePlanLevel | null,
+        plan_weeding: (contractForm.plan_weeding || null) as MaintenancePlanLevel | null,
+        plan_emergency: (contractForm.plan_emergency || null) as MaintenancePlanLevel | null,
         notes: contractForm.notes || null,
-      })
+      }
+      if (contract) {
+        await updateContract(contract.id, payload)
+      } else {
+        await createContract(project.id, payload)
+      }
       setContractModal(false)
       onReload()
+      toast(contract ? '契約情報を保存しました' : '契約情報を作成しました')
     } catch (e) { setErr(String(e)) } finally { setSaving(false) }
   }
 
@@ -309,7 +368,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             <div className="info-field" style={{ gridColumn: '1/-1' }}><span>設置住所</span><b>{project.site_address ?? '-'}</b></div>
             <div className="info-field"><span>系統ID</span><b>{project.grid_id ?? '-'}</b></div>
             <div className="info-field"><span>系統認定日</span><b>{project.grid_certified_at ?? '-'}</b></div>
-            <div className="info-field"><span>FIT期間</span><b>{project.fit_period != null ? `${project.fit_period}年` : '-'}</b></div>
+            <div className="info-field"><span>FIT</span><b>{project.fit_period != null ? `${project.fit_period}円` : '-'}</b></div>
             <div className="info-field"><span>給電開始日</span><b>{project.power_supply_start_date ?? '-'}</b></div>
             <div className="info-field"><span>お客さま番号</span><b>{project.customer_number ?? '-'}</b></div>
             <div className="info-field"><span>発電地点特定番号</span><b>{project.generation_point_id ?? '-'}</b></div>
@@ -326,8 +385,8 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             <div className="info-field"><span>紹介者</span><b>{project.referrer ?? '-'}</b></div>
             <div className="info-field"><span>電力変更日</span><b>{project.power_change_date ?? '-'}</b></div>
             <div className="info-field"><span>引渡日</span><b>{project.handover_date ?? '-'}</b></div>
-            <div className="info-field"><span>販売価格（税込）</span><b>{project.sales_price != null ? `¥${project.sales_price.toLocaleString()}` : '-'}</b></div>
-            <div className="info-field"><span>土地代</span><b>{project.land_cost != null ? `¥${project.land_cost.toLocaleString()}` : '-'}</b></div>
+            <div className="info-field"><span>販売価格（税込）</span><b>{fmtYen(project.sales_price)}</b></div>
+            <div className="info-field"><span>土地代</span><b>{fmtYen(project.land_cost)}</b></div>
             <div className="info-field"><span>アムラス会員番号</span><b>{project.amuras_member_no ?? '-'}</b></div>
             <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap' }}>{project.notes || '-'}</b></div>
           </div>
@@ -339,7 +398,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
         <div className="card">
           <div className="card-header-row">
             <h3 className="section-title" style={{ margin: 0 }}>保守対応記録</h3>
-            <button className="btn btn-main btn-sm" onClick={() => { setMrForm({ response_no: '', inquiry_date: '', occurrence_date: '', target_area: '', situation: '', response_content: '', report: '' }); setErr(''); setMrModal(true) }}>
+            <button className="btn btn-main btn-sm" onClick={() => { setMrForm({ inquiry_date: '', occurrence_date: '', target_area: '', situation: '', response_content: '', report: '' }); setErr(''); setMrModal(true) }}>
               ＋ 追加
             </button>
           </div>
@@ -369,36 +428,144 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       )}
 
       {/* ── 定期保守 ── */}
-      {tab === '定期保守' && (
-        <div className="card">
-          <div className="card-header-row">
-            <h3 className="section-title" style={{ margin: 0 }}>定期保守記録</h3>
-            <button className="btn btn-main btn-sm" onClick={() => { setPmForm({ record_date: '', work_type: '点検', content: '' }); setErr(''); setPmModal(true) }}>
-              ＋ 追加
-            </button>
-          </div>
-          <table>
-            <thead>
-              <tr><th>記録日</th><th>作業種別</th><th>内容</th><th>操作</th></tr>
-            </thead>
-            <tbody>
-              {periodicMaintenance.length === 0 && (
-                <tr><td colSpan={4} className="empty-cell">定期保守記録がありません</td></tr>
+      {tab === '定期保守' && (() => {
+        const currentYear = new Date().getFullYear()
+        const categories: { key: string; label: string; planField: 'plan_inspection' | 'plan_weeding' | 'plan_emergency' }[] = [
+          { key: '点検', label: '点検', planField: 'plan_inspection' },
+          { key: '除草', label: '除草', planField: 'plan_weeding' },
+          { key: '巡回', label: '巡回（駆けつけ）', planField: 'plan_emergency' },
+        ]
+        const otherRecords = periodicMaintenance.filter(m => !['点検', '除草', '巡回'].includes(m.work_type ?? ''))
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* プラン概要 */}
+            {contract && (contract.plan_inspection || contract.plan_weeding || contract.plan_emergency) && (
+              <div className="card" style={{ padding: '16px 20px' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 12 }}>保守プラン（{currentYear}年度 実施状況）</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                  {categories.map(cat => {
+                    const plan = contract[cat.planField]
+                    if (!plan) return null
+                    const records = periodicMaintenance.filter(m => m.work_type === cat.key && m.record_date.startsWith(String(currentYear)))
+                    const count = records.length
+                    const limit = plan === '無制限' ? null : plan === '年1回' ? 1 : 0
+                    const isDone = limit !== null && limit > 0 && count >= limit
+                    const isNone = plan === 'なし'
+                    return (
+                      <div key={cat.key} style={{
+                        background: isNone ? '#f8fafc' : isDone ? '#ecfdf5' : '#fffbeb',
+                        borderRadius: 8,
+                        padding: '12px 14px',
+                        borderLeft: `3px solid ${isNone ? '#cbd5e1' : isDone ? '#10b981' : '#f59e0b'}`,
+                      }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>{cat.label}</div>
+                        <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>契約: {plan}</div>
+                        {!isNone && (
+                          <div style={{ fontSize: 20, fontWeight: 800, color: isDone ? '#059669' : '#d97706' }}>
+                            {count}{limit !== null ? <span style={{ fontSize: 13, fontWeight: 500, color: '#94a3b8' }}> / {limit}回</span> : <span style={{ fontSize: 13, fontWeight: 500, color: '#94a3b8' }}>回</span>}
+                          </div>
+                        )}
+                        {isNone && <div style={{ fontSize: 13, color: '#94a3b8' }}>—</div>}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* カテゴリ別記録（縦カラム） */}
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${categories.filter(cat => {
+              const plan = contract?.[cat.planField]
+              const records = periodicMaintenance.filter(m => m.work_type === cat.key)
+              return records.length > 0 || (plan && plan !== 'なし')
+            }).length + (otherRecords.length > 0 ? 1 : 0)}, 1fr)`, gap: 12, alignItems: 'start' }}>
+              {categories.map(cat => {
+                const records = periodicMaintenance
+                  .filter(m => m.work_type === cat.key)
+                  .sort((a, b) => b.record_date.localeCompare(a.record_date))
+                const plan = contract?.[cat.planField]
+                if (records.length === 0 && (!plan || plan === 'なし')) return null
+                const thisYearCount = records.filter(r => r.record_date.startsWith(String(currentYear))).length
+                return (
+                  <div className="card" key={cat.key} style={{ margin: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>{cat.label}</div>
+                        {plan && plan !== 'なし' && (
+                          <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                            {currentYear}年: {thisYearCount}回 / 契約: {plan}
+                          </div>
+                        )}
+                      </div>
+                      <button className="btn btn-main btn-sm" onClick={() => { setPmForm({ record_date: '', work_type: cat.key, content: '' }); setErr(''); setPmModal(true) }}>
+                        ＋
+                      </button>
+                    </div>
+                    {records.length === 0 ? (
+                      <p className="empty-cell" style={{ padding: '12px 0' }}>記録なし</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {records.map(m => (
+                          <div key={m.id} style={{
+                            background: m.record_date.startsWith(String(currentYear)) ? '#f0fdf4' : '#f8fafc',
+                            borderRadius: 6,
+                            padding: '8px 10px',
+                            borderLeft: `3px solid ${m.record_date.startsWith(String(currentYear)) ? '#22c55e' : '#cbd5e1'}`,
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>
+                                {m.record_date}
+                                {m.record_date.startsWith(String(currentYear)) && (
+                                  <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: '#0ea5e9', background: '#f0f9ff', borderRadius: 4, padding: '1px 5px' }}>
+                                    #{records.filter(r => r.record_date.startsWith(String(currentYear)) && r.record_date <= m.record_date).length}
+                                  </span>
+                                )}
+                              </span>
+                              <button className="btn-icon" title="削除" onClick={() => handleDeletePM(m.id)} style={{ fontSize: 12 }}>🗑</button>
+                            </div>
+                            {m.content && <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>{m.content}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+
+              {/* その他 */}
+              {(otherRecords.length > 0) && (
+                <div className="card" style={{ margin: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>その他</div>
+                    <button className="btn btn-main btn-sm" onClick={() => { setPmForm({ record_date: '', work_type: 'その他', content: '' }); setErr(''); setPmModal(true) }}>
+                      ＋
+                    </button>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {otherRecords.sort((a, b) => b.record_date.localeCompare(a.record_date)).map(m => (
+                      <div key={m.id} style={{
+                        background: '#f8fafc',
+                        borderRadius: 6,
+                        padding: '8px 10px',
+                        borderLeft: '3px solid #a78bfa',
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>
+                            {m.record_date}
+                            <span style={{ marginLeft: 6, fontSize: 10, color: '#8b5cf6', background: '#f5f3ff', borderRadius: 4, padding: '1px 5px' }}>{m.work_type}</span>
+                          </span>
+                          <button className="btn-icon" title="削除" onClick={() => handleDeletePM(m.id)} style={{ fontSize: 12 }}>🗑</button>
+                        </div>
+                        {m.content && <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>{m.content}</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
-              {periodicMaintenance.map(m => (
-                <tr key={m.id}>
-                  <td>{m.record_date}</td>
-                  <td>{m.work_type ?? '-'}</td>
-                  <td>{m.content ?? '-'}</td>
-                  <td>
-                    <button className="btn-icon" title="削除" onClick={() => handleDeletePM(m.id)}>🗑</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ── 請求 ── */}
       {tab === '請求' && (
@@ -409,13 +576,32 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               {contract && (
                 <button className="btn btn-sub btn-sm" onClick={() => { setContractForm({
                   billing_method: contract.billing_method ?? '',
+                  billing_due_day: contract.billing_due_day ?? '',
                   billing_amount_ex: contract.billing_amount_ex != null ? String(contract.billing_amount_ex) : '',
                   billing_amount_inc: contract.billing_amount_inc != null ? String(contract.billing_amount_inc) : '',
                   annual_maintenance_ex: contract.annual_maintenance_ex != null ? String(contract.annual_maintenance_ex) : '',
                   annual_maintenance_inc: contract.annual_maintenance_inc != null ? String(contract.annual_maintenance_inc) : '',
+                  billing_count: contract.billing_count != null ? String(contract.billing_count) : '',
+                  land_cost_monthly: contract.land_cost_monthly != null ? String(contract.land_cost_monthly) : '',
+                  insurance_fee: contract.insurance_fee != null ? String(contract.insurance_fee) : '',
+                  other_fee: contract.other_fee != null ? String(contract.other_fee) : '',
+                  transfer_fee: contract.transfer_fee != null ? String(contract.transfer_fee) : '',
+                  sale_contract_date: contract.sale_contract_date ?? '',
+                  equipment_contract_date: contract.equipment_contract_date ?? '',
+                  land_contract_date: contract.land_contract_date ?? '',
+                  maintenance_contract_date: contract.maintenance_contract_date ?? '',
+                  sales_to_neosys: contract.sales_to_neosys ?? '',
+                  neosys_to_referrer: contract.neosys_to_referrer ?? '',
+                  contractor_name: contract.contractor_name ?? '',
                   subcontractor: contract.subcontractor ?? '',
                   subcontract_fee_ex: contract.subcontract_fee_ex != null ? String(contract.subcontract_fee_ex) : '',
+                  subcontract_fee_inc: contract.subcontract_fee_inc != null ? String(contract.subcontract_fee_inc) : '',
+                  subcontract_billing_day: contract.subcontract_billing_day ?? '',
+                  subcontract_start_date: contract.subcontract_start_date ?? '',
                   maintenance_start_date: contract.maintenance_start_date ?? '',
+                  plan_inspection: contract.plan_inspection ?? '',
+                  plan_weeding: contract.plan_weeding ?? '',
+                  plan_emergency: contract.plan_emergency ?? '',
                   notes: contract.notes ?? '',
                 }); setErr(''); setContractModal(true) }}>
                   編集
@@ -423,18 +609,57 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               )}
             </div>
             {!contract ? (
-              <p className="empty-cell">契約情報がありません</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0' }}>
+                <p className="empty-cell" style={{ margin: 0 }}>契約情報がありません</p>
+                <button className="btn btn-sub btn-sm" onClick={() => {
+                  setContractForm({
+                    billing_method: '', billing_due_day: '',
+                    billing_amount_ex: '', billing_amount_inc: '',
+                    annual_maintenance_ex: '', annual_maintenance_inc: '',
+                    billing_count: '',
+                    land_cost_monthly: '', insurance_fee: '', other_fee: '',
+                    transfer_fee: '',
+                    sale_contract_date: '', equipment_contract_date: '',
+                    land_contract_date: '', maintenance_contract_date: '',
+                    sales_to_neosys: '', neosys_to_referrer: '',
+                    contractor_name: '', subcontractor: '',
+                    subcontract_fee_ex: '', subcontract_fee_inc: '',
+                    subcontract_billing_day: '', subcontract_start_date: '',
+                    maintenance_start_date: '',
+                    plan_inspection: '', plan_weeding: '', plan_emergency: '',
+                    notes: '',
+                  }); setErr(''); setContractModal(true)
+                }}>＋ 契約情報を追加</button>
+              </div>
             ) : (
               <div className="info-grid">
                 <div className="info-field"><span>請求方法</span><b>{contract.billing_method ?? '-'}</b></div>
-                <div className="info-field"><span>年次保守料（税抜）</span><b>{contract.annual_maintenance_ex != null ? `¥${contract.annual_maintenance_ex.toLocaleString()}` : '-'}</b></div>
-                <div className="info-field"><span>年次保守料（税込）</span><b>{contract.annual_maintenance_inc != null ? `¥${contract.annual_maintenance_inc.toLocaleString()}` : '-'}</b></div>
-                <div className="info-field"><span>請求額（税抜）</span><b>{contract.billing_amount_ex != null ? `¥${contract.billing_amount_ex.toLocaleString()}` : '-'}</b></div>
-                <div className="info-field"><span>請求額（税込）</span><b>{contract.billing_amount_inc != null ? `¥${contract.billing_amount_inc.toLocaleString()}` : '-'}</b></div>
-                <div className="info-field"><span>委託先</span><b>{contract.subcontractor ?? '-'}</b></div>
-                <div className="info-field"><span>委託料（税抜）</span><b>{contract.subcontract_fee_ex != null ? `¥${contract.subcontract_fee_ex.toLocaleString()}` : '-'}</b></div>
+                <div className="info-field"><span>請求予定日</span><b>{contract.billing_due_day ?? '-'}</b></div>
+                <div className="info-field"><span>年次保守料（税抜）</span><b>{fmtYen(contract.annual_maintenance_ex)}</b></div>
+                <div className="info-field"><span>年次保守料（税込）</span><b>{fmtYen(contract.annual_maintenance_inc)}</b></div>
+                <div className="info-field"><span>請求額（税抜）</span><b>{fmtYen(contract.billing_amount_ex)}</b></div>
+                <div className="info-field"><span>請求額（税込）</span><b>{fmtYen(contract.billing_amount_inc)}</b></div>
+                <div className="info-field"><span>土地賃料（月額）</span><b>{fmtYen(contract.land_cost_monthly)}</b></div>
+                <div className="info-field"><span>保険料</span><b>{fmtYen(contract.insurance_fee)}</b></div>
+                <div className="info-field"><span>その他費用</span><b>{fmtYen(contract.other_fee)}</b></div>
+                <div className="info-field"><span>振替手数料</span><b>{fmtYen(contract.transfer_fee)}</b></div>
+                <div className="info-field"><span>売買契約日</span><b>{contract.sale_contract_date ?? '-'}</b></div>
+                <div className="info-field"><span>設備契約日</span><b>{contract.equipment_contract_date ?? '-'}</b></div>
+                <div className="info-field"><span>土地契約日</span><b>{contract.land_contract_date ?? '-'}</b></div>
+                <div className="info-field"><span>保守契約日</span><b>{contract.maintenance_contract_date ?? '-'}</b></div>
+                <div className="info-field"><span>販売店→ネオシス</span><b>{contract.sales_to_neosys ?? '-'}</b></div>
+                <div className="info-field"><span>ネオシス→紹介者</span><b>{contract.neosys_to_referrer ?? '-'}</b></div>
+                <div className="info-field"><span>契約者名</span><b>{contract.contractor_name ?? '-'}</b></div>
+                <div className="info-field"><span>保守委託先</span><b>{contract.subcontractor ?? '-'}</b></div>
+                <div className="info-field"><span>委託料（税抜）</span><b>{fmtYen(contract.subcontract_fee_ex)}</b></div>
+                <div className="info-field"><span>委託料（税込）</span><b>{fmtYen(contract.subcontract_fee_inc)}</b></div>
+                <div className="info-field"><span>委託請求日</span><b>{contract.subcontract_billing_day ?? '-'}</b></div>
+                <div className="info-field"><span>委託開始日</span><b>{contract.subcontract_start_date ?? '-'}</b></div>
                 <div className="info-field"><span>保守開始日</span><b>{contract.maintenance_start_date ?? '-'}</b></div>
-                {contract.notes && <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b>{contract.notes}</b></div>}
+                <div className="info-field"><span>点検プラン</span><b>{contract.plan_inspection ?? '-'}</b></div>
+                <div className="info-field"><span>除草プラン</span><b>{contract.plan_weeding ?? '-'}</b></div>
+                <div className="info-field"><span>駆けつけプラン</span><b>{contract.plan_emergency ?? '-'}</b></div>
+                {contract.notes && <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap' }}>{contract.notes}</b></div>}
               </div>
             )}
           </div>
@@ -448,11 +673,11 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             </div>
             <table>
               <thead>
-                <tr><th>年度</th><th>請求日</th><th>入金日</th><th>状態</th><th>変更</th></tr>
+                <tr><th>年度</th><th>請求日</th><th>入金日</th><th>状態</th><th>変更</th><th></th></tr>
               </thead>
               <tbody>
                 {annualRecords.length === 0 && (
-                  <tr><td colSpan={5} className="empty-cell">年次記録がありません</td></tr>
+                  <tr><td colSpan={6} className="empty-cell">年次記録がありません</td></tr>
                 )}
                 {annualRecords.sort((a, b) => b.year - a.year).map(r => (
                   <tr key={r.id}>
@@ -464,13 +689,22 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                       <select
                         className="status-select"
                         value={r.status}
-                        onChange={e => handleARStatusChange(r.id, e.target.value as '未入金' | '請求済' | '入金済')}
+                        onChange={e => handleARStatusChange(r.id, e.target.value as '' | '請求済' | '入金済')}
                         onClick={e => e.stopPropagation()}
                       >
-                        <option value="未入金">未入金</option>
+                        <option value="">—</option>
                         <option value="請求済">請求済</option>
                         <option value="入金済">入金済</option>
                       </select>
+                    </td>
+                    <td>
+                      <button
+                        className="btn btn-danger btn-sm"
+                        style={{ fontSize: 11, padding: '2px 8px' }}
+                        onClick={() => handleDeleteAR(r.id, r.year)}
+                      >
+                        削除
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -485,10 +719,6 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
         <Modal title="保守対応記録を追加" onClose={() => setMrModal(false)}>
           {err && <div className="form-error">{err}</div>}
           <div className="form-grid">
-            <label className="form-label">
-              管理番号
-              <input className="form-input" value={mrForm.response_no} onChange={e => setMrForm(f => ({ ...f, response_no: e.target.value }))} />
-            </label>
             <label className="form-label">
               問合日
               <input className="form-input" type="date" value={mrForm.inquiry_date} onChange={e => setMrForm(f => ({ ...f, inquiry_date: e.target.value }))} />
@@ -559,8 +789,8 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             </label>
             <label className="form-label">
               状態
-              <select className="form-select" value={arForm.status} onChange={e => setArForm(f => ({ ...f, status: e.target.value as '未入金' | '請求済' | '入金済' }))}>
-                <option value="未入金">未入金</option>
+              <select className="form-select" value={arForm.status} onChange={e => setArForm(f => ({ ...f, status: e.target.value as '' | '請求済' | '入金済' }))}>
+                <option value="">—</option>
                 <option value="請求済">請求済</option>
                 <option value="入金済">入金済</option>
               </select>
@@ -594,41 +824,191 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
         <Modal title="契約情報を編集" onClose={() => setContractModal(false)}>
           {err && <div className="form-error">{err}</div>}
           <div className="form-grid">
+            <p style={{ gridColumn: '1/-1', margin: '0 0 4px', fontWeight: 600, fontSize: 13, color: '#475569' }}>── 請求情報</p>
             <label className="form-label">
               請求方法
               <select className="form-select" value={contractForm.billing_method} onChange={e => setContractForm(f => ({ ...f, billing_method: e.target.value }))}>
                 <option value="">-</option>
                 <option value="請求書">請求書</option>
-                <option value="ROBOT">ROBOT</option>
+                <option value="口座振替">口座振替</option>
               </select>
             </label>
+            <label className="form-label">
+              請求予定日
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <select className="form-select" value={contractForm.billing_due_day.match(/(\d{1,2})月/)?.[1] ?? ''} onChange={e => {
+                  const day = contractForm.billing_due_day.match(/(\d{1,2})日/)?.[1] ?? '1'
+                  setContractForm(f => ({ ...f, billing_due_day: e.target.value ? `${e.target.value}月${day}日` : '' }))
+                }}>
+                  <option value="">月</option>
+                  {Array.from({ length: 12 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}月</option>)}
+                </select>
+                <select className="form-select" value={contractForm.billing_due_day.match(/(\d{1,2})日/)?.[1] ?? ''} onChange={e => {
+                  const month = contractForm.billing_due_day.match(/(\d{1,2})月/)?.[1] ?? '1'
+                  setContractForm(f => ({ ...f, billing_due_day: e.target.value ? `${month}月${e.target.value}日` : '' }))
+                }}>
+                  <option value="">日</option>
+                  {Array.from({ length: 31 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}日</option>)}
+                </select>
+              </div>
+            </label>
+            <label className="form-label">
+              年次保守料（税抜）
+              <input className="form-input" type="number" value={contractForm.annual_maintenance_ex} onChange={e => {
+                const v = e.target.value
+                const incVal = v ? String(Math.round(Number(v) * 1.1)) : ''
+                setContractForm(f => {
+                  const count = Number(f.billing_count) || 1
+                  const billingInc = incVal ? String(Math.round(Number(incVal) / count)) : ''
+                  const billingEx = billingInc ? String(Math.round(Number(billingInc) / 1.1)) : ''
+                  return { ...f, annual_maintenance_ex: v, annual_maintenance_inc: incVal, billing_amount_inc: billingInc, billing_amount_ex: billingEx }
+                })
+              }} />
+            </label>
+            <label className="form-label">
+              年次保守料（税込）
+              <input className="form-input" type="number" value={contractForm.annual_maintenance_inc} onChange={e => {
+                const v = e.target.value
+                const exVal = v ? String(Math.round(Number(v) / 1.1)) : ''
+                setContractForm(f => {
+                  const count = Number(f.billing_count) || 1
+                  const billingInc = v ? String(Math.round(Number(v) / count)) : ''
+                  const billingEx = billingInc ? String(Math.round(Number(billingInc) / 1.1)) : ''
+                  return { ...f, annual_maintenance_inc: v, annual_maintenance_ex: exVal, billing_amount_inc: billingInc, billing_amount_ex: billingEx }
+                })
+              }} />
+            </label>
+            <label className="form-label">
+              請求回数（年間）
+              <input className="form-input" type="number" value={contractForm.billing_count} onChange={e => {
+                const v = e.target.value
+                setContractForm(f => {
+                  const count = Number(v) || 1
+                  const annualInc = Number(f.annual_maintenance_inc) || 0
+                  const billingInc = annualInc ? String(Math.round(annualInc / count)) : ''
+                  const billingEx = billingInc ? String(Math.round(Number(billingInc) / 1.1)) : ''
+                  return { ...f, billing_count: v, billing_amount_inc: billingInc, billing_amount_ex: billingEx }
+                })
+              }} />
+            </label>
+            <label className="form-label">
+              請求額（税込/回）※自動計算
+              <input className="form-input" type="number" value={contractForm.billing_amount_inc} onChange={e => {
+                const v = e.target.value
+                setContractForm(f => ({ ...f, billing_amount_inc: v, billing_amount_ex: v ? String(Math.round(Number(v) / 1.1)) : '' }))
+              }} />
+            </label>
+            <label className="form-label">
+              請求額（税抜/回）※自動計算
+              <input className="form-input" type="number" value={contractForm.billing_amount_ex} onChange={e => {
+                const v = e.target.value
+                setContractForm(f => ({ ...f, billing_amount_ex: v, billing_amount_inc: v ? String(Math.round(Number(v) * 1.1)) : '' }))
+              }} />
+            </label>
+            <label className="form-label">
+              土地賃料（月額）
+              <input className="form-input" type="number" value={contractForm.land_cost_monthly} onChange={e => setContractForm(f => ({ ...f, land_cost_monthly: e.target.value }))} />
+            </label>
+            <label className="form-label">
+              保険料
+              <input className="form-input" type="number" value={contractForm.insurance_fee} onChange={e => setContractForm(f => ({ ...f, insurance_fee: e.target.value }))} />
+            </label>
+            <label className="form-label">
+              その他費用
+              <input className="form-input" type="number" value={contractForm.other_fee} onChange={e => setContractForm(f => ({ ...f, other_fee: e.target.value }))} />
+            </label>
+            <label className="form-label">
+              振替手数料
+              <input className="form-input" type="number" value={contractForm.transfer_fee} onChange={e => setContractForm(f => ({ ...f, transfer_fee: e.target.value }))} />
+            </label>
+            <p style={{ gridColumn: '1/-1', margin: '8px 0 4px', fontWeight: 600, fontSize: 13, color: '#475569' }}>── 契約日</p>
+            <label className="form-label">
+              売買契約日
+              <input className="form-input" type="date" value={contractForm.sale_contract_date} onChange={e => setContractForm(f => ({ ...f, sale_contract_date: e.target.value }))} />
+            </label>
+            <label className="form-label">
+              設備契約日
+              <input className="form-input" type="date" value={contractForm.equipment_contract_date} onChange={e => setContractForm(f => ({ ...f, equipment_contract_date: e.target.value }))} />
+            </label>
+            <label className="form-label">
+              土地契約日
+              <input className="form-input" type="date" value={contractForm.land_contract_date} onChange={e => setContractForm(f => ({ ...f, land_contract_date: e.target.value }))} />
+            </label>
+            <label className="form-label">
+              保守契約日
+              <input className="form-input" type="date" value={contractForm.maintenance_contract_date} onChange={e => setContractForm(f => ({ ...f, maintenance_contract_date: e.target.value }))} />
+            </label>
+            <p style={{ gridColumn: '1/-1', margin: '8px 0 4px', fontWeight: 600, fontSize: 13, color: '#475569' }}>── 販売経路</p>
+            <label className="form-label">
+              販売店→ネオシス
+              <input className="form-input" value={contractForm.sales_to_neosys} onChange={e => setContractForm(f => ({ ...f, sales_to_neosys: e.target.value }))} />
+            </label>
+            <label className="form-label">
+              ネオシス→紹介者
+              <input className="form-input" value={contractForm.neosys_to_referrer} onChange={e => setContractForm(f => ({ ...f, neosys_to_referrer: e.target.value }))} />
+            </label>
+            <label className="form-label">
+              契約者名
+              <input className="form-input" value={contractForm.contractor_name} onChange={e => setContractForm(f => ({ ...f, contractor_name: e.target.value }))} />
+            </label>
+            <p style={{ gridColumn: '1/-1', margin: '8px 0 4px', fontWeight: 600, fontSize: 13, color: '#475569' }}>── 保守委託情報</p>
             <label className="form-label">
               保守開始日
               <input className="form-input" type="date" value={contractForm.maintenance_start_date} onChange={e => setContractForm(f => ({ ...f, maintenance_start_date: e.target.value }))} />
             </label>
             <label className="form-label">
-              年次保守料（税抜）
-              <input className="form-input" type="number" value={contractForm.annual_maintenance_ex} onChange={e => setContractForm(f => ({ ...f, annual_maintenance_ex: e.target.value }))} />
-            </label>
-            <label className="form-label">
-              年次保守料（税込）
-              <input className="form-input" type="number" value={contractForm.annual_maintenance_inc} onChange={e => setContractForm(f => ({ ...f, annual_maintenance_inc: e.target.value }))} />
-            </label>
-            <label className="form-label">
-              請求額（税抜）
-              <input className="form-input" type="number" value={contractForm.billing_amount_ex} onChange={e => setContractForm(f => ({ ...f, billing_amount_ex: e.target.value }))} />
-            </label>
-            <label className="form-label">
-              請求額（税込）
-              <input className="form-input" type="number" value={contractForm.billing_amount_inc} onChange={e => setContractForm(f => ({ ...f, billing_amount_inc: e.target.value }))} />
-            </label>
-            <label className="form-label">
-              委託先
+              保守委託先
               <input className="form-input" value={contractForm.subcontractor} onChange={e => setContractForm(f => ({ ...f, subcontractor: e.target.value }))} />
             </label>
             <label className="form-label">
               委託料（税抜）
-              <input className="form-input" type="number" value={contractForm.subcontract_fee_ex} onChange={e => setContractForm(f => ({ ...f, subcontract_fee_ex: e.target.value }))} />
+              <input className="form-input" type="number" value={contractForm.subcontract_fee_ex} onChange={e => {
+                const v = e.target.value
+                setContractForm(f => ({ ...f, subcontract_fee_ex: v, subcontract_fee_inc: v ? String(Math.round(Number(v) * 1.1)) : '' }))
+              }} />
+            </label>
+            <label className="form-label">
+              委託料（税込）
+              <input className="form-input" type="number" value={contractForm.subcontract_fee_inc} onChange={e => {
+                const v = e.target.value
+                setContractForm(f => ({ ...f, subcontract_fee_inc: v, subcontract_fee_ex: v ? String(Math.round(Number(v) / 1.1)) : '' }))
+              }} />
+            </label>
+            <label className="form-label">
+              委託請求日
+              <input className="form-input" value={contractForm.subcontract_billing_day} onChange={e => setContractForm(f => ({ ...f, subcontract_billing_day: e.target.value }))} placeholder="例: 毎月末" />
+            </label>
+            <label className="form-label">
+              委託開始日
+              <input className="form-input" type="date" value={contractForm.subcontract_start_date} onChange={e => setContractForm(f => ({ ...f, subcontract_start_date: e.target.value }))} />
+            </label>
+            <p style={{ gridColumn: '1/-1', margin: '8px 0 4px', fontWeight: 600, fontSize: 13, color: '#475569' }}>── 保守プラン</p>
+            <label className="form-label">
+              点検
+              <select className="form-select" value={contractForm.plan_inspection} onChange={e => setContractForm(f => ({ ...f, plan_inspection: e.target.value }))}>
+                <option value="">-</option>
+                <option value="なし">なし</option>
+                <option value="年1回">年1回</option>
+              </select>
+            </label>
+            <label className="form-label">
+              除草
+              <select className="form-select" value={contractForm.plan_weeding} onChange={e => setContractForm(f => ({ ...f, plan_weeding: e.target.value }))}>
+                <option value="">-</option>
+                <option value="なし">なし</option>
+                <option value="年1回">年1回</option>
+                <option value="年2回">年2回</option>
+                <option value="年3回">年3回</option>
+              </select>
+            </label>
+            <label className="form-label">
+              駆けつけ
+              <select className="form-select" value={contractForm.plan_emergency} onChange={e => setContractForm(f => ({ ...f, plan_emergency: e.target.value }))}>
+                <option value="">-</option>
+                <option value="なし">なし</option>
+                <option value="年1回">年1回</option>
+                <option value="無制限">無制限</option>
+              </select>
             </label>
             <label className="form-label" style={{ gridColumn: '1/-1' }}>
               備考
@@ -720,7 +1100,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               <input className="form-input" type="date" value={projForm.grid_certified_at} onChange={e => setProjForm(f => ({ ...f, grid_certified_at: e.target.value }))} />
             </label>
             <label className="form-label">
-              FIT期間（年）
+              FIT（円）
               <input className="form-input" type="number" value={projForm.fit_period} onChange={e => setProjForm(f => ({ ...f, fit_period: e.target.value }))} />
             </label>
             <label className="form-label">

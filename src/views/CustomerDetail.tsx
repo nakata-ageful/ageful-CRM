@@ -3,6 +3,8 @@ import type { CustomerDetailData, CustomerInput } from '../types'
 import type { ProjectInput } from '../lib/actions'
 import { Modal } from '../components/Modal'
 import { createProject, updateCustomer, uploadAttachment, deleteAttachment } from '../lib/actions'
+import { fmtDate } from '../lib/utils'
+import { useToast } from '../components/Toast'
 
 type Props = {
   detail: CustomerDetailData
@@ -25,6 +27,7 @@ const emptyProject: Omit<ProjectInput, 'customer_id'> = {
 }
 
 export function CustomerDetailView({ detail, onBack, onReload, onViewProject }: Props) {
+  const toast = useToast()
   const { customer, projects, attachments } = detail
 
   const [editModal, setEditModal] = useState(false)
@@ -59,6 +62,7 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject }: 
       await updateCustomer(customer.id, editForm)
       setEditModal(false)
       onReload()
+      toast('顧客情報を保存しました')
     } catch (e) { setError(String(e)) } finally { setSaving(false) }
   }
 
@@ -69,6 +73,7 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject }: 
       await createProject({ ...projectForm, customer_id: customer.id })
       setProjectModal(false)
       onReload()
+      toast('案件を追加しました')
     } catch (e) { setError(String(e)) } finally { setSaving(false) }
   }
 
@@ -96,6 +101,7 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject }: 
       setUploadFile(null)
       setUploadDesc('')
       onReload()
+      toast('ファイルをアップロードしました')
     } catch (e) {
       setUploadErr(String(e))
     } finally {
@@ -107,6 +113,7 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject }: 
     if (!confirm('この添付ファイルを削除しますか？')) return
     await deleteAttachment(id, fileUrl)
     onReload()
+    toast('ファイルを削除しました')
   }
 
   return (
@@ -151,7 +158,7 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject }: 
         ) : (
           <table>
             <thead>
-              <tr><th>案件名</th><th>都道府県</th><th>FIT期間</th><th>委託先</th><th>保守開始日</th></tr>
+              <tr><th>案件名</th><th>都道府県</th><th>FIT</th><th>委託先</th><th>保守開始日</th></tr>
             </thead>
             <tbody>
               {projects.map(p => (
@@ -161,7 +168,7 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject }: 
                     {p.project_no && <div style={{ fontSize: 11, color: '#64748b' }}>{p.project_no}</div>}
                   </td>
                   <td>{p.site_prefecture ?? '-'}</td>
-                  <td>{p.fit_period != null ? `${p.fit_period}年` : '-'}</td>
+                  <td>{p.fit_period != null ? `${p.fit_period}円` : '-'}</td>
                   <td>{p.subcontractor ?? '-'}</td>
                   <td>{p.maintenance_start_date ?? '-'}</td>
                 </tr>
@@ -194,7 +201,7 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject }: 
                 <div className="attachment-info">
                   <div className="attachment-name">{a.file_name}</div>
                   {a.description && <div className="attachment-desc">{a.description}</div>}
-                  <div className="attachment-date">{a.uploaded_at.slice(0, 10)}</div>
+                  <div className="attachment-date">{fmtDate(a.uploaded_at)}</div>
                 </div>
                 <div className="attachment-actions">
                   <a href={a.file_url} target="_blank" rel="noopener noreferrer" className="btn btn-sub btn-sm">
@@ -269,7 +276,7 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject }: 
               <input className="form-input" value={projectForm.site_address} onChange={e => setProjectForm(f => ({ ...f, site_address: e.target.value }))} />
             </label>
             <label className="form-label">
-              FIT期間（年）
+              FIT（円）
               <input className="form-input" type="number" value={projectForm.fit_period} onChange={e => setProjectForm(f => ({ ...f, fit_period: e.target.value }))} />
             </label>
             <label className="form-label">

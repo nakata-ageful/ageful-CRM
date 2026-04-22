@@ -3,6 +3,7 @@ import type { MaintenanceResponse } from '../types'
 import { StatusBadge } from '../components/StatusBadge'
 import { Modal } from '../components/Modal'
 import { updateMaintenanceResponse, completeMaintenanceResponse } from '../lib/actions'
+import { useToast } from '../components/Toast'
 
 type Props = {
   response: MaintenanceResponse
@@ -12,9 +13,9 @@ type Props = {
 }
 
 export function MaintenanceResponseDetail({ response, onBack, onReload, onViewProject }: Props) {
+  const toast = useToast()
   const [editModal, setEditModal] = useState(false)
   const [form, setForm] = useState({
-    response_no: response.response_no ?? '',
     inquiry_date: response.inquiry_date ?? '',
     occurrence_date: response.occurrence_date ?? '',
     target_area: response.target_area ?? '',
@@ -32,13 +33,17 @@ export function MaintenanceResponseDetail({ response, onBack, onReload, onViewPr
       await updateMaintenanceResponse(response.id, form)
       setEditModal(false)
       onReload()
+      toast('保守対応を保存しました')
     } catch (e) { setError(String(e)) } finally { setSaving(false) }
   }
 
   async function handleComplete() {
     if (!confirm('この保守対応を完了にしますか？')) return
-    await completeMaintenanceResponse(response.id)
-    onReload()
+    try {
+      await completeMaintenanceResponse(response.id)
+      onReload()
+      toast('保守対応を完了にしました')
+    } catch (e) { setError(String(e)) }
   }
 
   return (
@@ -54,6 +59,8 @@ export function MaintenanceResponseDetail({ response, onBack, onReload, onViewPr
         <StatusBadge status={response.status} />
       </div>
 
+      {error && !editModal && <div className="form-error" style={{ marginBottom: 12 }}>{error}</div>}
+
       <div className="card">
         <div className="card-header-row">
           <h3 className="section-title" style={{ margin: 0 }}>
@@ -61,7 +68,6 @@ export function MaintenanceResponseDetail({ response, onBack, onReload, onViewPr
           </h3>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-sub btn-sm" onClick={() => { setForm({
-              response_no: response.response_no ?? '',
               inquiry_date: response.inquiry_date ?? '',
               occurrence_date: response.occurrence_date ?? '',
               target_area: response.target_area ?? '',
@@ -108,7 +114,7 @@ export function MaintenanceResponseDetail({ response, onBack, onReload, onViewPr
           <div className="form-grid">
             <label className="form-label">
               管理番号
-              <input className="form-input" value={form.response_no} onChange={e => setForm(f => ({ ...f, response_no: e.target.value }))} />
+              <input className="form-input" value={response.response_no ?? ''} disabled style={{ backgroundColor: '#f1f5f9' }} />
             </label>
             <label className="form-label">
               状態

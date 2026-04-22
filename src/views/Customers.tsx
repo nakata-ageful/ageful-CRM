@@ -3,6 +3,7 @@ import type { Customer, CustomerInput } from '../types'
 import { Modal } from '../components/Modal'
 import { Confirm } from '../components/Confirm'
 import { createCustomer, updateCustomer, deleteCustomer } from '../lib/actions'
+import { useToast } from '../components/Toast'
 
 type Props = {
   customers: Customer[]
@@ -21,6 +22,7 @@ const emptyForm: CustomerInput = {
 }
 
 export function Customers({ customers, onReload, onViewDetail }: Props) {
+  const toast = useToast()
   const [search, setSearch] = useState('')
   const [modal, setModal] = useState<'create' | 'edit' | null>(null)
   const [editTarget, setEditTarget] = useState<Customer | null>(null)
@@ -69,6 +71,7 @@ export function Customers({ customers, onReload, onViewDetail }: Props) {
       else if (modal === 'edit' && editTarget) await updateCustomer(editTarget.id, form)
       setModal(null)
       onReload()
+      toast(modal === 'create' ? '顧客を追加しました' : '顧客情報を保存しました')
     } catch (e) {
       setError(String(e))
     } finally {
@@ -81,6 +84,7 @@ export function Customers({ customers, onReload, onViewDetail }: Props) {
     await deleteCustomer(deleteTarget.id)
     setDeleteTarget(null)
     onReload()
+    toast('顧客を削除しました')
   }
 
   return (

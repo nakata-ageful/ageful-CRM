@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
+import { ToastProvider } from './components/Toast'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { hasSupabaseEnv } from './lib/supabase'
 import {
   getDashboard, getCustomers, getProjects, getProjectDetail,
   getCustomerDetail, getMaintenanceResponses, getMaintenanceResponseById,
-  getBillingRows, getBillingDetail,
+  getBillingRows, getBillingDetail, getProspects, getProspectById,
 } from './lib/data'
 import type {
   DashboardStats, Customer, ProjectRow, ProjectDetail,
-  CustomerDetailData, MaintenanceResponse, BillingRow, BillingDetail,
+  CustomerDetailData, MaintenanceResponse, BillingRow, BillingDetail, Prospect,
 } from './types'
 
 import { Dashboard } from './views/Dashboard'
@@ -20,6 +22,8 @@ import { MaintenanceResponseDetail } from './views/MaintenanceResponseDetail'
 import { Billing } from './views/Billing'
 import { BillingDetailView } from './views/BillingDetail'
 import { CsvImport } from './views/CsvImport'
+import { Prospects } from './views/Prospects'
+import { ProspectDetailView } from './views/ProspectDetail'
 
 type ViewKey =
   | 'dashboard'
@@ -28,9 +32,11 @@ type ViewKey =
   | 'maintenance-responses' | 'maintenance-response-detail'
   | 'billing' | 'billing-detail'
   | 'import'
+  | 'prospects' | 'prospect-detail'
 
 const NAV: { key: ViewKey; label: string; icon: string }[] = [
   { key: 'dashboard',             label: 'ダッシュボード', icon: '◎' },
+  { key: 'prospects',             label: '見込み管理',     icon: '📋' },
   { key: 'projects',              label: '案件',           icon: '🏭' },
   { key: 'customers',             label: '顧客',           icon: '👤' },
   { key: 'maintenance-responses', label: '保守対応',       icon: '🔧' },
@@ -38,7 +44,7 @@ const NAV: { key: ViewKey; label: string; icon: string }[] = [
   { key: 'import',                label: 'CSVインポート',  icon: '📥' },
 ]
 
-const DETAIL_VIEWS: ViewKey[] = ['project-detail', 'customer-detail', 'maintenance-response-detail', 'billing-detail']
+const DETAIL_VIEWS: ViewKey[] = ['project-detail', 'customer-detail', 'maintenance-response-detail', 'billing-detail', 'prospect-detail']
 
 function navActive(navKey: ViewKey, currentView: ViewKey): boolean {
   if (navKey === currentView) return true
@@ -46,6 +52,7 @@ function navActive(navKey: ViewKey, currentView: ViewKey): boolean {
   if (navKey === 'customers' && currentView === 'customer-detail') return true
   if (navKey === 'maintenance-responses' && currentView === 'maintenance-response-detail') return true
   if (navKey === 'billing' && currentView === 'billing-detail') return true
+  if (navKey === 'prospects' && currentView === 'prospect-detail') return true
   return false
 }
 
@@ -53,7 +60,6 @@ export default function App() {
   const [view, setView] = useState<ViewKey>('dashboard')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-
   // List data
   const [stats, setStats] = useState<DashboardStats>({ totalCustomers: 0, totalProjects: 0, activeMaintenanceCount: 0, pendingBillingCount: 0 })
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -61,33 +67,39 @@ export default function App() {
   const [maintenanceList, setMaintenanceList] = useState<MaintenanceResponse[]>([])
   const [billingRows, setBillingRows] = useState<BillingRow[]>([])
 
+  // List data — prospects
+  const [prospects, setProspects] = useState<Prospect[]>([])
+
   // Detail data
   const [projectDetail, setProjectDetail] = useState<ProjectDetail | null>(null)
   const [customerDetail, setCustomerDetail] = useState<CustomerDetailData | null>(null)
   const [maintenanceDetail, setMaintenanceDetail] = useState<MaintenanceResponse | null>(null)
   const [billingDetail, setBillingDetail] = useState<BillingDetail | null>(null)
+  const [prospectDetail, setProspectDetail] = useState<Prospect | null>(null)
 
-  const loadAll = useCallback(async () => {
-    setLoading(true)
+  const loadAll = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     setError('')
     try {
-      const [s, c, p, m, b] = await Promise.all([
+      const [s, c, p, m, b, pr] = await Promise.all([
         getDashboard(),
         getCustomers(),
         getProjects(),
         getMaintenanceResponses(),
         getBillingRows(),
+        getProspects(),
       ])
       setStats(s)
       setCustomers(c)
       setProjectRows(p)
       setMaintenanceList(m)
       setBillingRows(b)
+      setProspects(pr)
     } catch (e) {
       setError('データの取得に失敗しました。')
       console.error(e)
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [])
 
@@ -95,54 +107,75 @@ export default function App() {
 
   async function navToProjectDetail(projectId: number) {
     const detail = await getProjectDetail(projectId)
-    setProjectDetail(detail)
-    setView('project-detail')
+    if (detail) {
+      setProjectDetail(detail)
+      setView('project-detail')
+    }
   }
 
   async function navToCustomerDetail(customerId: number) {
     const detail = await getCustomerDetail(customerId)
-    setCustomerDetail(detail)
-    setView('customer-detail')
+    if (detail) {
+      setCustomerDetail(detail)
+      setView('customer-detail')
+    }
   }
 
   async function navToMaintenanceDetail(id: number) {
     const detail = await getMaintenanceResponseById(id)
-    setMaintenanceDetail(detail)
-    setView('maintenance-response-detail')
+    if (detail) {
+      setMaintenanceDetail(detail)
+      setView('maintenance-response-detail')
+    }
   }
 
   async function navToBillingDetail(projectId: number) {
     const detail = await getBillingDetail(projectId)
-    setBillingDetail(detail)
-    setView('billing-detail')
+    if (detail) {
+      setBillingDetail(detail)
+      setView('billing-detail')
+    }
+  }
+
+  async function navToProspectDetail(id: number) {
+    const detail = await getProspectById(id)
+    if (detail) {
+      setProspectDetail(detail)
+      setView('prospect-detail')
+    }
+  }
+
+  async function reloadProspects() {
+    const pr = await getProspects()
+    setProspects(pr)
   }
 
   async function reloadProjectDetail() {
     if (!projectDetail) return
     const detail = await getProjectDetail(projectDetail.project.id)
     setProjectDetail(detail)
-    loadAll()
+    loadAll(true)
   }
 
   async function reloadCustomerDetail() {
     if (!customerDetail) return
     const detail = await getCustomerDetail(customerDetail.customer.id)
     setCustomerDetail(detail)
-    loadAll()
+    loadAll(true)
   }
 
   async function reloadMaintenanceDetail() {
     if (!maintenanceDetail) return
     const detail = await getMaintenanceResponseById(maintenanceDetail.id)
     setMaintenanceDetail(detail)
-    loadAll()
+    loadAll(true)
   }
 
   async function reloadBillingDetail() {
     if (!billingDetail) return
     const detail = await getBillingDetail(billingDetail.project.id)
     setBillingDetail(detail)
-    loadAll()
+    loadAll(true)
   }
 
   function handleNavClick(key: ViewKey) {
@@ -153,11 +186,14 @@ export default function App() {
       setCustomerDetail(null)
       setMaintenanceDetail(null)
       setBillingDetail(null)
+      setProspectDetail(null)
     }
   }
 
   const viewTitle: Record<ViewKey, string> = {
     dashboard: 'ダッシュボード',
+    prospects: '見込み管理',
+    'prospect-detail': prospectDetail ? `${prospectDetail.customer_name} / ${prospectDetail.project_name}` : '見込み詳細',
     projects: '案件一覧',
     'project-detail': projectDetail?.project.project_name ?? '案件詳細',
     customers: '顧客一覧',
@@ -170,11 +206,14 @@ export default function App() {
   }
 
   return (
+    <ErrorBoundary>
+    <ToastProvider>
     <div className="app">
       <aside className="sidebar">
         <div className="logo-block">
-          <div className="logo-text">Ageful</div>
-          <div className="logo-sub">太陽光 管理</div>
+          <img src="/logo.png" alt="Ageful" className="logo-img" />
+          <div className="logo-divider" />
+          <div className="logo-sub">太陽光発電 管理システム</div>
         </div>
         {NAV.map(n => (
           <button
@@ -207,7 +246,7 @@ export default function App() {
             {view === 'dashboard' && (
               <Dashboard
                 stats={stats}
-                maintenanceList={maintenanceList.slice(0, 6)}
+                maintenanceList={maintenanceList}
                 billingRows={billingRows}
                 onNavigate={v => handleNavClick(v as ViewKey)}
                 onViewMaintenance={navToMaintenanceDetail}
@@ -279,9 +318,28 @@ export default function App() {
             {view === 'import' && (
               <CsvImport onReload={loadAll} />
             )}
+            {view === 'prospects' && (
+              <Prospects
+                prospects={prospects}
+                onReload={reloadProspects}
+                onViewDetail={navToProspectDetail}
+              />
+            )}
+            {view === 'prospect-detail' && prospectDetail && (
+              <ProspectDetailView
+                prospect={prospectDetail}
+                onBack={() => setView('prospects')}
+                onConverted={async (customerId) => {
+                  await loadAll()
+                  navToCustomerDetail(customerId)
+                }}
+              />
+            )}
           </>
         )}
       </main>
     </div>
+    </ToastProvider>
+    </ErrorBoundary>
   )
 }

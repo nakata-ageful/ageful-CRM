@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Prospect, ProspectApplyStatus, ProspectContractStatus } from '../types'
 import { updateProspect, convertProspectToCustomer } from '../lib/actions'
 import { fmtNum } from '../lib/utils'
+import { buildTaskMap, buildSubTaskMap } from '../lib/prospect-tasks'
 
 const APPLY_STATUSES: ProspectApplyStatus[] = ['未', '提出済', '通過', '不通', '不可']
 const CONTRACT_STATUSES: ProspectContractStatus[] = ['未', '完了', '不可']
@@ -268,6 +269,17 @@ export function ProspectDetailView({
     setSaving(false)
   }
 
+  async function handleLoanCompanyChange(company: string | null) {
+    const c = company || ''
+    save({
+      loan_company: company,
+      apply_tasks: buildTaskMap('apply', c),
+      contract_tasks: buildTaskMap('contract', c),
+      apply_sub_tasks: buildSubTaskMap('apply', c),
+      contract_sub_tasks: buildSubTaskMap('contract', c),
+    })
+  }
+
   async function handleConvert() {
     const customerId = await convertProspectToCustomer(p)
     setP(prev => ({ ...prev, converted_customer_id: customerId, converted_at: new Date().toISOString() }))
@@ -356,7 +368,7 @@ export function ProspectDetailView({
             <select
               className="form-input" style={{ marginTop: 4 }}
               value={p.loan_company ?? ''}
-              onChange={e => save({ loan_company: e.target.value || null })}
+              onChange={e => handleLoanCompanyChange(e.target.value || null)}
             >
               <option value="">未設定</option>
               <option value="アプラス">アプラス</option>

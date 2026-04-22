@@ -2,7 +2,6 @@ import { useState } from 'react'
 import type { Prospect, ProspectApplyStatus, ProspectContractStatus } from '../types'
 import { updateProspect, convertProspectToCustomer } from '../lib/actions'
 import { fmtNum } from '../lib/utils'
-import { tasksForCompany } from '../lib/prospect-tasks'
 
 const APPLY_STATUSES: ProspectApplyStatus[] = ['未', '提出済', '通過', '不通', '不可']
 const CONTRACT_STATUSES: ProspectContractStatus[] = ['未', '完了', '不可']
@@ -18,12 +17,12 @@ function ContractBadge({ status }: { status: ProspectContractStatus }) {
 // ── タスクパネル ──────────────────────────────────────────
 
 function TaskPanel({
-  title, mode, company, checkedMap, subTaskMap, status, memo, statuses,
+  title, mode, checkedMap, subTaskMap, status, memo, statuses,
   onTaskChange, onSubTaskChange, onStatusChange, onMemoChange,
+  onAddTask, onRemoveTask, onAddSubTask, onRemoveSubTask,
 }: {
   title: string
   mode: 'apply' | 'contract'
-  company: string
   checkedMap: Record<string, boolean>
   subTaskMap: Record<string, Record<string, boolean>>
   status: ProspectApplyStatus | ProspectContractStatus
@@ -33,8 +32,32 @@ function TaskPanel({
   onSubTaskChange: (name: string, sub: string, checked: boolean) => void
   onStatusChange: (s: string) => void
   onMemoChange: (v: string) => void
+  onAddTask: (name: string) => void
+  onRemoveTask: (name: string) => void
+  onAddSubTask: (taskName: string, subName: string) => void
+  onRemoveSubTask: (taskName: string, subName: string) => void
 }) {
-  const tasks = tasksForCompany(mode, company)
+  const [newTask, setNewTask] = useState('')
+  const [addingSubFor, setAddingSubFor] = useState<string | null>(null)
+  const [newSub, setNewSub] = useState('')
+
+  const taskNames = Object.keys(checkedMap)
+
+  function handleAddTask() {
+    const name = newTask.trim()
+    if (!name || checkedMap[name] !== undefined) return
+    onAddTask(name)
+    setNewTask('')
+  }
+
+  function handleAddSub(taskName: string) {
+    const name = newSub.trim()
+    if (!name) return
+    if (subTaskMap[taskName]?.[name] !== undefined) return
+    onAddSubTask(taskName, name)
+    setNewSub('')
+    setAddingSubFor(null)
+  }
 
   return (
     <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -46,37 +69,95 @@ function TaskPanel({
 
       {/* タスクリスト */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-        {tasks.map(task => (
-          <div key={task.name}>
-            <label className="prospect-task-line">
-              <input
-                type="checkbox"
-                className="prospect-checkbox"
-                checked={Boolean(checkedMap[task.name])}
-                onChange={e => onTaskChange(task.name, e.target.checked)}
-              />
-              <span style={{ fontSize: 13, fontWeight: 500, color: '#1e293b' }}>{task.name}</span>
-            </label>
-            {task.subTasks.length > 0 && (
-              <div style={{ marginLeft: 24, marginTop: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                {task.subTasks.map(sub => (
-                  <label key={sub} className="prospect-task-line">
-                    <input
-                      type="checkbox"
-                      className="prospect-checkbox"
-                      checked={Boolean(subTaskMap[task.name]?.[sub])}
-                      onChange={e => onSubTaskChange(task.name, sub, e.target.checked)}
-                    />
-                    <span style={{ fontSize: 12.5, color: '#64748b' }}>{sub}</span>
-                  </label>
-                ))}
+        {taskNames.map(taskName => {
+          const subs = subTaskMap[taskName] ? Object.keys(subTaskMap[taskName]) : []
+          return (
+            <div key={taskName}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <label className="prospect-task-line" style={{ flex: 1 }}>
+                  <input
+                    type="checkbox"
+                    className="prospect-checkbox"
+                    checked={Boolean(checkedMap[taskName])}
+                    onChange={e => onTaskChange(taskName, e.target.checked)}
+                  />
+                  <span style={{ fontSize: 13, fontWeight: 500, color: '#1e293b' }}>{taskName}</span>
+                </label>
+                <button
+                  onClick={() => { setAddingSubFor(addingSubFor === taskName ? null : taskName); setNewSub('') }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: '#94a3b8', padding: '2px 4px' }}
+                  title="小項目を追加"
+                >+小</button>
+                <button
+                  onClick={() => { if (confirm(`「${taskName}」を削除しますか？`)) onRemoveTask(taskName) }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#cbd5e1', padding: '2px 4px' }}
+                  title="削除"
+                >✕</button>
               </div>
-            )}
-          </div>
-        ))}
-        {tasks.length === 0 && (
-          <p style={{ fontSize: 12.5, color: '#94a3b8' }}>ローン会社を設定するとタスクが表示されます</p>
+              {subs.length > 0 && (
+                <div style={{ marginLeft: 24, marginTop: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  {subs.map(sub => (
+                    <div key={sub} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <label className="prospect-task-line" style={{ flex: 1 }}>
+                        <input
+                          type="checkbox"
+                          className="prospect-checkbox"
+                          checked={Boolean(subTaskMap[taskName]?.[sub])}
+                          onChange={e => onSubTaskChange(taskName, sub, e.target.checked)}
+                        />
+                        <span style={{ fontSize: 12.5, color: '#64748b' }}>{sub}</span>
+                      </label>
+                      <button
+                        onClick={() => { if (confirm(`「${sub}」を削除しますか？`)) onRemoveSubTask(taskName, sub) }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: '#cbd5e1', padding: '2px 4px' }}
+                        title="削除"
+                      >✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {addingSubFor === taskName && (
+                <div style={{ marginLeft: 24, marginTop: 4, display: 'flex', gap: 4 }}>
+                  <input
+                    type="text"
+                    className="form-input"
+                    style={{ fontSize: 12, padding: '3px 8px', flex: 1 }}
+                    value={newSub}
+                    onChange={e => setNewSub(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleAddSub(taskName); if (e.key === 'Escape') setAddingSubFor(null) }}
+                    placeholder="小項目名を入力..."
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => handleAddSub(taskName)}
+                    style={{ fontSize: 11, padding: '3px 8px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 5, cursor: 'pointer' }}
+                  >追加</button>
+                </div>
+              )}
+            </div>
+          )
+        })}
+        {taskNames.length === 0 && (
+          <p style={{ fontSize: 12.5, color: '#94a3b8' }}>項目がありません</p>
         )}
+      </div>
+
+      {/* 大項目追加 */}
+      <div style={{ display: 'flex', gap: 4 }}>
+        <input
+          type="text"
+          className="form-input"
+          style={{ fontSize: 12.5, padding: '4px 8px', flex: 1 }}
+          value={newTask}
+          onChange={e => setNewTask(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') handleAddTask() }}
+          placeholder="大項目を追加..."
+        />
+        <button
+          onClick={handleAddTask}
+          disabled={!newTask.trim()}
+          style={{ fontSize: 12, padding: '4px 10px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 5, cursor: 'pointer', opacity: newTask.trim() ? 1 : 0.5 }}
+        >追加</button>
       </div>
 
       {/* ステータス */}
@@ -373,7 +454,6 @@ export function ProspectDetailView({
         <TaskPanel
           title="申込"
           mode="apply"
-          company={p.loan_company ?? ''}
           checkedMap={p.apply_tasks}
           subTaskMap={p.apply_sub_tasks}
           status={p.apply_status}
@@ -385,11 +465,23 @@ export function ProspectDetailView({
           }
           onStatusChange={s => save({ apply_status: s as ProspectApplyStatus })}
           onMemoChange={v => save({ apply_memo: v || null })}
+          onAddTask={name => save({ apply_tasks: { ...p.apply_tasks, [name]: false } })}
+          onRemoveTask={name => {
+            const { [name]: _, ...rest } = p.apply_tasks
+            const { [name]: __, ...restSub } = p.apply_sub_tasks
+            save({ apply_tasks: rest, apply_sub_tasks: restSub })
+          }}
+          onAddSubTask={(taskName, subName) =>
+            save({ apply_sub_tasks: { ...p.apply_sub_tasks, [taskName]: { ...(p.apply_sub_tasks[taskName] ?? {}), [subName]: false } } })
+          }
+          onRemoveSubTask={(taskName, subName) => {
+            const { [subName]: _, ...rest } = (p.apply_sub_tasks[taskName] ?? {})
+            save({ apply_sub_tasks: { ...p.apply_sub_tasks, [taskName]: rest } })
+          }}
         />
         <TaskPanel
           title="契約"
           mode="contract"
-          company={p.loan_company ?? ''}
           checkedMap={p.contract_tasks}
           subTaskMap={p.contract_sub_tasks}
           status={p.contract_status}
@@ -401,6 +493,19 @@ export function ProspectDetailView({
           }
           onStatusChange={s => save({ contract_status: s as ProspectContractStatus })}
           onMemoChange={v => save({ contract_memo: v || null })}
+          onAddTask={name => save({ contract_tasks: { ...p.contract_tasks, [name]: false } })}
+          onRemoveTask={name => {
+            const { [name]: _, ...rest } = p.contract_tasks
+            const { [name]: __, ...restSub } = p.contract_sub_tasks
+            save({ contract_tasks: rest, contract_sub_tasks: restSub })
+          }}
+          onAddSubTask={(taskName, subName) =>
+            save({ contract_sub_tasks: { ...p.contract_sub_tasks, [taskName]: { ...(p.contract_sub_tasks[taskName] ?? {}), [subName]: false } } })
+          }
+          onRemoveSubTask={(taskName, subName) => {
+            const { [subName]: _, ...rest } = (p.contract_sub_tasks[taskName] ?? {})
+            save({ contract_sub_tasks: { ...p.contract_sub_tasks, [taskName]: rest } })
+          }}
         />
       </div>
 

@@ -46,6 +46,27 @@ const NAV: { key: ViewKey; label: string; icon: string }[] = [
 
 const DETAIL_VIEWS: ViewKey[] = ['project-detail', 'customer-detail', 'maintenance-response-detail', 'billing-detail', 'prospect-detail']
 
+const ALL_VIEWS: ViewKey[] = [
+  'dashboard', 'projects', 'project-detail', 'customers', 'customer-detail',
+  'maintenance-responses', 'maintenance-response-detail', 'billing', 'billing-detail',
+  'import', 'prospects', 'prospect-detail',
+]
+
+function parseHash(): { view: ViewKey; detailId: number | null } {
+  const h = window.location.hash.replace('#', '')
+  const [viewPart, idPart] = h.split('/')
+  const view = ALL_VIEWS.includes(viewPart as ViewKey) ? (viewPart as ViewKey) : 'dashboard'
+  const detailId = idPart ? Number(idPart) : null
+  return { view, detailId: detailId && !isNaN(detailId) ? detailId : null }
+}
+
+function pushHash(view: ViewKey, detailId?: number) {
+  const hash = detailId ? `#${view}/${detailId}` : `#${view}`
+  if (window.location.hash !== hash) {
+    window.history.pushState(null, '', hash)
+  }
+}
+
 function navActive(navKey: ViewKey, currentView: ViewKey): boolean {
   if (navKey === currentView) return true
   if (navKey === 'projects' && currentView === 'project-detail') return true
@@ -57,7 +78,9 @@ function navActive(navKey: ViewKey, currentView: ViewKey): boolean {
 }
 
 export default function App() {
-  const [view, setView] = useState<ViewKey>('dashboard')
+  const initial = parseHash()
+  const [view, setViewRaw] = useState<ViewKey>(initial.view)
+  const [pendingDetailId, setPendingDetailId] = useState<number | null>(initial.detailId)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   // List data
@@ -76,6 +99,25 @@ export default function App() {
   const [maintenanceDetail, setMaintenanceDetail] = useState<MaintenanceResponse | null>(null)
   const [billingDetail, setBillingDetail] = useState<BillingDetail | null>(null)
   const [prospectDetail, setProspectDetail] = useState<Prospect | null>(null)
+
+  // Wrap setView to also update the URL hash
+  const setView = useCallback((v: ViewKey, detailId?: number) => {
+    setViewRaw(v)
+    pushHash(v, detailId)
+  }, [])
+
+  // Listen for browser back/forward
+  useEffect(() => {
+    function onPopState() {
+      const { view: v, detailId } = parseHash()
+      setViewRaw(v)
+      if (detailId && DETAIL_VIEWS.includes(v)) {
+        setPendingDetailId(detailId)
+      }
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
 
   const loadAll = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -105,11 +147,24 @@ export default function App() {
 
   useEffect(() => { loadAll() }, [loadAll])
 
+  // Restore detail view after initial load (e.g. page reload with #prospect-detail/123)
+  useEffect(() => {
+    if (loading || !pendingDetailId) return
+    const id = pendingDetailId
+    setPendingDetailId(null)
+    if (view === 'prospect-detail') navToProspectDetail(id)
+    else if (view === 'project-detail') navToProjectDetail(id)
+    else if (view === 'customer-detail') navToCustomerDetail(id)
+    else if (view === 'maintenance-response-detail') navToMaintenanceDetail(id)
+    else if (view === 'billing-detail') navToBillingDetail(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading])
+
   async function navToProjectDetail(projectId: number) {
     const detail = await getProjectDetail(projectId)
     if (detail) {
       setProjectDetail(detail)
-      setView('project-detail')
+      setView('project-detail', projectId)
     }
   }
 
@@ -117,7 +172,7 @@ export default function App() {
     const detail = await getCustomerDetail(customerId)
     if (detail) {
       setCustomerDetail(detail)
-      setView('customer-detail')
+      setView('customer-detail', customerId)
     }
   }
 
@@ -125,7 +180,7 @@ export default function App() {
     const detail = await getMaintenanceResponseById(id)
     if (detail) {
       setMaintenanceDetail(detail)
-      setView('maintenance-response-detail')
+      setView('maintenance-response-detail', id)
     }
   }
 
@@ -133,7 +188,7 @@ export default function App() {
     const detail = await getBillingDetail(projectId)
     if (detail) {
       setBillingDetail(detail)
-      setView('billing-detail')
+      setView('billing-detail', projectId)
     }
   }
 
@@ -141,7 +196,7 @@ export default function App() {
     const detail = await getProspectById(id)
     if (detail) {
       setProspectDetail(detail)
-      setView('prospect-detail')
+      setView('prospect-detail', id)
     }
   }
 
@@ -264,7 +319,7 @@ export default function App() {
             {view === 'project-detail' && projectDetail && (
               <ProjectDetailView
                 detail={projectDetail}
-                onBack={() => setView('projects')}
+                onBack={() => { setView('projects'); loadAll(true) }}
                 onReload={reloadProjectDetail}
                 onViewCustomer={navToCustomerDetail}
                 onViewMaintenance={navToMaintenanceDetail}
@@ -280,7 +335,7 @@ export default function App() {
             {view === 'customer-detail' && customerDetail && (
               <CustomerDetailView
                 detail={customerDetail}
-                onBack={() => setView('customers')}
+                onBack={() => { setView('customers'); loadAll(true) }}
                 onReload={reloadCustomerDetail}
                 onViewProject={navToProjectDetail}
               />
@@ -295,7 +350,7 @@ export default function App() {
             {view === 'maintenance-response-detail' && maintenanceDetail && (
               <MaintenanceResponseDetail
                 response={maintenanceDetail}
-                onBack={() => setView('maintenance-responses')}
+                onBack={() => { setView('maintenance-responses'); loadAll(true) }}
                 onReload={reloadMaintenanceDetail}
                 onViewProject={navToProjectDetail}
               />
@@ -310,7 +365,7 @@ export default function App() {
             {view === 'billing-detail' && billingDetail && (
               <BillingDetailView
                 detail={billingDetail}
-                onBack={() => setView('billing')}
+                onBack={() => { setView('billing'); loadAll(true) }}
                 onReload={reloadBillingDetail}
                 onViewProject={navToProjectDetail}
               />
@@ -328,7 +383,7 @@ export default function App() {
             {view === 'prospect-detail' && prospectDetail && (
               <ProspectDetailView
                 prospect={prospectDetail}
-                onBack={() => setView('prospects')}
+                onBack={() => { setView('prospects'); reloadProspects() }}
                 onViewCustomer={navToCustomerDetail}
               />
             )}

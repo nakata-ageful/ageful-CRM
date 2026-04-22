@@ -218,6 +218,12 @@ export async function updateProject(id: number, input: Omit<ProjectInput, 'custo
   return data as Project
 }
 
+export async function deleteProject(id: number): Promise<void> {
+  if (!hasSupabaseEnv) { projectStore.delete(id); return }
+  const { error } = await db().from('projects').delete().eq('id', id)
+  if (error) throw error
+}
+
 // ── Maintenance Response CRUD ─────────────────────────────
 
 async function generateResponseNo(): Promise<string> {

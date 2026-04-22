@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { ProjectRow, Customer, CustomerInput } from '../types'
 import type { ProjectInput } from '../lib/actions'
 import { Modal } from '../components/Modal'
-import { createCustomer, createProject } from '../lib/actions'
+import { createCustomer, createProject, deleteProject } from '../lib/actions'
 import { useToast } from '../components/Toast'
 
 type Props = {
@@ -146,12 +146,12 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
           <thead>
             <tr>
               <th>案件名</th><th>顧客</th><th>都道府県</th><th>FIT</th>
-              <th>委託先</th><th>引渡日</th><th>監視</th>
+              <th>委託先</th><th>引渡日</th><th>監視</th><th style={{ width: 48 }}></th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 && (
-              <tr><td colSpan={7} className="empty-cell">該当する案件がありません</td></tr>
+              <tr><td colSpan={8} className="empty-cell">該当する案件がありません</td></tr>
             )}
             {filtered.map(p => (
               <tr key={p.id} className="clickable-row" onClick={() => onViewDetail(p.id)}>
@@ -170,6 +170,19 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
                 <td>{p.subcontractor ?? '-'}</td>
                 <td>{p.handover_date ?? '-'}</td>
                 <td>{p.monitoring_system ?? '-'}</td>
+                <td>
+                  <button
+                    className="btn-icon"
+                    title="削除"
+                    onClick={async (e) => {
+                      e.stopPropagation()
+                      if (!confirm(`「${p.project_name}」を削除しますか？\n関連する契約・請求データも削除されます。`)) return
+                      await deleteProject(p.id)
+                      onReload()
+                      toast('案件を削除しました')
+                    }}
+                  >🗑</button>
+                </td>
               </tr>
             ))}
           </tbody>

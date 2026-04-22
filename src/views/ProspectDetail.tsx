@@ -218,24 +218,104 @@ export function ProspectDetailView({
 
       {/* 金額カード */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-        {[
-          { label: '設備費', value: p.equipment },
-          { label: '土地費', value: p.land_cost },
-          { label: '合計', value: total },
-          { label: '融資額', value: p.loan_amount },
-        ].map(({ label, value }) => (
+        {([
+          { label: '設備費', key: 'equipment' as const, value: p.equipment },
+          { label: '土地費', key: 'land_cost' as const, value: p.land_cost },
+          { label: '合計', key: null, value: total },
+          { label: '融資額', key: 'loan_amount' as const, value: p.loan_amount },
+        ] as const).map(({ label, key, value }) => (
           <div key={label} className="kpi-card" style={{ borderLeftColor: label === '融資額' ? '#0ea5e9' : undefined }}>
             <div className="kpi-label">{label}</div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', lineHeight: 1 }}>
-              {fmtNum(value)}<span style={{ fontSize: 12, fontWeight: 500, color: '#94a3b8', marginLeft: 2 }}>円</span>
-            </div>
+            {key ? (
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
+                <input
+                  type="number"
+                  className="form-input"
+                  style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', width: '100%', padding: '2px 6px', textAlign: 'right' }}
+                  value={value ?? ''}
+                  onChange={e => {
+                    const v = e.target.value ? Number(e.target.value) : null
+                    save({ [key]: v })
+                  }}
+                  placeholder="0"
+                />
+                <span style={{ fontSize: 12, fontWeight: 500, color: '#94a3b8', flexShrink: 0 }}>円</span>
+              </div>
+            ) : (
+              <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', lineHeight: 1 }}>
+                {fmtNum(value)}<span style={{ fontSize: 12, fontWeight: 500, color: '#94a3b8', marginLeft: 2 }}>円</span>
+              </div>
+            )}
           </div>
         ))}
       </div>
 
-      {/* 日付・住所情報 */}
+      {/* 基本情報 */}
       <div className="card">
         <div className="section-title">基本情報</div>
+        <div className="info-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+          <div className="info-field">
+            <span>顧客名</span>
+            <input
+              type="text" className="form-input" style={{ marginTop: 4 }}
+              value={p.customer_name}
+              onChange={e => save({ customer_name: e.target.value })}
+            />
+          </div>
+          <div className="info-field">
+            <span>物件名</span>
+            <input
+              type="text" className="form-input" style={{ marginTop: 4 }}
+              value={p.project_name}
+              onChange={e => save({ project_name: e.target.value })}
+            />
+          </div>
+          <div className="info-field">
+            <span>ローン会社</span>
+            <select
+              className="form-input" style={{ marginTop: 4 }}
+              value={p.loan_company ?? ''}
+              onChange={e => save({ loan_company: e.target.value || null })}
+            >
+              <option value="">未設定</option>
+              <option value="アプラス">アプラス</option>
+              <option value="ジャックス">ジャックス</option>
+            </select>
+          </div>
+          <div className="info-field">
+            <span>パネル容量 (kW)</span>
+            <input
+              type="number" className="form-input" style={{ marginTop: 4 }}
+              value={p.panel_kw ?? ''}
+              onChange={e => save({ panel_kw: e.target.value ? Number(e.target.value) : null })}
+              placeholder="0"
+              step="0.01"
+            />
+          </div>
+          <div className="info-field">
+            <span>紹介者</span>
+            <input
+              type="text" className="form-input" style={{ marginTop: 4 }}
+              value={p.referrer ?? ''}
+              onChange={e => save({ referrer: e.target.value || null })}
+              placeholder="紹介者名"
+            />
+          </div>
+          <div className="info-field">
+            <span>物件所在地</span>
+            <input
+              type="text" className="form-input" style={{ marginTop: 4 }}
+              value={p.site_address ?? ''}
+              onChange={e => save({ site_address: e.target.value || null })}
+              placeholder="茨城県鹿嶋市..."
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* 日付情報 */}
+      <div className="card">
+        <div className="section-title">日付</div>
         <div className="info-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
           <div className="info-field">
             <span>商談開始日</span>
@@ -283,15 +363,6 @@ export function ProspectDetailView({
               type="date" className="form-input" style={{ marginTop: 4 }}
               value={p.handover_date ?? ''}
               onChange={e => save({ handover_date: e.target.value || null })}
-            />
-          </div>
-          <div className="info-field" style={{ gridColumn: '1 / -1' }}>
-            <span>物件所在地</span>
-            <input
-              type="text" className="form-input" style={{ marginTop: 4 }}
-              value={p.site_address ?? ''}
-              onChange={e => save({ site_address: e.target.value || null })}
-              placeholder="茨城県鹿嶋市..."
             />
           </div>
         </div>

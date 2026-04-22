@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { Prospect, ProspectApplyStatus, ProspectContractStatus } from '../types'
 import { updateProspect, convertProspectToCustomer } from '../lib/actions'
 import { fmtNum } from '../lib/utils'
-import { buildTaskMap, buildSubTaskMap } from '../lib/prospect-tasks'
+import { buildTaskMap, buildSubTaskMap, tasksForCompany } from '../lib/prospect-tasks'
 
 const APPLY_STATUSES: ProspectApplyStatus[] = ['未', '提出済', '通過', '不通', '不可']
 const CONTRACT_STATUSES: ProspectContractStatus[] = ['未', '完了', '不可']
@@ -18,12 +18,13 @@ function ContractBadge({ status }: { status: ProspectContractStatus }) {
 // ── タスクパネル ──────────────────────────────────────────
 
 function TaskPanel({
-  title, mode, checkedMap, subTaskMap, status, memo, statuses,
+  title, mode, company, checkedMap, subTaskMap, status, memo, statuses,
   onTaskChange, onSubTaskChange, onStatusChange, onMemoChange,
   onAddTask, onRemoveTask, onAddSubTask, onRemoveSubTask,
 }: {
   title: string
   mode: 'apply' | 'contract'
+  company: string
   checkedMap: Record<string, boolean>
   subTaskMap: Record<string, Record<string, boolean>>
   status: ProspectApplyStatus | ProspectContractStatus
@@ -42,7 +43,13 @@ function TaskPanel({
   const [addingSubFor, setAddingSubFor] = useState<string | null>(null)
   const [newSub, setNewSub] = useState('')
 
-  const taskNames = Object.keys(checkedMap)
+  // 定義順でソート、定義にないカスタム項目は末尾に追加
+  const definedOrder = tasksForCompany(mode, company).map(t => t.name)
+  const allKeys = Object.keys(checkedMap)
+  const taskNames = [
+    ...definedOrder.filter(n => allKeys.includes(n)),
+    ...allKeys.filter(n => !definedOrder.includes(n)),
+  ]
 
   function handleAddTask() {
     const name = newTask.trim()
@@ -466,6 +473,7 @@ export function ProspectDetailView({
         <TaskPanel
           title="申込"
           mode="apply"
+          company={p.loan_company ?? ''}
           checkedMap={p.apply_tasks}
           subTaskMap={p.apply_sub_tasks}
           status={p.apply_status}
@@ -494,6 +502,7 @@ export function ProspectDetailView({
         <TaskPanel
           title="契約"
           mode="contract"
+          company={p.loan_company ?? ''}
           checkedMap={p.contract_tasks}
           subTaskMap={p.contract_sub_tasks}
           status={p.contract_status}

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { Prospect, ProspectApplyStatus, ProspectContractStatus } from '../types'
-import { updateProspect, convertProspectToCustomer } from '../lib/actions'
+import { updateProspect } from '../lib/actions'
 import { fmtNum } from '../lib/utils'
 import { buildTaskMap, buildSubTaskMap, tasksForCompany } from '../lib/prospect-tasks'
 
@@ -201,71 +201,18 @@ function TaskPanel({
   )
 }
 
-// ── 変換確認モーダル ──────────────────────────────────────
-
-function ConvertModal({
-  prospect,
-  onConfirm,
-  onClose,
-}: {
-  prospect: Prospect
-  onConfirm: () => Promise<void>
-  onClose: () => void
-}) {
-  const [loading, setLoading] = useState(false)
-
-  async function handleConfirm() {
-    setLoading(true)
-    await onConfirm()
-    setLoading(false)
-  }
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2 className="modal-title">顧客管理へ登録</h2>
-          <button className="modal-close" onClick={onClose}>✕</button>
-        </div>
-        <div className="modal-body">
-          <p style={{ fontSize: 13.5, color: '#374151', marginBottom: 16 }}>
-            以下のデータを顧客管理システムへ登録します。登録後は「案件」ページで続きの情報を入力してください。
-          </p>
-          <div className="info-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
-            <div className="info-field"><span>顧客名</span><b>{prospect.customer_name}</b></div>
-            <div className="info-field"><span>物件名</span><b>{prospect.project_name}</b></div>
-            <div className="info-field"><span>ローン会社</span><b>{prospect.loan_company ?? '未設定'}</b></div>
-            <div className="info-field"><span>物件所在地</span><b>{prospect.site_address ?? '—'}</b></div>
-            <div className="info-field"><span>設備費</span><b>{fmtNum(prospect.equipment)} 円</b></div>
-            <div className="info-field"><span>土地費</span><b>{fmtNum(prospect.land_cost)} 円</b></div>
-            <div className="info-field"><span>融資額</span><b>{fmtNum(prospect.loan_amount)} 円</b></div>
-            <div className="info-field"><span>売買契約日</span><b>{prospect.sale_contract_date ?? '—'}</b></div>
-          </div>
-          <div className="modal-footer">
-            <button className="btn btn-sub" onClick={onClose}>キャンセル</button>
-            <button className="btn btn-main" onClick={handleConfirm} disabled={loading}>
-              {loading ? '登録中...' : '登録する'}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ── メイン ────────────────────────────────────────────────
 
 export function ProspectDetailView({
   prospect: initial,
   onBack,
-  onConverted,
+  onViewCustomer,
 }: {
   prospect: Prospect
   onBack: () => void
-  onConverted: (customerId: number) => void
+  onViewCustomer: (customerId: number) => void
 }) {
   const [p, setP] = useState<Prospect>(initial)
-  const [showConvert, setShowConvert] = useState(false)
   const [saving, setSaving] = useState(false)
 
   async function save(updated: Partial<Omit<Prospect, 'id' | 'created_at'>>) {
@@ -287,12 +234,6 @@ export function ProspectDetailView({
     })
   }
 
-  async function handleConvert() {
-    const customerId = await convertProspectToCustomer(p)
-    setP(prev => ({ ...prev, converted_customer_id: customerId, converted_at: new Date().toISOString() }))
-    setShowConvert(false)
-    onConverted(customerId)
-  }
 
   const total = (p.equipment ?? 0) + (p.land_cost ?? 0)
 
@@ -309,11 +250,9 @@ export function ProspectDetailView({
           )}
         </div>
         {saving && <span style={{ fontSize: 12, color: '#94a3b8' }}>保存中...</span>}
-        {p.converted_customer_id ? (
-          <span style={{ fontSize: 12.5, background: '#d1fae5', color: '#065f46', borderRadius: 99, padding: '4px 12px', fontWeight: 600 }}>✓ 顧客管理済</span>
-        ) : p.contract_status === '完了' ? (
-          <button className="btn btn-main btn-sm" onClick={() => setShowConvert(true)}>顧客管理へ登録 →</button>
-        ) : null}
+        {p.converted_customer_id && (
+          <button className="btn btn-main btn-sm" onClick={() => onViewCustomer(p.converted_customer_id!)}>顧客・案件を見る →</button>
+        )}
       </div>
 
       {/* 金額カード */}
@@ -530,13 +469,6 @@ export function ProspectDetailView({
         />
       </div>
 
-      {showConvert && (
-        <ConvertModal
-          prospect={p}
-          onConfirm={handleConvert}
-          onClose={() => setShowConvert(false)}
-        />
-      )}
     </div>
   )
 }

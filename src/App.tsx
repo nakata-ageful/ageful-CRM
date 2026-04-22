@@ -329,10 +329,7 @@ export default function App() {
               <ProspectDetailView
                 prospect={prospectDetail}
                 onBack={() => setView('prospects')}
-                onConverted={async (customerId) => {
-                  await loadAll()
-                  navToCustomerDetail(customerId)
-                }}
+                onViewCustomer={navToCustomerDetail}
               />
             )}
           </>

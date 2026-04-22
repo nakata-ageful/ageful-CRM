@@ -792,6 +792,35 @@ export async function bulkImportBilling(
 // ── Prospect CRUD ─────────────────────────────────────────
 
 export async function createProspect(input: ProspectInput): Promise<Prospect> {
+  // 顧客+案件を同時作成（見込み段階から案件情報を入力可能にするため）
+  const customer = await createCustomer({
+    name: input.customer_name,
+    company_name: '',
+    is_corporate: false,
+    email: '',
+    phone: '',
+    postal_code: '',
+    address: input.site_address || '',
+  })
+
+  await createProject({
+    customer_id: customer.id,
+    project_no: '', project_name: input.project_name, plant_name: '',
+    site_postal_code: '', site_prefecture: '', site_address: input.site_address || '',
+    latitude: '', longitude: '',
+    panel_kw: input.panel_kw || '', panel_count: '',
+    panel_maker: '', panel_model: '', pcs_kw: '', pcs_count: '', pcs_maker: '', pcs_model: '',
+    grid_id: '', grid_certified_at: '', fit_period: '', power_supply_start_date: '',
+    customer_number: '', generation_point_id: '', meter_reading_day: '',
+    monitoring_system: '', monitoring_id: '', monitoring_user: '', monitoring_pw: '',
+    has_4g: false, key_number: '', local_association: '', old_owner: '',
+    sales_company: '', referrer: input.referrer || '',
+    power_change_date: '', handover_date: '',
+    sales_price: input.equipment || '',
+    reference_price: '', land_cost: input.land_cost || '',
+    amuras_member_no: '', notes: '',
+  })
+
   const payload = {
     customer_name: input.customer_name,
     project_name: input.project_name,
@@ -816,8 +845,8 @@ export async function createProspect(input: ProspectInput): Promise<Prospect> {
     sale_contract_date: null,
     land_contract_date: null,
     handover_date: null,
-    converted_customer_id: null,
-    converted_at: null,
+    converted_customer_id: customer.id,
+    converted_at: new Date().toISOString(),
   }
   if (!hasSupabaseEnv) return prospectStore.create(payload)
   const { data, error } = await db().from('prospects').insert(payload).select().single()

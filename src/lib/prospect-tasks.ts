@@ -42,21 +42,33 @@ const APLUS_APPLY: TaskDef[] = [
 
 // ── ジャックス 契約 ──────────────────────────────────────
 const JACCS_CONTRACT: TaskDef[] = [
-  { name: '売買契約書',        subTasks: ['顧客へ郵送', '代理店へ郵送'] },
-  { name: '土地契約書',        subTasks: ['顧客へ郵送', '代理店へ郵送'] },
-  { name: '住民票',            subTasks: [] },
-  { name: '印鑑証明書',        subTasks: [] },
-  { name: '金消契約関連書類',  subTasks: [] },
-  { name: '契約チェック',      subTasks: [] },
+  { name: '設備売買契約書',                          subTasks: [] },
+  { name: '土地売買契約書',                          subTasks: [] },
+  { name: '土地登記変更（所有権移転・地上権設定）',  subTasks: ['登記申請'] },
+  { name: '土地登記変更（抵当権設定）',              subTasks: ['登記申請'] },
+  { name: '住民票',                                  subTasks: [] },
+  { name: '印鑑証明書',                              subTasks: [] },
+  { name: '現地写真（全景・看板・構内柱・電柱）',    subTasks: [] },
+  { name: '電線盗難防止工事',                        subTasks: [] },
+  { name: '経済産業省 変更申請画面',                 subTasks: [] },
+  { name: '電力名義変更申請写し',                    subTasks: [] },
+  { name: '本人確認電話',                            subTasks: [] },
+  { name: '保守契約書',                              subTasks: [] },
 ]
 
 // ── アプラス 契約 ────────────────────────────────────────
 const APLUS_CONTRACT: TaskDef[] = [
-  { name: '売買契約書',        subTasks: ['顧客へ郵送', '代理店へ郵送'] },
-  { name: '土地契約書',        subTasks: ['顧客へ郵送', '代理店へ郵送'] },
-  { name: '住民票',            subTasks: [] },
-  { name: '印鑑証明書',        subTasks: [] },
-  { name: '契約チェック',      subTasks: [] },
+  { name: '設備売買契約書',                          subTasks: [] },
+  { name: '土地売買契約書',                          subTasks: [] },
+  { name: '土地登記変更（所有権移転・地上権設定）',  subTasks: ['登記申請'] },
+  { name: '土地登記変更（抵当権設定）',              subTasks: ['登記申請'] },
+  { name: '住民票',                                  subTasks: [] },
+  { name: '印鑑証明書',                              subTasks: [] },
+  { name: '現地写真（全景・看板・構内柱・電柱）',    subTasks: [] },
+  { name: '経済産業省 変更申請画面',                 subTasks: [] },
+  { name: '電力名義変更申請写し',                    subTasks: [] },
+  { name: '本人確認電話',                            subTasks: [] },
+  { name: '保守契約書',                              subTasks: [] },
 ]
 
 const TASK_MAP: Record<string, { apply: TaskDef[]; contract: TaskDef[] }> = {

@@ -854,10 +854,55 @@ export async function createProspect(input: ProspectInput): Promise<Prospect> {
   return data as Prospect
 }
 
-export async function updateProspect(id: number, data: Partial<Omit<Prospect, 'id' | 'created_at'>>): Promise<void> {
-  if (!hasSupabaseEnv) { prospectStore.update(id, data); return }
+export async function updateProspect(id: number, data: Partial<Omit<Prospect, 'id' | 'created_at'>>, customerId?: number | null): Promise<void> {
+  if (!hasSupabaseEnv) {
+    prospectStore.update(id, data)
+    // モック: 顧客・案件への同期
+    if (customerId) syncProspectToCustomerProject(data, customerId)
+    return
+  }
   const { error } = await db().from('prospects').update(data).eq('id', id)
   if (error) throw error
+  // 顧客・案件への同期
+  if (customerId) syncProspectToCustomerProject(data, customerId)
+}
+
+/** 見込みの共有フィールド変更を顧客・案件に反映 */
+async function syncProspectToCustomerProject(
+  data: Partial<Omit<Prospect, 'id' | 'created_at'>>,
+  customerId: number,
+) {
+  // 顧客テーブルへの同期
+  const customerUpdate: Record<string, unknown> = {}
+  if ('customer_name' in data) customerUpdate.name = data.customer_name
+  if ('site_address' in data) customerUpdate.address = data.site_address || ''
+
+  if (Object.keys(customerUpdate).length > 0) {
+    if (!hasSupabaseEnv) {
+      customerStore.update(customerId, customerUpdate)
+    } else {
+      await db().from('customers').update(customerUpdate).eq('id', customerId)
+    }
+  }
+
+  // 案件テーブルへの同期（customer_id から案件を引く）
+  const projectUpdate: Record<string, unknown> = {}
+  if ('project_name' in data) projectUpdate.project_name = data.project_name
+  if ('site_address' in data) projectUpdate.site_address = data.site_address || ''
+  if ('panel_kw' in data) projectUpdate.panel_kw = data.panel_kw
+  if ('referrer' in data) projectUpdate.referrer = data.referrer || ''
+  if ('equipment' in data) projectUpdate.sales_price = data.equipment
+  if ('land_cost' in data) projectUpdate.land_cost = data.land_cost
+  if ('handover_date' in data) projectUpdate.handover_date = data.handover_date
+
+  if (Object.keys(projectUpdate).length > 0) {
+    if (!hasSupabaseEnv) {
+      const proj = projectStore.getAll().find((p: { customer_id: number }) => p.customer_id === customerId)
+      if (proj) projectStore.update(proj.id, projectUpdate)
+    } else {
+      await db().from('projects').update(projectUpdate).eq('customer_id', customerId)
+    }
+  }
 }
 
 export async function deleteProspect(id: number): Promise<void> {

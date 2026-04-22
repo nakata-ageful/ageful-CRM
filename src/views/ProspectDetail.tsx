@@ -219,7 +219,7 @@ export function ProspectDetailView({
     const next = { ...p, ...updated }
     setP(next)
     setSaving(true)
-    await updateProspect(p.id, updated)
+    await updateProspect(p.id, updated, p.converted_customer_id)
     setSaving(false)
   }
 

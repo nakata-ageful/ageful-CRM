@@ -9,6 +9,12 @@ import {
 } from '../lib/actions'
 import { fmtYen } from '../lib/utils'
 
+/** 住所文字列から都道府県を抽出 */
+function extractPrefecture(address: string): string {
+  const m = address.match(/^(北海道|東京都|(?:京都|大阪)府|.{2,3}県)/)
+  return m ? m[1] : ''
+}
+
 /** フォーム用: 文字列数値をカンマ区切りに。空文字・非数値はそのまま返す */
 function fmtFormNum(v: string): string {
   const raw = v.replace(/,/g, '')
@@ -1066,7 +1072,11 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             </label>
             <label className="form-label" style={{ gridColumn: '1/-1' }}>
               設置住所
-              <input className="form-input" value={projForm.site_address} onChange={e => setProjForm(f => ({ ...f, site_address: e.target.value }))} />
+              <input className="form-input" value={projForm.site_address} onChange={e => {
+                const addr = e.target.value
+                const pref = extractPrefecture(addr)
+                setProjForm(f => ({ ...f, site_address: addr, ...(pref ? { site_prefecture: pref } : {}) }))
+              }} />
             </label>
             <label className="form-label">
               Google座標

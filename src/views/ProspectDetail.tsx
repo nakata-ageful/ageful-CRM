@@ -316,6 +316,7 @@ export function ProspectDetailView({
               <option value="">未設定</option>
               <option value="アプラス">アプラス</option>
               <option value="ジャックス">ジャックス</option>
+              <option value="無し">無し</option>
             </select>
           </div>
           <div className="info-field">

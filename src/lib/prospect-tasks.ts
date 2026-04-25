@@ -71,9 +71,37 @@ const APLUS_CONTRACT: TaskDef[] = [
   { name: '保守契約書',                              subTasks: [] },
 ]
 
+// ── 無し 申込 ──────────────────────────────────────────
+const NONE_APPLY: TaskDef[] = [
+  { name: '本人確認書類（運転免許証）', subTasks: [] },
+  { name: '土地全部事項証明書',        subTasks: ['Google座標'] },
+  { name: '経済産業省 設備認定書',     subTasks: [] },
+  { name: '電力受給契約書',            subTasks: [] },
+  { name: '設備概要',                  subTasks: ['パネル', 'パワコン'] },
+  { name: '売電実績',                  subTasks: [] },
+  { name: '発電シミュレーション',      subTasks: [] },
+  { name: '見積書・収支シミュレーション', subTasks: [] },
+]
+
+// ── 無し 契約 ──────────────────────────────────────────
+const NONE_CONTRACT: TaskDef[] = [
+  { name: '設備売買契約書',                          subTasks: [] },
+  { name: '土地売買契約書',                          subTasks: [] },
+  { name: '土地登記変更（所有権移転・地上権設定）',  subTasks: ['登記申請'] },
+  { name: '土地登記変更（抵当権設定）',              subTasks: ['登記申請'] },
+  { name: '住民票',                                  subTasks: [] },
+  { name: '印鑑証明書',                              subTasks: [] },
+  { name: '現地写真（全景・看板・構内柱・電柱）',    subTasks: [] },
+  { name: '経済産業省 変更申請画面',                 subTasks: [] },
+  { name: '電力名義変更申請写し',                    subTasks: [] },
+  { name: '保守契約書',                              subTasks: [] },
+  { name: '保険申込書',                              subTasks: [] },
+]
+
 const TASK_MAP: Record<string, { apply: TaskDef[]; contract: TaskDef[] }> = {
   'ジャックス': { apply: JACCS_APPLY, contract: JACCS_CONTRACT },
   'アプラス':   { apply: APLUS_APPLY, contract: APLUS_CONTRACT },
+  '無し':       { apply: NONE_APPLY,  contract: NONE_CONTRACT },
 }
 
 export function tasksForCompany(mode: 'apply' | 'contract', company: string): TaskDef[] {

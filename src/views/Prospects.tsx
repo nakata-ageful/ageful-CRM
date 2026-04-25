@@ -194,9 +194,6 @@ export function Prospects({
                 >
                   <td style={{ ...tdStyle, fontWeight: 600 }}>
                     {p.customer_name}
-                    {p.converted_customer_id && (
-                      <span style={{ marginLeft: 6, fontSize: 11, background: '#d1fae5', color: '#065f46', borderRadius: 99, padding: '1px 6px', fontWeight: 600 }}>移行済</span>
-                    )}
                   </td>
                   <td style={tdStyle}>{p.project_name}</td>
                   <td style={tdStyle}>

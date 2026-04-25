@@ -16,6 +16,7 @@ type CustomerMode = 'existing' | 'new'
 
 const emptyCustomerForm: CustomerInput = {
   name: '',
+  name_kana: '',
   company_name: '',
   is_corporate: false,
   email: '',

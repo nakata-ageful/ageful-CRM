@@ -13,6 +13,7 @@ type Props = {
 
 const emptyForm: CustomerInput = {
   name: '',
+  name_kana: '',
   company_name: '',
   is_corporate: false,
   email: '',
@@ -51,6 +52,7 @@ export function Customers({ customers, onReload, onViewDetail }: Props) {
   function openEdit(c: Customer) {
     setForm({
       name: c.name,
+      name_kana: c.name_kana ?? '',
       company_name: c.company_name ?? '',
       is_corporate: c.is_corporate,
       email: c.email ?? '',

@@ -437,6 +437,7 @@ export async function bulkImportProjects(
         } else {
           const newCust = customerStore.create({
             name: row.customer_name || row.company_name || '（名前未設定）',
+            name_kana: null,
             company_name: row.company_name || null,
             is_corporate: !!row.company_name,
             email: row.email || null,
@@ -803,6 +804,7 @@ export async function createProspect(input: ProspectInput): Promise<Prospect> {
   // 顧客+案件を同時作成（見込み段階から案件情報を入力可能にするため）
   const customer = await createCustomer({
     name: input.customer_name,
+    name_kana: '',
     company_name: '',
     is_corporate: false,
     email: '',
@@ -923,6 +925,7 @@ export async function convertProspectToCustomer(prospect: Prospect): Promise<num
   // 顧客作成
   const customer = await createCustomer({
     name: prospect.customer_name,
+    name_kana: '',
     company_name: '',
     is_corporate: false,
     email: '',

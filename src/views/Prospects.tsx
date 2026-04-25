@@ -177,7 +177,7 @@ export function Prospects({
               <tr>
                 <th style={thStyle}>顧客名</th>
                 <th style={thStyle}>物件名</th>
-                <th style={thStyle}>会社</th>
+                <th style={thStyle}>信販利用</th>
                 <th style={thStyle}>設備費</th>
                 <th style={thStyle}>融資額</th>
                 <th style={thStyle}>申込</th>

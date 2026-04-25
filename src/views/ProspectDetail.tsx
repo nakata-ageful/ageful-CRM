@@ -242,13 +242,7 @@ export function ProspectDetailView({
       {/* ヘッダー */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
         <button className="back-btn" onClick={onBack}>← 一覧へ</button>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
-          <span style={{ fontSize: 20, fontWeight: 700, color: '#0f172a' }}>{p.customer_name}</span>
-          <span style={{ fontSize: 14, color: '#64748b', fontWeight: 500 }}>{p.project_name}</span>
-          {p.loan_company && (
-            <span style={{ background: '#e0f2fe', color: '#0369a1', fontSize: 11.5, fontWeight: 600, borderRadius: 99, padding: '2px 9px' }}>{p.loan_company}</span>
-          )}
-        </div>
+        <div style={{ flex: 1 }} />
         {saving && <span style={{ fontSize: 12, color: '#94a3b8' }}>保存中...</span>}
         {p.converted_customer_id && (
           <button className="btn btn-main btn-sm" onClick={() => onViewCustomer(p.converted_customer_id!)}>顧客・案件を見る →</button>

@@ -33,6 +33,7 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject }: 
   const [editModal, setEditModal] = useState(false)
   const [editForm, setEditForm] = useState<CustomerInput>({
     name: customer.name,
+    name_kana: customer.name_kana ?? '',
     company_name: customer.company_name ?? '',
     is_corporate: customer.is_corporate,
     email: customer.email ?? '',
@@ -125,6 +126,7 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject }: 
           <h3 className="section-title" style={{ margin: 0 }}>顧客情報</h3>
           <button className="btn btn-sub btn-sm" onClick={() => { setEditForm({
             name: customer.name,
+            name_kana: customer.name_kana ?? '',
             company_name: customer.company_name ?? '',
             is_corporate: customer.is_corporate,
             email: customer.email ?? '',
@@ -139,6 +141,7 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject }: 
           <div className="info-field"><span>種別</span><b>{customer.is_corporate ? '法人' : '個人'}</b></div>
           {customer.company_name && <div className="info-field"><span>会社名</span><b>{customer.company_name}</b></div>}
           <div className="info-field"><span>顧客名</span><b>{customer.name}</b></div>
+          <div className="info-field"><span>ふりがな</span><b>{customer.name_kana ?? '-'}</b></div>
           <div className="info-field"><span>電話</span><b>{customer.phone ?? '-'}</b></div>
           <div className="info-field"><span>メール</span><b>{customer.email ?? '-'}</b></div>
           <div className="info-field"><span>郵便番号</span><b>{customer.postal_code ?? '-'}</b></div>
@@ -225,6 +228,10 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject }: 
             <label className="form-label required">
               顧客名
               <input className="form-input" value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
+            </label>
+            <label className="form-label">
+              ふりがな
+              <input className="form-input" value={editForm.name_kana} onChange={e => setEditForm(f => ({ ...f, name_kana: e.target.value }))} placeholder="やまだ たろう" />
             </label>
             <label className="form-label">
               会社名（法人の場合）

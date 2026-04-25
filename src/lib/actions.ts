@@ -68,6 +68,7 @@ export async function createCustomer(input: CustomerInput): Promise<Customer> {
 
   const payload = {
     name: input.name,
+    name_kana: input.name_kana || null,
     company_name: input.company_name || null,
     is_corporate: input.is_corporate,
     email: input.email || null,
@@ -84,6 +85,7 @@ export async function createCustomer(input: CustomerInput): Promise<Customer> {
 export async function updateCustomer(id: number, input: CustomerInput): Promise<Customer> {
   const payload = {
     name: input.name,
+    name_kana: input.name_kana || null,
     company_name: input.company_name || null,
     is_corporate: input.is_corporate,
     email: input.email || null,

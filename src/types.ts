@@ -5,6 +5,7 @@
 export type Customer = {
   id: number
   name: string               // 個人名
+  name_kana: string | null   // ふりがな
   company_name: string | null // 法人名（法人の場合）
   is_corporate: boolean
   email: string | null
@@ -242,6 +243,7 @@ export type BillingDetail = {
 
 export type CustomerInput = {
   name: string
+  name_kana: string
   company_name: string
   is_corporate: boolean
   email: string

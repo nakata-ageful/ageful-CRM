@@ -16,11 +16,12 @@ function extractPrefecture(address: string): string {
 }
 
 /** フォーム用: 文字列数値をカンマ区切りに。空文字・非数値はそのまま返す */
-function fmtFormNum(v: string): string {
-  const raw = v.replace(/,/g, '')
+function fmtFormNum(v: string | number | null | undefined): string {
+  if (v == null) return ''
+  const raw = String(v).replace(/,/g, '')
   if (!raw) return ''
   const n = Number(raw)
-  if (isNaN(n)) return v
+  if (isNaN(n)) return String(v)
   // 小数対応
   if (raw.includes('.')) {
     const [int, dec] = raw.split('.')

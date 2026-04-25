@@ -885,7 +885,6 @@ async function syncProspectToCustomerProject(
   // 顧客テーブルへの同期
   const customerUpdate: Record<string, unknown> = {}
   if ('customer_name' in data) customerUpdate.name = data.customer_name
-  if ('site_address' in data) customerUpdate.address = data.site_address || ''
 
   if (Object.keys(customerUpdate).length > 0) {
     if (!hasSupabaseEnv) {

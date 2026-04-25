@@ -387,7 +387,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             <div className="info-field"><span>引渡日</span><b>{project.handover_date ?? '-'}</b></div>
             <div className="info-field"><span>販売価格（税込）</span><b>{fmtYen(project.sales_price)}</b></div>
             <div className="info-field"><span>土地代</span><b>{fmtYen(project.land_cost)}</b></div>
-            <div className="info-field"><span>アムラス会員番号</span><b>{project.amuras_member_no ?? '-'}</b></div>
+            <div className="info-field"><span>アプラス会員番号</span><b>{project.amuras_member_no ?? '-'}</b></div>
             <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap' }}>{project.notes || '-'}</b></div>
           </div>
         </div>
@@ -1176,7 +1176,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               <input className="form-input" type="number" value={projForm.land_cost} onChange={e => setProjForm(f => ({ ...f, land_cost: e.target.value }))} />
             </label>
             <label className="form-label">
-              アムラス会員番号
+              アプラス会員番号
               <input className="form-input" value={projForm.amuras_member_no} onChange={e => setProjForm(f => ({ ...f, amuras_member_no: e.target.value }))} />
             </label>
             <label className="form-label" style={{ gridColumn: '1/-1' }}>

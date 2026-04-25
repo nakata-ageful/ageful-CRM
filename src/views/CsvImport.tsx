@@ -33,7 +33,7 @@ const CSV_COLUMNS: { key: keyof CsvImportRow; label: string; required?: boolean 
   { key: 'sales_price',             label: '販売価格' },
   { key: 'reference_price',         label: '価格参照' },
   { key: 'land_cost',               label: '土地代' },
-  { key: 'amuras_member_no',        label: 'アムラス会員番号' },
+  { key: 'amuras_member_no',        label: 'アプラス会員番号' },
   { key: 'monitoring_system',       label: '遠隔監視システム' },
   { key: 'notes',                   label: '備考' },
   { key: 'panel_kw',                label: 'パネルkW' },

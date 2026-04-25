@@ -8,6 +8,20 @@ import {
   upsertAnnualRecord, updateAnnualRecordStatus, deleteAnnualRecord, createContract, updateContract, updateProject,
 } from '../lib/actions'
 import { fmtYen } from '../lib/utils'
+
+/** フォーム用: 文字列数値をカンマ区切りに。空文字・非数値はそのまま返す */
+function fmtFormNum(v: string): string {
+  const raw = v.replace(/,/g, '')
+  if (!raw) return ''
+  const n = Number(raw)
+  if (isNaN(n)) return v
+  // 小数対応
+  if (raw.includes('.')) {
+    const [int, dec] = raw.split('.')
+    return Number(int).toLocaleString('ja-JP') + '.' + dec
+  }
+  return n.toLocaleString('ja-JP')
+}
 import { useToast } from '../components/Toast'
 
 type Tab = '基本情報' | '保守対応' | '定期保守' | '請求'
@@ -788,7 +802,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           <div className="form-grid">
             <label className="form-label">
               年度
-              <input className="form-input" type="number" value={arForm.year} onChange={e => setArForm(f => ({ ...f, year: parseInt(e.target.value) }))} />
+              <input className="form-input" inputMode="numeric" value={arForm.year || ''} onChange={e => setArForm(f => ({ ...f, year: parseInt(e.target.value) || 0 }))} />
             </label>
             <label className="form-label">
               状態
@@ -857,8 +871,8 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             </label>
             <label className="form-label">
               年次保守料（税抜）
-              <input className="form-input" type="number" value={contractForm.annual_maintenance_ex} onChange={e => {
-                const v = e.target.value
+              <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.annual_maintenance_ex)} onChange={e => {
+                const v = e.target.value.replace(/,/g, '')
                 const incVal = v ? String(Math.round(Number(v) * 1.1)) : ''
                 setContractForm(f => {
                   const count = Number(f.billing_count) || 1
@@ -870,8 +884,8 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             </label>
             <label className="form-label">
               年次保守料（税込）
-              <input className="form-input" type="number" value={contractForm.annual_maintenance_inc} onChange={e => {
-                const v = e.target.value
+              <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.annual_maintenance_inc)} onChange={e => {
+                const v = e.target.value.replace(/,/g, '')
                 const exVal = v ? String(Math.round(Number(v) / 1.1)) : ''
                 setContractForm(f => {
                   const count = Number(f.billing_count) || 1
@@ -883,8 +897,8 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             </label>
             <label className="form-label">
               請求回数（年間）
-              <input className="form-input" type="number" value={contractForm.billing_count} onChange={e => {
-                const v = e.target.value
+              <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.billing_count)} onChange={e => {
+                const v = e.target.value.replace(/,/g, '')
                 setContractForm(f => {
                   const count = Number(v) || 1
                   const annualInc = Number(f.annual_maintenance_inc) || 0
@@ -896,33 +910,33 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             </label>
             <label className="form-label">
               請求額（税込/回）※自動計算
-              <input className="form-input" type="number" value={contractForm.billing_amount_inc} onChange={e => {
-                const v = e.target.value
+              <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.billing_amount_inc)} onChange={e => {
+                const v = e.target.value.replace(/,/g, '')
                 setContractForm(f => ({ ...f, billing_amount_inc: v, billing_amount_ex: v ? String(Math.round(Number(v) / 1.1)) : '' }))
               }} />
             </label>
             <label className="form-label">
               請求額（税抜/回）※自動計算
-              <input className="form-input" type="number" value={contractForm.billing_amount_ex} onChange={e => {
-                const v = e.target.value
+              <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.billing_amount_ex)} onChange={e => {
+                const v = e.target.value.replace(/,/g, '')
                 setContractForm(f => ({ ...f, billing_amount_ex: v, billing_amount_inc: v ? String(Math.round(Number(v) * 1.1)) : '' }))
               }} />
             </label>
             <label className="form-label">
               土地賃料（月額）
-              <input className="form-input" type="number" value={contractForm.land_cost_monthly} onChange={e => setContractForm(f => ({ ...f, land_cost_monthly: e.target.value }))} />
+              <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.land_cost_monthly)} onChange={e => setContractForm(f => ({ ...f, land_cost_monthly: e.target.value.replace(/,/g, '') }))} />
             </label>
             <label className="form-label">
               保険料
-              <input className="form-input" type="number" value={contractForm.insurance_fee} onChange={e => setContractForm(f => ({ ...f, insurance_fee: e.target.value }))} />
+              <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.insurance_fee)} onChange={e => setContractForm(f => ({ ...f, insurance_fee: e.target.value.replace(/,/g, '') }))} />
             </label>
             <label className="form-label">
               その他費用
-              <input className="form-input" type="number" value={contractForm.other_fee} onChange={e => setContractForm(f => ({ ...f, other_fee: e.target.value }))} />
+              <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.other_fee)} onChange={e => setContractForm(f => ({ ...f, other_fee: e.target.value.replace(/,/g, '') }))} />
             </label>
             <label className="form-label">
               振替手数料
-              <input className="form-input" type="number" value={contractForm.transfer_fee} onChange={e => setContractForm(f => ({ ...f, transfer_fee: e.target.value }))} />
+              <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.transfer_fee)} onChange={e => setContractForm(f => ({ ...f, transfer_fee: e.target.value.replace(/,/g, '') }))} />
             </label>
             <p style={{ gridColumn: '1/-1', margin: '8px 0 4px', fontWeight: 600, fontSize: 13, color: '#475569' }}>── 契約日</p>
             <label className="form-label">
@@ -965,15 +979,15 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             </label>
             <label className="form-label">
               委託料（税抜）
-              <input className="form-input" type="number" value={contractForm.subcontract_fee_ex} onChange={e => {
-                const v = e.target.value
+              <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.subcontract_fee_ex)} onChange={e => {
+                const v = e.target.value.replace(/,/g, '')
                 setContractForm(f => ({ ...f, subcontract_fee_ex: v, subcontract_fee_inc: v ? String(Math.round(Number(v) * 1.1)) : '' }))
               }} />
             </label>
             <label className="form-label">
               委託料（税込）
-              <input className="form-input" type="number" value={contractForm.subcontract_fee_inc} onChange={e => {
-                const v = e.target.value
+              <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.subcontract_fee_inc)} onChange={e => {
+                const v = e.target.value.replace(/,/g, '')
                 setContractForm(f => ({ ...f, subcontract_fee_inc: v, subcontract_fee_ex: v ? String(Math.round(Number(v) / 1.1)) : '' }))
               }} />
             </label>
@@ -1060,11 +1074,11 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             </label>
             <label className="form-label">
               パネルkW
-              <input className="form-input" type="number" value={projForm.panel_kw} onChange={e => setProjForm(f => ({ ...f, panel_kw: e.target.value }))} />
+              <input className="form-input" inputMode="numeric" value={fmtFormNum(projForm.panel_kw)} onChange={e => setProjForm(f => ({ ...f, panel_kw: e.target.value.replace(/,/g, '') }))} />
             </label>
             <label className="form-label">
               パネル枚数
-              <input className="form-input" type="number" value={projForm.panel_count} onChange={e => setProjForm(f => ({ ...f, panel_count: e.target.value }))} />
+              <input className="form-input" inputMode="numeric" value={fmtFormNum(projForm.panel_count)} onChange={e => setProjForm(f => ({ ...f, panel_count: e.target.value.replace(/,/g, '') }))} />
             </label>
             <label className="form-label">
               パネルメーカー
@@ -1076,11 +1090,11 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             </label>
             <label className="form-label">
               パワコンkW
-              <input className="form-input" type="number" value={projForm.pcs_kw} onChange={e => setProjForm(f => ({ ...f, pcs_kw: e.target.value }))} />
+              <input className="form-input" inputMode="numeric" value={fmtFormNum(projForm.pcs_kw)} onChange={e => setProjForm(f => ({ ...f, pcs_kw: e.target.value.replace(/,/g, '') }))} />
             </label>
             <label className="form-label">
               パワコン台数
-              <input className="form-input" type="number" value={projForm.pcs_count} onChange={e => setProjForm(f => ({ ...f, pcs_count: e.target.value }))} />
+              <input className="form-input" inputMode="numeric" value={fmtFormNum(projForm.pcs_count)} onChange={e => setProjForm(f => ({ ...f, pcs_count: e.target.value.replace(/,/g, '') }))} />
             </label>
             <label className="form-label">
               パワコンメーカー
@@ -1100,7 +1114,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             </label>
             <label className="form-label">
               FIT（円）
-              <input className="form-input" type="number" value={projForm.fit_period} onChange={e => setProjForm(f => ({ ...f, fit_period: e.target.value }))} />
+              <input className="form-input" inputMode="numeric" value={fmtFormNum(projForm.fit_period)} onChange={e => setProjForm(f => ({ ...f, fit_period: e.target.value.replace(/,/g, '') }))} />
             </label>
             <label className="form-label">
               需給開始日
@@ -1168,11 +1182,11 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             </label>
             <label className="form-label">
               販売価格（税込）
-              <input className="form-input" type="number" value={projForm.sales_price} onChange={e => setProjForm(f => ({ ...f, sales_price: e.target.value }))} />
+              <input className="form-input" inputMode="numeric" value={fmtFormNum(projForm.sales_price)} onChange={e => setProjForm(f => ({ ...f, sales_price: e.target.value.replace(/,/g, '') }))} />
             </label>
             <label className="form-label">
               土地代
-              <input className="form-input" type="number" value={projForm.land_cost} onChange={e => setProjForm(f => ({ ...f, land_cost: e.target.value }))} />
+              <input className="form-input" inputMode="numeric" value={fmtFormNum(projForm.land_cost)} onChange={e => setProjForm(f => ({ ...f, land_cost: e.target.value.replace(/,/g, '') }))} />
             </label>
             <label className="form-label">
               アプラス会員番号

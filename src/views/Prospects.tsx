@@ -178,8 +178,8 @@ export function Prospects({
                 <th style={thStyle}>顧客名</th>
                 <th style={thStyle}>物件名</th>
                 <th style={thStyle}>会社</th>
-                <th style={{ ...thStyle, textAlign: 'right' }}>設備費</th>
-                <th style={{ ...thStyle, textAlign: 'right' }}>融資額</th>
+                <th style={thStyle}>設備費</th>
+                <th style={thStyle}>融資額</th>
                 <th style={thStyle}>申込</th>
                 <th style={thStyle}>契約</th>
                 <th style={thStyle}></th>
@@ -192,13 +192,13 @@ export function Prospects({
                   className="clickable-row"
                   onClick={() => onViewDetail(p.id)}
                 >
-                  <td style={{ ...tdStyle, fontWeight: 600, color: '#1e293b' }}>
+                  <td style={{ ...tdStyle, fontWeight: 600 }}>
                     {p.customer_name}
                     {p.converted_customer_id && (
                       <span style={{ marginLeft: 6, fontSize: 11, background: '#d1fae5', color: '#065f46', borderRadius: 99, padding: '1px 6px', fontWeight: 600 }}>移行済</span>
                     )}
                   </td>
-                  <td style={{ ...tdStyle, color: '#64748b' }}>{p.project_name}</td>
+                  <td style={tdStyle}>{p.project_name}</td>
                   <td style={tdStyle}>
                     {p.loan_company && (
                       <span style={{ background: '#e0f2fe', color: '#0369a1', fontSize: 11.5, fontWeight: 600, borderRadius: 99, padding: '2px 8px' }}>
@@ -206,8 +206,8 @@ export function Prospects({
                       </span>
                     )}
                   </td>
-                  <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>{fmtNum(p.equipment)}</td>
-                  <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>{fmtNum(p.loan_amount)}</td>
+                  <td style={{ ...tdStyle, fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>{fmtNum(p.equipment)}</td>
+                  <td style={{ ...tdStyle, fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>{fmtNum(p.loan_amount)}</td>
                   <td style={tdStyle}><ApplyBadge status={p.apply_status} /></td>
                   <td style={tdStyle}><ContractBadge status={p.contract_status} /></td>
                   <td style={tdStyle} onClick={e => e.stopPropagation()}>
@@ -231,11 +231,11 @@ export function Prospects({
 }
 
 const thStyle: React.CSSProperties = {
-  textAlign: 'left', padding: '9px 12px',
+  textAlign: 'center', padding: '9px 12px',
   fontSize: 12, fontWeight: 600, color: '#475569',
   borderBottom: '2px solid #f1f5f9', whiteSpace: 'nowrap',
 }
 const tdStyle: React.CSSProperties = {
-  padding: '10px 12px', borderBottom: '1px solid #f1f5f9',
+  textAlign: 'center', padding: '10px 12px', borderBottom: '1px solid #f1f5f9',
   fontSize: 13.5, color: '#374151',
 }

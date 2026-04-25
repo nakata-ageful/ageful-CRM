@@ -63,6 +63,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
     site_address: project.site_address ?? '',
     latitude: project.latitude != null ? String(project.latitude) : '',
     longitude: project.longitude != null ? String(project.longitude) : '',
+    google_coordinates: project.google_coordinates ?? '',
     panel_kw: project.panel_kw != null ? String(project.panel_kw) : '',
     panel_count: project.panel_count != null ? String(project.panel_count) : '',
     panel_maker: project.panel_maker ?? '',
@@ -162,6 +163,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       site_address: project.site_address ?? '',
       latitude: project.latitude != null ? String(project.latitude) : '',
       longitude: project.longitude != null ? String(project.longitude) : '',
+      google_coordinates: project.google_coordinates ?? '',
       panel_kw: project.panel_kw != null ? String(project.panel_kw) : '',
       panel_count: project.panel_count != null ? String(project.panel_count) : '',
       panel_maker: project.panel_maker ?? '',
@@ -366,8 +368,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             <div className="info-field"><span>発電所名</span><b>{project.plant_name ?? '-'}</b></div>
             <div className="info-field"><span>都道府県</span><b>{project.site_prefecture ?? '-'}</b></div>
             <div className="info-field" style={{ gridColumn: '1/-1' }}><span>設置住所</span><b>{project.site_address ?? '-'}</b></div>
-            <div className="info-field"><span>緯度</span><b>{project.latitude != null ? String(project.latitude) : '-'}</b></div>
-            <div className="info-field"><span>経度</span><b>{project.longitude != null ? String(project.longitude) : '-'}</b></div>
+            <div className="info-field"><span>Google座標</span><b>{project.google_coordinates ?? '-'}</b></div>
             <div className="info-field"><span>系統ID</span><b>{project.grid_id ?? '-'}</b></div>
             <div className="info-field"><span>系統認定日</span><b>{project.grid_certified_at ?? '-'}</b></div>
             <div className="info-field"><span>FIT</span><b>{project.fit_period != null ? `${project.fit_period}円` : '-'}</b></div>
@@ -1054,12 +1055,8 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               <input className="form-input" value={projForm.site_address} onChange={e => setProjForm(f => ({ ...f, site_address: e.target.value }))} />
             </label>
             <label className="form-label">
-              緯度
-              <input className="form-input" value={projForm.latitude} onChange={e => setProjForm(f => ({ ...f, latitude: e.target.value }))} />
-            </label>
-            <label className="form-label">
-              経度
-              <input className="form-input" value={projForm.longitude} onChange={e => setProjForm(f => ({ ...f, longitude: e.target.value }))} />
+              Google座標
+              <input className="form-input" value={projForm.google_coordinates} onChange={e => setProjForm(f => ({ ...f, google_coordinates: e.target.value }))} placeholder="35.6812, 139.7671" />
             </label>
             <label className="form-label">
               パネルkW

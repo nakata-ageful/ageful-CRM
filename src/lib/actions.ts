@@ -121,6 +121,7 @@ export type ProjectInput = {
   site_address: string
   latitude: string
   longitude: string
+  google_coordinates: string
   panel_kw: string
   panel_count: string
   panel_maker: string
@@ -165,6 +166,7 @@ function projectPayload(input: Omit<ProjectInput, 'customer_id'>): Omit<Project,
     site_address: input.site_address || null,
     latitude: toFloat(input.latitude),
     longitude: toFloat(input.longitude),
+    google_coordinates: input.google_coordinates || null,
     panel_kw: toFloat(input.panel_kw),
     panel_count: toInt(input.panel_count),
     panel_maker: input.panel_maker || null,
@@ -498,6 +500,7 @@ export async function bulkImportProjects(
         site_address: row.site_address || null,
         latitude: toFloat(row.latitude),
         longitude: toFloat(row.longitude),
+        google_coordinates: null,
         panel_kw: toFloat(row.panel_kw),
         panel_count: toInt(row.panel_count),
         panel_maker: row.panel_manufacturer || null,
@@ -817,7 +820,7 @@ export async function createProspect(input: ProspectInput): Promise<Prospect> {
     customer_id: customer.id,
     project_no: '', project_name: input.project_name, plant_name: '',
     site_postal_code: '', site_prefecture: '', site_address: input.site_address || '',
-    latitude: '', longitude: '',
+    latitude: '', longitude: '', google_coordinates: '',
     panel_kw: input.panel_kw || '', panel_count: '',
     panel_maker: '', panel_model: '', pcs_kw: '', pcs_count: '', pcs_maker: '', pcs_model: '',
     grid_id: '', grid_certified_at: '', fit_period: '', power_supply_start_date: '',
@@ -940,7 +943,7 @@ export async function convertProspectToCustomer(prospect: Prospect): Promise<num
     customer_id: customer.id,
     project_no: '', project_name: prospect.project_name, plant_name: '',
     site_postal_code: '', site_prefecture: '', site_address: prospect.site_address || '',
-    latitude: '', longitude: '',
+    latitude: '', longitude: '', google_coordinates: '',
     panel_kw: prospect.panel_kw?.toString() ?? '', panel_count: '',
     panel_maker: '', panel_model: '', pcs_kw: '', pcs_count: '', pcs_maker: '', pcs_model: '',
     grid_id: '', grid_certified_at: '', fit_period: '', power_supply_start_date: '',

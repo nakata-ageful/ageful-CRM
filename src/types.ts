@@ -28,6 +28,7 @@ export type Project = {
   site_address: string | null
   latitude: number | null
   longitude: number | null
+  google_coordinates: string | null
   // パネル情報
   panel_kw: number | null
   panel_count: number | null

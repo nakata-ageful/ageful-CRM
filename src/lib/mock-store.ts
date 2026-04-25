@@ -26,7 +26,7 @@ const initProjects: Project[] = [
   {
     id: 1, customer_id: 7, project_no: null, plant_name: null, project_name:'阿久根',
     site_postal_code: '895-1402', site_prefecture: '鹿児島県', site_address: '薩摩川内市阿久根浦之名14458-3',
-    latitude: null, longitude: null,
+    latitude: null, longitude: null, google_coordinates: null,
     panel_kw: 45.9, panel_count: 180, panel_maker: 'ハンファ', panel_model: 'Q.PRO-G3 255',
     pcs_kw: 50.0, pcs_count: 5, pcs_maker: '新電元工業', pcs_model: null,
     grid_id: 'A829960H46', grid_certified_at: '2013-11-25', fit_period: 36,
@@ -40,7 +40,7 @@ const initProjects: Project[] = [
   {
     id: 2, customer_id: 1, project_no: null, plant_name: null, project_name:'幡ヶ岳ソーラーエネルギー',
     site_postal_code: '788-0323', site_prefecture: '高知県', site_address: '幡多郡大正町江師 子丸田710付',
-    latitude: null, longitude: null,
+    latitude: null, longitude: null, google_coordinates: null,
     panel_kw: null, panel_count: null, panel_maker: null, panel_model: null,
     pcs_kw: null, pcs_count: null, pcs_maker: null, pcs_model: null,
     grid_id: null, grid_certified_at: '2020-12-16', fit_period: 18,
@@ -54,7 +54,7 @@ const initProjects: Project[] = [
   {
     id: 3, customer_id: 6, project_no: null, plant_name: null, project_name:'天草8666',
     site_postal_code: '861-6551', site_prefecture: '熊本県', site_address: '天草市上浦町深浦8666-10',
-    latitude: 32.402234, longitude: 130.246934,
+    latitude: 32.402234, longitude: 130.246934, google_coordinates: null,
     panel_kw: null, panel_count: null, panel_maker: null, panel_model: null,
     pcs_kw: null, pcs_count: null, pcs_maker: null, pcs_model: null,
     grid_id: null, grid_certified_at: '2021-10-27', fit_period: 14,
@@ -68,7 +68,7 @@ const initProjects: Project[] = [
   {
     id: 4, customer_id: 2, project_no: null, plant_name: null, project_name:'竹田市梅木水引',
     site_postal_code: '878-0204', site_prefecture: '大分県', site_address: '竹田市九重野大字梅木字水引3811-9',
-    latitude: 33.025612, longitude: 131.351047,
+    latitude: 33.025612, longitude: 131.351047, google_coordinates: null,
     panel_kw: 94.34, panel_count: null, panel_maker: 'Maxar', panel_model: null,
     pcs_kw: 49.5, pcs_count: null, pcs_maker: 'HUWEI', pcs_model: null,
     grid_id: null, grid_certified_at: '2021-07-22', fit_period: 21,
@@ -82,7 +82,7 @@ const initProjects: Project[] = [
   {
     id: 5, customer_id: 3, project_no: null, plant_name: null, project_name:'枌木第一丸田・保守',
     site_postal_code: '788-0323', site_prefecture: '高知県', site_address: '幡多郡大正町江師 子丸田710付',
-    latitude: null, longitude: null,
+    latitude: null, longitude: null, google_coordinates: null,
     panel_kw: null, panel_count: null, panel_maker: null, panel_model: null,
     pcs_kw: null, pcs_count: null, pcs_maker: null, pcs_model: null,
     grid_id: null, grid_certified_at: '2020-12-16', fit_period: 18,
@@ -96,7 +96,7 @@ const initProjects: Project[] = [
   {
     id: 6, customer_id: 4, project_no: null, plant_name: null, project_name:'三好市奥公',
     site_postal_code: '771-2302', site_prefecture: '徳島県', site_address: '三好市三野町大字加茂野宮413-3',
-    latitude: 34.044083, longitude: 133.983222,
+    latitude: 34.044083, longitude: 133.983222, google_coordinates: null,
     panel_kw: null, panel_count: null, panel_maker: null, panel_model: null,
     pcs_kw: null, pcs_count: null, pcs_maker: null, pcs_model: null,
     grid_id: null, grid_certified_at: '2020-06-25', fit_period: 18,
@@ -110,7 +110,7 @@ const initProjects: Project[] = [
   {
     id: 7, customer_id: 5, project_no: null, plant_name: null, project_name:'淡路市心谷1',
     site_postal_code: '656-2131', site_prefecture: '兵庫県', site_address: '淡路市心谷（ニュー）字向谷2724付',
-    latitude: 34.428646, longitude: 134.895562,
+    latitude: 34.428646, longitude: 134.895562, google_coordinates: null,
     panel_kw: null, panel_count: null, panel_maker: null, panel_model: null,
     pcs_kw: null, pcs_count: null, pcs_maker: null, pcs_model: null,
     grid_id: null, grid_certified_at: '2022-01-14', fit_period: 18,
@@ -124,7 +124,7 @@ const initProjects: Project[] = [
   {
     id: 8, customer_id: 8, project_no: null, plant_name: null, project_name:'天草大矢野',
     site_postal_code: '861-5532', site_prefecture: '熊本県', site_address: '上天草市大矢野町太陽近太陽近山101-5',
-    latitude: null, longitude: null,
+    latitude: null, longitude: null, google_coordinates: null,
     panel_kw: null, panel_count: null, panel_maker: null, panel_model: null,
     pcs_kw: null, pcs_count: null, pcs_maker: null, pcs_model: null,
     grid_id: null, grid_certified_at: '2021-02-26', fit_period: 14,

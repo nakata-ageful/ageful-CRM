@@ -34,6 +34,7 @@ const emptyProjectForm: Omit<ProjectInput, 'customer_id'> = {
   site_address: '',
   latitude: '',
   longitude: '',
+  google_coordinates: '',
   panel_kw: '',
   panel_count: '',
   panel_maker: '',

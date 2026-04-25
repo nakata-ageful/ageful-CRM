@@ -366,6 +366,8 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             <div className="info-field"><span>発電所名</span><b>{project.plant_name ?? '-'}</b></div>
             <div className="info-field"><span>都道府県</span><b>{project.site_prefecture ?? '-'}</b></div>
             <div className="info-field" style={{ gridColumn: '1/-1' }}><span>設置住所</span><b>{project.site_address ?? '-'}</b></div>
+            <div className="info-field"><span>緯度</span><b>{project.latitude != null ? String(project.latitude) : '-'}</b></div>
+            <div className="info-field"><span>経度</span><b>{project.longitude != null ? String(project.longitude) : '-'}</b></div>
             <div className="info-field"><span>系統ID</span><b>{project.grid_id ?? '-'}</b></div>
             <div className="info-field"><span>系統認定日</span><b>{project.grid_certified_at ?? '-'}</b></div>
             <div className="info-field"><span>FIT</span><b>{project.fit_period != null ? `${project.fit_period}円` : '-'}</b></div>

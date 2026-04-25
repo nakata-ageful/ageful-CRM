@@ -53,11 +53,12 @@ function AddModal({ onSave, onClose }: { onSave: (input: ProspectInput) => Promi
               <input className="form-input" value={form.project_name} onChange={e => set('project_name', e.target.value)} placeholder="鹿嶋市武井" />
             </label>
             <label className="form-label">
-              ローン会社
+              信販利用
               <select className="form-select" value={form.loan_company} onChange={e => set('loan_company', e.target.value)}>
                 <option value="">選択してください</option>
-                <option value="アプラス">アプラス</option>
                 <option value="ジャックス">ジャックス</option>
+                <option value="アプラス">アプラス</option>
+                <option value="無し">無し</option>
               </select>
             </label>
             <label className="form-label">

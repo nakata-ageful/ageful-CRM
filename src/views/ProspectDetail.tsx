@@ -132,7 +132,7 @@ function TaskPanel({
                     style={{ fontSize: 12, padding: '3px 8px', flex: 1 }}
                     value={newSub}
                     onChange={e => setNewSub(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') handleAddSub(taskName); if (e.key === 'Escape') setAddingSubFor(null) }}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleAddSub(taskName); if (e.key === 'Escape') setAddingSubFor(null) }}
                     placeholder="小項目名を入力..."
                     autoFocus
                   />
@@ -158,7 +158,7 @@ function TaskPanel({
           style={{ fontSize: 12.5, padding: '4px 8px', flex: 1 }}
           value={newTask}
           onChange={e => setNewTask(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') handleAddTask() }}
+          onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleAddTask() }}
           placeholder="大項目を追加..."
         />
         <button
@@ -188,7 +188,7 @@ function TaskPanel({
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: '#94a3b8' }}>メモ</span>
         <textarea
-          rows={3}
+          rows={10}
           style={{ width: '100%', padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 7, fontSize: 13.5, fontFamily: 'inherit', resize: 'vertical', outline: 'none' }}
           value={memo}
           onChange={e => onMemoChange(e.target.value)}

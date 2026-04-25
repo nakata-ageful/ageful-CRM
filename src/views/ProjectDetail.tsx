@@ -171,7 +171,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       setProjModal(false)
       onReload()
       toast('案件情報を保存しました')
-    } catch (e) { setErr(String(e)) } finally { setSaving(false) }
+    } catch (e: unknown) { setErr(e instanceof Error ? e.message : JSON.stringify(e)) } finally { setSaving(false) }
   }
 
   function openProjEdit() {
@@ -231,7 +231,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       setMrModal(false)
       onReload()
       toast('保守対応を追加しました')
-    } catch (e) { setErr(String(e)) } finally { setSaving(false) }
+    } catch (e: unknown) { setErr(e instanceof Error ? e.message : JSON.stringify(e)) } finally { setSaving(false) }
   }
 
   async function handleDeleteMR(id: number) {
@@ -251,7 +251,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       setPmModal(false)
       onReload()
       toast('定期保守を追加しました')
-    } catch (e) { setErr(String(e)) } finally { setSaving(false) }
+    } catch (e: unknown) { setErr(e instanceof Error ? e.message : JSON.stringify(e)) } finally { setSaving(false) }
   }
 
   async function handleDeletePM(id: number) {
@@ -285,7 +285,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       setArModal(false)
       onReload()
       toast('年次記録を保存しました')
-    } catch (e) { setErr(String(e)) } finally { setSaving(false) }
+    } catch (e: unknown) { setErr(e instanceof Error ? e.message : JSON.stringify(e)) } finally { setSaving(false) }
   }
 
   async function handleARStatusChange(id: number, status: '' | '請求済' | '入金済') {
@@ -344,7 +344,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       setContractModal(false)
       onReload()
       toast(contract ? '契約情報を保存しました' : '契約情報を作成しました')
-    } catch (e) { setErr(String(e)) } finally { setSaving(false) }
+    } catch (e: unknown) { setErr(e instanceof Error ? e.message : JSON.stringify(e)) } finally { setSaving(false) }
   }
 
   return (

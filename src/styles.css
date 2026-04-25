@@ -406,8 +406,12 @@ tr:last-child td { border-bottom: none; }
 .modal-footer {
   display: flex; gap: 8px; justify-content: flex-end;
   margin-top: 20px;
-  padding-top: 16px;
+  padding: 16px 0 0;
   border-top: 1px solid #f1f5f9;
+  position: sticky;
+  bottom: 0;
+  background: #fff;
+  padding-bottom: 4px;
 }
 
 /* ── Form ────────────────────────────────────────────────── */

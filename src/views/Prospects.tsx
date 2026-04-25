@@ -23,7 +23,7 @@ function AddModal({ onSave, onClose }: { onSave: (input: ProspectInput) => Promi
   const [form, setForm] = useState<ProspectInput>({
     customer_name: '', customer_name_kana: '', project_name: '', loan_company: '',
     equipment: '', land_cost: '', loan_amount: '',
-    site_address: '', panel_kw: '', referrer: '', lead_date: '',
+    site_address: '', panel_kw: '', sales_company: '', referrer: '', lead_date: '',
   })
   const [saving, setSaving] = useState(false)
   const set = (k: keyof ProspectInput, v: string) => setForm(f => ({ ...f, [k]: v }))
@@ -84,6 +84,10 @@ function AddModal({ onSave, onClose }: { onSave: (input: ProspectInput) => Promi
             <label className="form-label">
               kW数
               <input className="form-input" type="number" value={form.panel_kw} onChange={e => set('panel_kw', e.target.value)} placeholder="45.9" />
+            </label>
+            <label className="form-label">
+              販売会社
+              <input className="form-input" value={form.sales_company} onChange={e => set('sales_company', e.target.value)} />
             </label>
             <label className="form-label">
               紹介元

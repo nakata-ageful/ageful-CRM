@@ -827,7 +827,7 @@ export async function createProspect(input: ProspectInput): Promise<Prospect> {
     customer_number: '', generation_point_id: '', meter_reading_day: '',
     monitoring_system: '', monitoring_id: '', monitoring_user: '', monitoring_pw: '',
     has_4g: false, key_number: '', local_association: '', old_owner: '',
-    sales_company: '', referrer: input.referrer || '',
+    sales_company: input.sales_company || '', referrer: input.referrer || '',
     power_change_date: '', handover_date: '',
     sales_price: input.equipment || '',
     reference_price: '', land_cost: input.land_cost || '',
@@ -852,6 +852,7 @@ export async function createProspect(input: ProspectInput): Promise<Prospect> {
     contract_memo: null,
     site_address: input.site_address || null,
     panel_kw: toFloat(input.panel_kw),
+    sales_company: input.sales_company || null,
     referrer: input.referrer || null,
     lead_date: input.lead_date || null,
     apply_submit_date: null,
@@ -904,6 +905,7 @@ async function syncProspectToCustomerProject(
   if ('project_name' in data) projectUpdate.project_name = data.project_name
   if ('site_address' in data) projectUpdate.site_address = data.site_address || ''
   if ('panel_kw' in data) projectUpdate.panel_kw = data.panel_kw
+  if ('sales_company' in data) projectUpdate.sales_company = data.sales_company || ''
   if ('referrer' in data) projectUpdate.referrer = data.referrer || ''
   if ('equipment' in data) projectUpdate.sales_price = data.equipment
   if ('land_cost' in data) projectUpdate.land_cost = data.land_cost
@@ -950,7 +952,7 @@ export async function convertProspectToCustomer(prospect: Prospect): Promise<num
     customer_number: '', generation_point_id: '', meter_reading_day: '',
     monitoring_system: '', monitoring_id: '', monitoring_user: '', monitoring_pw: '',
     has_4g: false, key_number: '', local_association: '', old_owner: '',
-    sales_company: '', referrer: prospect.referrer || '',
+    sales_company: prospect.sales_company || '', referrer: prospect.referrer || '',
     power_change_date: '', handover_date: prospect.handover_date || '',
     sales_price: prospect.equipment?.toString() ?? '',
     reference_price: '', land_cost: prospect.land_cost?.toString() ?? '',

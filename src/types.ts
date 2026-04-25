@@ -306,6 +306,7 @@ export type Prospect = {
   contract_memo: string | null
   site_address: string | null
   panel_kw: number | null
+  sales_company: string | null
   referrer: string | null
   lead_date: string | null
   apply_submit_date: string | null
@@ -328,6 +329,7 @@ export type ProspectInput = {
   loan_amount: string
   site_address: string
   panel_kw: string
+  sales_company: string
   referrer: string
   lead_date: string
 }

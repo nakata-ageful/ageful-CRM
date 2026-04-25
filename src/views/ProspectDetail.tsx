@@ -258,8 +258,8 @@ export function ProspectDetailView({
       {/* 金額カード */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
         {([
-          { label: '設備費', key: 'equipment' as const, value: p.equipment },
-          { label: '土地費', key: 'land_cost' as const, value: p.land_cost },
+          { label: '設備代', key: 'equipment' as const, value: p.equipment },
+          { label: '土地代', key: 'land_cost' as const, value: p.land_cost },
           { label: '合計', key: null, value: total },
           { label: '融資額', key: 'loan_amount' as const, value: p.loan_amount },
         ] as const).map(({ label, key, value }) => (
@@ -268,12 +268,15 @@ export function ProspectDetailView({
             {key ? (
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   className="form-input"
                   style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', width: '100%', padding: '2px 6px', textAlign: 'right' }}
-                  value={value ?? ''}
+                  value={value != null ? fmtNum(value) : ''}
                   onChange={e => {
-                    const v = e.target.value ? Number(e.target.value) : null
+                    const raw = e.target.value.replace(/,/g, '')
+                    const v = raw ? Number(raw) : null
+                    if (raw && isNaN(Number(raw))) return
                     save({ [key]: v })
                   }}
                   placeholder="0"

@@ -518,7 +518,7 @@ let _nextProspectId = 1
 const initProspects: Prospect[] = [
   {
     id: _nextProspectId++,
-    customer_name: '米澤 翔平', project_name: '伊佐③', loan_company: 'ジャックス',
+    customer_name: '米澤 翔平', customer_name_kana: null, project_name: '伊佐③', loan_company: 'ジャックス',
     equipment: 22400000, land_cost: 1400000, loan_amount: 23800000,
     apply_status: '未', contract_status: '未',
     apply_tasks: {}, contract_tasks: {}, apply_sub_tasks: {}, contract_sub_tasks: {},
@@ -530,7 +530,7 @@ const initProspects: Prospect[] = [
   },
   {
     id: _nextProspectId++,
-    customer_name: '小林 恵理子', project_name: '伊佐②', loan_company: 'ジャックス',
+    customer_name: '小林 恵理子', customer_name_kana: null, project_name: '伊佐②', loan_company: 'ジャックス',
     equipment: 21100000, land_cost: 1400000, loan_amount: 22500000,
     apply_status: '提出済', contract_status: '未',
     apply_tasks: {}, contract_tasks: {}, apply_sub_tasks: {}, contract_sub_tasks: {},
@@ -542,7 +542,7 @@ const initProspects: Prospect[] = [
   },
   {
     id: _nextProspectId++,
-    customer_name: '赤坂 恭夫', project_name: '鹿嶋市武井', loan_company: 'ジャックス',
+    customer_name: '赤坂 恭夫', customer_name_kana: null, project_name: '鹿嶋市武井', loan_company: 'ジャックス',
     equipment: 17100000, land_cost: 1000000, loan_amount: 18100000,
     apply_status: '通過', contract_status: '未',
     apply_tasks: {}, contract_tasks: {}, apply_sub_tasks: {}, contract_sub_tasks: {},

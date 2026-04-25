@@ -289,6 +289,7 @@ export type ProspectContractStatus = '未' | '完了' | '不可'
 export type Prospect = {
   id: number
   customer_name: string
+  customer_name_kana: string | null
   project_name: string
   loan_company: string | null       // アプラス / ジャックス
   equipment: number | null          // 設備費（円）
@@ -318,6 +319,7 @@ export type Prospect = {
 
 export type ProspectInput = {
   customer_name: string
+  customer_name_kana: string
   project_name: string
   loan_company: string
   equipment: string

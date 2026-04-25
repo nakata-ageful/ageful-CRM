@@ -804,7 +804,7 @@ export async function createProspect(input: ProspectInput): Promise<Prospect> {
   // 顧客+案件を同時作成（見込み段階から案件情報を入力可能にするため）
   const customer = await createCustomer({
     name: input.customer_name,
-    name_kana: '',
+    name_kana: input.customer_name_kana || '',
     company_name: '',
     is_corporate: false,
     email: '',
@@ -833,6 +833,7 @@ export async function createProspect(input: ProspectInput): Promise<Prospect> {
 
   const payload = {
     customer_name: input.customer_name,
+    customer_name_kana: input.customer_name_kana || null,
     project_name: input.project_name,
     loan_company: input.loan_company || null,
     equipment: toInt(input.equipment),
@@ -885,6 +886,7 @@ async function syncProspectToCustomerProject(
   // 顧客テーブルへの同期
   const customerUpdate: Record<string, unknown> = {}
   if ('customer_name' in data) customerUpdate.name = data.customer_name
+  if ('customer_name_kana' in data) customerUpdate.name_kana = data.customer_name_kana ?? ''
 
   if (Object.keys(customerUpdate).length > 0) {
     if (!hasSupabaseEnv) {
@@ -924,7 +926,7 @@ export async function convertProspectToCustomer(prospect: Prospect): Promise<num
   // 顧客作成
   const customer = await createCustomer({
     name: prospect.customer_name,
-    name_kana: '',
+    name_kana: prospect.customer_name_kana ?? '',
     company_name: '',
     is_corporate: false,
     email: '',

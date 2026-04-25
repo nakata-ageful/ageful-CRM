@@ -21,7 +21,7 @@ function ContractBadge({ status }: { status: ProspectContractStatus }) {
 
 function AddModal({ onSave, onClose }: { onSave: (input: ProspectInput) => Promise<void>; onClose: () => void }) {
   const [form, setForm] = useState<ProspectInput>({
-    customer_name: '', project_name: '', loan_company: '',
+    customer_name: '', customer_name_kana: '', project_name: '', loan_company: '',
     equipment: '', land_cost: '', loan_amount: '',
     site_address: '', panel_kw: '', referrer: '', lead_date: '',
   })
@@ -47,6 +47,10 @@ function AddModal({ onSave, onClose }: { onSave: (input: ProspectInput) => Promi
             <label className="form-label required">
               顧客名
               <input className="form-input" value={form.customer_name} onChange={e => set('customer_name', e.target.value)} placeholder="山田 太郎" />
+            </label>
+            <label className="form-label">
+              ふりがな
+              <input className="form-input" value={form.customer_name_kana} onChange={e => set('customer_name_kana', e.target.value)} placeholder="やまだ たろう" />
             </label>
             <label className="form-label required">
               物件名

@@ -299,6 +299,15 @@ export function ProspectDetailView({
             />
           </div>
           <div className="info-field">
+            <span>ふりがな</span>
+            <input
+              type="text" className="form-input" style={{ marginTop: 4 }}
+              value={p.customer_name_kana ?? ''}
+              onChange={e => save({ customer_name_kana: e.target.value || null })}
+              placeholder="やまだ たろう"
+            />
+          </div>
+          <div className="info-field">
             <span>物件名</span>
             <input
               type="text" className="form-input" style={{ marginTop: 4 }}

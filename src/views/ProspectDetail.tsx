@@ -313,7 +313,7 @@ export function ProspectDetailView({
             />
           </div>
           <div className="info-field">
-            <span>ローン会社</span>
+            <span>信販利用</span>
             <select
               className="form-input" style={{ marginTop: 4 }}
               value={p.loan_company ?? ''}

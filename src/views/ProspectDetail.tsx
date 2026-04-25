@@ -290,6 +290,7 @@ export function ProspectDetailView({
       <div className="card">
         <div className="section-title">基本情報</div>
         <div className="info-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+          {/* 1行目: 顧客名 / ふりがな / パネル容量 */}
           <div className="info-field">
             <span>顧客名</span>
             <input
@@ -308,11 +309,31 @@ export function ProspectDetailView({
             />
           </div>
           <div className="info-field">
+            <span>パネル容量 (kW)</span>
+            <input
+              type="number" className="form-input" style={{ marginTop: 4 }}
+              value={p.panel_kw ?? ''}
+              onChange={e => save({ panel_kw: e.target.value ? Number(e.target.value) : null })}
+              placeholder="0"
+              step="0.01"
+            />
+          </div>
+          {/* 2行目: 物件名 / 物件所在地 / 信販利用 */}
+          <div className="info-field">
             <span>物件名</span>
             <input
               type="text" className="form-input" style={{ marginTop: 4 }}
               value={p.project_name}
               onChange={e => save({ project_name: e.target.value })}
+            />
+          </div>
+          <div className="info-field">
+            <span>物件所在地</span>
+            <input
+              type="text" className="form-input" style={{ marginTop: 4 }}
+              value={p.site_address ?? ''}
+              onChange={e => save({ site_address: e.target.value || null })}
+              placeholder="茨城県鹿嶋市..."
             />
           </div>
           <div className="info-field">
@@ -328,25 +349,7 @@ export function ProspectDetailView({
               <option value="無し">無し</option>
             </select>
           </div>
-          <div className="info-field">
-            <span>パネル容量 (kW)</span>
-            <input
-              type="number" className="form-input" style={{ marginTop: 4 }}
-              value={p.panel_kw ?? ''}
-              onChange={e => save({ panel_kw: e.target.value ? Number(e.target.value) : null })}
-              placeholder="0"
-              step="0.01"
-            />
-          </div>
-          <div className="info-field">
-            <span>紹介者</span>
-            <input
-              type="text" className="form-input" style={{ marginTop: 4 }}
-              value={p.referrer ?? ''}
-              onChange={e => save({ referrer: e.target.value || null })}
-              placeholder="紹介者名"
-            />
-          </div>
+          {/* 3行目: 販売会社 / 紹介者 */}
           <div className="info-field">
             <span>販売会社</span>
             <input
@@ -357,12 +360,12 @@ export function ProspectDetailView({
             />
           </div>
           <div className="info-field">
-            <span>物件所在地</span>
+            <span>紹介者</span>
             <input
               type="text" className="form-input" style={{ marginTop: 4 }}
-              value={p.site_address ?? ''}
-              onChange={e => save({ site_address: e.target.value || null })}
-              placeholder="茨城県鹿嶋市..."
+              value={p.referrer ?? ''}
+              onChange={e => save({ referrer: e.target.value || null })}
+              placeholder="紹介者名"
             />
           </div>
         </div>

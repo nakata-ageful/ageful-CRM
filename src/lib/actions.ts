@@ -818,7 +818,7 @@ export async function createProspect(input: ProspectInput): Promise<Prospect> {
 
   await createProject({
     customer_id: customer.id,
-    project_no: '', project_name: input.project_name, plant_name: '',
+    project_no: '', project_name: input.project_name, plant_name: input.project_name,
     site_postal_code: '', site_prefecture: '', site_address: input.site_address || '',
     latitude: '', longitude: '', google_coordinates: '',
     panel_kw: input.panel_kw || '', panel_count: '',
@@ -902,7 +902,10 @@ async function syncProspectToCustomerProject(
 
   // 案件テーブルへの同期（customer_id から案件を引く）
   const projectUpdate: Record<string, unknown> = {}
-  if ('project_name' in data) projectUpdate.project_name = data.project_name
+  if ('project_name' in data) {
+    projectUpdate.project_name = data.project_name
+    projectUpdate.plant_name = data.project_name
+  }
   if ('site_address' in data) projectUpdate.site_address = data.site_address || ''
   if ('panel_kw' in data) projectUpdate.panel_kw = data.panel_kw
   if ('sales_company' in data) projectUpdate.sales_company = data.sales_company || ''
@@ -943,7 +946,7 @@ export async function convertProspectToCustomer(prospect: Prospect): Promise<num
   // 案件作成
   const project = await createProject({
     customer_id: customer.id,
-    project_no: '', project_name: prospect.project_name, plant_name: '',
+    project_no: '', project_name: prospect.project_name, plant_name: prospect.project_name,
     site_postal_code: '', site_prefecture: '', site_address: prospect.site_address || '',
     latitude: '', longitude: '', google_coordinates: '',
     panel_kw: prospect.panel_kw?.toString() ?? '', panel_count: '',

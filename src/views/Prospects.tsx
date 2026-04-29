@@ -53,7 +53,7 @@ function AddModal({ onSave, onClose }: { onSave: (input: ProspectInput) => Promi
               <input className="form-input" value={form.customer_name_kana} onChange={e => set('customer_name_kana', e.target.value)} placeholder="やまだ たろう" />
             </label>
             <label className="form-label required">
-              物件名
+              発電所名
               <input className="form-input" value={form.project_name} onChange={e => set('project_name', e.target.value)} placeholder="鹿嶋市武井" />
             </label>
             <label className="form-label">
@@ -185,7 +185,7 @@ export function Prospects({
             <thead>
               <tr>
                 <th style={thStyle}>顧客名</th>
-                <th style={thStyle}>物件名</th>
+                <th style={thStyle}>発電所名</th>
                 <th style={thStyle}>信販利用</th>
                 <th style={thStyle}>設備費</th>
                 <th style={thStyle}>融資額</th>

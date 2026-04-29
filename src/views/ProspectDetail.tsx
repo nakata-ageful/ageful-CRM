@@ -318,9 +318,9 @@ export function ProspectDetailView({
               step="0.01"
             />
           </div>
-          {/* 2行目: 物件名 / 物件所在地 / 信販利用 */}
+          {/* 2行目: 発電所名 / 物件所在地 / 信販利用 */}
           <div className="info-field">
-            <span>物件名</span>
+            <span>発電所名</span>
             <input
               type="text" className="form-input" style={{ marginTop: 4 }}
               value={p.project_name}

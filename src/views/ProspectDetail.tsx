@@ -248,7 +248,7 @@ export function ProspectDetailView({
         {saving && <span style={{ fontSize: 12, color: '#94a3b8' }}>保存中...</span>}
         {p.converted_customer_id && (<>
           <button className="btn btn-sub btn-sm" onClick={() => onViewCustomer(p.converted_customer_id!)}>顧客詳細 →</button>
-          <button className="btn btn-main btn-sm" onClick={() => onViewProject(p.converted_customer_id!)}>案件詳細 →</button>
+          <button className="btn btn-sub btn-sm" onClick={() => onViewProject(p.converted_customer_id!)}>案件詳細 →</button>
         </>)}
       </div>
 

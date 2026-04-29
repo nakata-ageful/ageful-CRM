@@ -311,11 +311,13 @@ export function ProspectDetailView({
           <div className="info-field">
             <span>パネル容量 (kW)</span>
             <input
-              type="number" className="form-input" style={{ marginTop: 4 }}
+              type="text" inputMode="decimal" className="form-input" style={{ marginTop: 4 }}
               value={p.panel_kw ?? ''}
-              onChange={e => save({ panel_kw: e.target.value ? Number(e.target.value) : null })}
+              onChange={e => {
+                const v = e.target.value
+                if (v === '' || /^[\d.]*$/.test(v)) save({ panel_kw: v ? Number(v) : null })
+              }}
               placeholder="0"
-              step="0.01"
             />
           </div>
           {/* 2行目: 発電所名 / 物件所在地 / 信販利用 */}

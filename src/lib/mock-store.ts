@@ -10,14 +10,14 @@ import type {
 // ── 初期顧客データ ─────────────────────────────────────────
 
 const initCustomers: Customer[] = [
-  { id: 1, name: '大野 修善', company_name: null, is_corporate: false, name_kana: null, email: null, phone: '090-3563-8698', postal_code: '471-0878', address: '愛知県豊田市上挙母1-3-3', created_at: '2020-06-01' },
-  { id: 2, name: '仲 奈夫子', company_name: null, is_corporate: false, name_kana: null, email: 'n.k.you.free@gmail.com', phone: '090-2912-1272', postal_code: '344-0067', address: '埼玉県春日部市中央1-57-3', created_at: '2021-07-22' },
-  { id: 3, name: '森田 義雄', company_name: null, is_corporate: false, name_kana: null, email: 'yoshio.m.0527@gmail.com', phone: '080-1038-4530', postal_code: null, address: null, created_at: '2020-12-16' },
-  { id: 4, name: '小泉 千尋', company_name: null, is_corporate: false, name_kana: null, email: 'kchihiro2801@gmail.com', phone: '080-1123-0732', postal_code: null, address: null, created_at: '2020-06-25' },
-  { id: 5, name: '岩山 洋行', company_name: null, is_corporate: false, name_kana: null, email: 'lifeisplaying@yahoo.co.jp', phone: '080-2255-5284', postal_code: null, address: '兵庫県宍粟市赤西304', created_at: '2022-01-14' },
-  { id: 6, name: '川上 貴弘', company_name: null, is_corporate: false, name_kana: null, email: 'taka110058kt@gmail.com', phone: null, postal_code: '285-0812', address: '千葉県佐倉市上座743', created_at: '2021-10-27' },
-  { id: 7, name: '田中', company_name: 'ヴェクトレイトSE', is_corporate: true, name_kana: null, email: null, phone: null, postal_code: null, address: null, created_at: '2020-01-01' },
-  { id: 8, name: '平澤 滋実', company_name: null, is_corporate: false, name_kana: null, email: null, phone: null, postal_code: null, address: null, created_at: '2021-05-01' },
+  { id: 1, name: '大野 修善', company_name: null, is_corporate: false, name_kana: null, email: null, phone: '090-3563-8698', postal_code: '471-0878', address: '愛知県豊田市上挙母1-3-3', notes: null, created_at: '2020-06-01' },
+  { id: 2, name: '仲 奈夫子', company_name: null, is_corporate: false, name_kana: null, email: 'n.k.you.free@gmail.com', phone: '090-2912-1272', postal_code: '344-0067', address: '埼玉県春日部市中央1-57-3', notes: null, created_at: '2021-07-22' },
+  { id: 3, name: '森田 義雄', company_name: null, is_corporate: false, name_kana: null, email: 'yoshio.m.0527@gmail.com', phone: '080-1038-4530', postal_code: null, address: null, notes: null, created_at: '2020-12-16' },
+  { id: 4, name: '小泉 千尋', company_name: null, is_corporate: false, name_kana: null, email: 'kchihiro2801@gmail.com', phone: '080-1123-0732', postal_code: null, address: null, notes: null, created_at: '2020-06-25' },
+  { id: 5, name: '岩山 洋行', company_name: null, is_corporate: false, name_kana: null, email: 'lifeisplaying@yahoo.co.jp', phone: '080-2255-5284', postal_code: null, address: '兵庫県宍粟市赤西304', notes: null, created_at: '2022-01-14' },
+  { id: 6, name: '川上 貴弘', company_name: null, is_corporate: false, name_kana: null, email: 'taka110058kt@gmail.com', phone: null, postal_code: '285-0812', address: '千葉県佐倉市上座743', notes: null, created_at: '2021-10-27' },
+  { id: 7, name: '田中', company_name: 'ヴェクトレイトSE', is_corporate: true, name_kana: null, email: null, phone: null, postal_code: null, address: null, notes: null, created_at: '2020-01-01' },
+  { id: 8, name: '平澤 滋実', company_name: null, is_corporate: false, name_kana: null, email: null, phone: null, postal_code: null, address: null, notes: null, created_at: '2021-05-01' },
 ]
 
 // ── 初期案件データ ─────────────────────────────────────────
@@ -388,7 +388,7 @@ export const customerStore = {
   getById: (id: number) => customers.find(c => c.id === id) ?? null,
   findByName: (name: string) => customers.find(c => c.name === name || c.company_name === name) ?? null,
   create: (input: Omit<Customer, 'id' | 'created_at' | 'project_count'>) => {
-    const c: Customer = { ...input, id: _nextCustId++, created_at: new Date().toISOString().slice(0, 10) }
+    const c: Customer = { ...input, id: _nextCustId++, notes: null, created_at: new Date().toISOString().slice(0, 10) }
     customers = [...customers, c]
     return c
   },
@@ -406,7 +406,7 @@ export const projectStore = {
   getByCustomerId: (customerId: number) => projects.filter(p => p.customer_id === customerId),
   getById: (id: number) => projects.find(p => p.id === id) ?? null,
   create: (input: Omit<Project, 'id' | 'created_at'>) => {
-    const p: Project = { ...input, id: _nextProjId++, created_at: new Date().toISOString().slice(0, 10) }
+    const p: Project = { ...input, id: _nextProjId++, notes: null, created_at: new Date().toISOString().slice(0, 10) }
     projects = [...projects, p]
     return p
   },
@@ -423,7 +423,7 @@ export const contractStore = {
   getAll: () => contracts,
   getByProjectId: (projectId: number) => contracts.find(c => c.project_id === projectId) ?? null,
   create: (input: Omit<Contract, 'id' | 'created_at'>) => {
-    const c: Contract = { ...input, id: _nextContractId++, created_at: new Date().toISOString().slice(0, 10) }
+    const c: Contract = { ...input, id: _nextContractId++, notes: null, created_at: new Date().toISOString().slice(0, 10) }
     contracts = [...contracts, c]
     return c
   },

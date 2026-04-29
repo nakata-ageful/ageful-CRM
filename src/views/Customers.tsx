@@ -31,6 +31,7 @@ const emptyForm: CustomerInput = {
   phone: '',
   postal_code: '',
   address: '',
+  notes: '',
 }
 
 export function Customers({ customers, onReload, onViewDetail }: Props) {
@@ -86,6 +87,7 @@ export function Customers({ customers, onReload, onViewDetail }: Props) {
       phone: c.phone ?? '',
       postal_code: c.postal_code ?? '',
       address: c.address ?? '',
+      notes: c.notes ?? '',
     })
     setEditTarget(c)
     setModal('edit')

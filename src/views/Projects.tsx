@@ -23,6 +23,7 @@ const emptyCustomerForm: CustomerInput = {
   phone: '',
   postal_code: '',
   address: '',
+  notes: '',
 }
 
 const emptyProjectForm: Omit<ProjectInput, 'customer_id'> = {

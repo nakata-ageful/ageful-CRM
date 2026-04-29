@@ -40,6 +40,7 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject }: 
     phone: customer.phone ?? '',
     postal_code: customer.postal_code ?? '',
     address: customer.address ?? '',
+    notes: customer.notes ?? '',
   })
 
   const [projectModal, setProjectModal] = useState(false)
@@ -133,20 +134,49 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject }: 
             phone: customer.phone ?? '',
             postal_code: customer.postal_code ?? '',
             address: customer.address ?? '',
+            notes: customer.notes ?? '',
           }); setError(''); setEditModal(true) }}>
             編集
           </button>
         </div>
-        <div className="info-grid">
-          <div className="info-field"><span>種別</span><b>{customer.is_corporate ? '法人' : '個人'}</b></div>
-          {customer.company_name && <div className="info-field"><span>会社名</span><b>{customer.company_name}</b></div>}
-          <div className="info-field"><span>顧客名</span><b>{customer.name}</b></div>
-          <div className="info-field"><span>ふりがな</span><b>{customer.name_kana ?? '-'}</b></div>
-          <div className="info-field"><span>電話</span><b>{customer.phone ?? '-'}</b></div>
-          <div className="info-field"><span>メール</span><b>{customer.email ?? '-'}</b></div>
-          <div className="info-field"><span>郵便番号</span><b>{customer.postal_code ?? '-'}</b></div>
-          <div className="info-field" style={{ gridColumn: '1/-1' }}><span>住所</span><b>{customer.address ?? '-'}</b></div>
-        </div>
+        {customer.is_corporate ? (
+          <>
+            <div className="info-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+              <div className="info-field"><span>種別</span><b>法人</b></div>
+              <div className="info-field"><span>会社名</span><b>{customer.company_name ?? '-'}</b></div>
+              <div className="info-field"><span>電話</span><b>{customer.phone ?? '-'}</b></div>
+              <div className="info-field"><span>担当者名</span><b>{customer.name}</b></div>
+              <div className="info-field"><span>ふりがな</span><b>{customer.name_kana ?? '-'}</b></div>
+              <div className="info-field"><span>メール</span><b>{customer.email ?? '-'}</b></div>
+            </div>
+            <div className="info-grid">
+              <div className="info-field"><span>郵便番号</span><b>{customer.postal_code ?? '-'}</b></div>
+              <div className="info-field"><span>住所</span><b>{customer.address ?? '-'}</b></div>
+            </div>
+            <div className="info-grid">
+              <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap' }}>{customer.notes || '-'}</b></div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="info-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+              <div className="info-field"><span>種別</span><b>個人</b></div>
+              <div className="info-field"><span>顧客名</span><b>{customer.name}</b></div>
+              <div className="info-field"><span>ふりがな</span><b>{customer.name_kana ?? '-'}</b></div>
+            </div>
+            <div className="info-grid">
+              <div className="info-field"><span>電話</span><b>{customer.phone ?? '-'}</b></div>
+              <div className="info-field"><span>メール</span><b>{customer.email ?? '-'}</b></div>
+            </div>
+            <div className="info-grid">
+              <div className="info-field"><span>郵便番号</span><b>{customer.postal_code ?? '-'}</b></div>
+              <div className="info-field"><span>住所</span><b>{customer.address ?? '-'}</b></div>
+            </div>
+            <div className="info-grid">
+              <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap' }}>{customer.notes || '-'}</b></div>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="card">
@@ -252,6 +282,10 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject }: 
             <label className="form-label" style={{ gridColumn: '1/-1' }}>
               住所
               <input className="form-input" value={editForm.address} onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))} />
+            </label>
+            <label className="form-label" style={{ gridColumn: '1/-1' }}>
+              備考
+              <textarea className="form-input" rows={3} value={editForm.notes} onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))} />
             </label>
           </div>
           <div className="modal-footer">

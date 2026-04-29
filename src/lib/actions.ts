@@ -75,6 +75,7 @@ export async function createCustomer(input: CustomerInput): Promise<Customer> {
     phone: input.phone || null,
     postal_code: input.postal_code || null,
     address: input.address || null,
+    notes: input.notes || null,
   }
   if (!hasSupabaseEnv) return customerStore.create(payload)
   const { data, error } = await db().from('customers').insert(payload).select().single()
@@ -92,6 +93,7 @@ export async function updateCustomer(id: number, input: CustomerInput): Promise<
     phone: input.phone || null,
     postal_code: input.postal_code || null,
     address: input.address || null,
+    notes: input.notes || null,
   }
   if (!hasSupabaseEnv) {
     const updated = customerStore.update(id, payload)
@@ -446,6 +448,7 @@ export async function bulkImportProjects(
             phone: row.phone || null,
             postal_code: row.postal_code || null,
             address: row.customer_address || null,
+            notes: '',
           })
           customerId = newCust.id
         }
@@ -814,6 +817,7 @@ export async function createProspect(input: ProspectInput): Promise<Prospect> {
     phone: '',
     postal_code: '',
     address: input.site_address || '',
+    notes: '',
   })
 
   await createProject({
@@ -942,6 +946,7 @@ export async function convertProspectToCustomer(prospect: Prospect): Promise<num
     phone: '',
     postal_code: '',
     address: prospect.site_address || '',
+    notes: '',
   })
 
   // 案件作成

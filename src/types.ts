@@ -12,6 +12,7 @@ export type Customer = {
   phone: string | null
   postal_code: string | null
   address: string | null
+  notes: string | null
   created_at: string
   project_count?: number
 }
@@ -251,6 +252,7 @@ export type CustomerInput = {
   phone: string
   postal_code: string
   address: string
+  notes: string
 }
 
 export type MaintenanceResponseInput = {

@@ -134,7 +134,7 @@ export function Customers({ customers, onReload, onViewDetail }: Props) {
         <table>
           <thead>
             <tr>
-              <th>顧客名</th><th>会社名</th><th>種別</th><th>電話番号</th>
+              <th>会社名</th><th>担当者名</th><th>種別</th><th>電話番号</th>
               <th>メール</th><th>案件数</th><th>操作</th>
             </tr>
           </thead>
@@ -144,8 +144,8 @@ export function Customers({ customers, onReload, onViewDetail }: Props) {
             )}
             {groups.map(g => (
               <tr key={g.primary.id} className="clickable-row" onClick={() => onViewDetail(g.primary.id)}>
-                <td><strong>{g.primary.name}</strong></td>
-                <td>{g.primary.company_name ?? '-'}</td>
+                <td><strong>{g.primary.is_corporate ? g.primary.company_name ?? '-' : g.primary.name}</strong></td>
+                <td>{g.primary.is_corporate ? g.primary.name : '-'}</td>
                 <td>{g.primary.is_corporate ? '法人' : '個人'}</td>
                 <td>{g.primary.phone ?? '-'}</td>
                 <td>{g.primary.email ?? '-'}</td>

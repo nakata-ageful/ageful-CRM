@@ -207,10 +207,12 @@ export function ProspectDetailView({
   prospect: initial,
   onBack,
   onViewCustomer,
+  onViewProject,
 }: {
   prospect: Prospect
   onBack: () => void
   onViewCustomer: (customerId: number) => void
+  onViewProject: (customerId: number) => void
 }) {
   const [p, setP] = useState<Prospect>(initial)
   const [saving, setSaving] = useState(false)
@@ -244,9 +246,10 @@ export function ProspectDetailView({
         <button className="back-btn" onClick={onBack}>← 一覧へ</button>
         <div style={{ flex: 1 }} />
         {saving && <span style={{ fontSize: 12, color: '#94a3b8' }}>保存中...</span>}
-        {p.converted_customer_id && (
-          <button className="btn btn-main btn-sm" onClick={() => onViewCustomer(p.converted_customer_id!)}>顧客・案件を見る →</button>
-        )}
+        {p.converted_customer_id && (<>
+          <button className="btn btn-sub btn-sm" onClick={() => onViewCustomer(p.converted_customer_id!)}>顧客詳細 →</button>
+          <button className="btn btn-main btn-sm" onClick={() => onViewProject(p.converted_customer_id!)}>案件詳細 →</button>
+        </>)}
       </div>
 
       {/* 金額カード */}

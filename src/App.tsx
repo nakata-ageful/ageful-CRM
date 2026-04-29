@@ -391,6 +391,10 @@ export default function App() {
                 prospect={prospectDetail}
                 onBack={() => { setView('prospects'); reloadProspects() }}
                 onViewCustomer={navToCustomerDetail}
+                onViewProject={async (customerId) => {
+                  const projectId = await getProjectIdByCustomerId(customerId)
+                  if (projectId) navToProjectDetail(projectId)
+                }}
               />
             )}
           </>

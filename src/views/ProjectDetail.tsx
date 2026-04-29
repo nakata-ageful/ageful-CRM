@@ -9,9 +9,10 @@ import {
 } from '../lib/actions'
 import { fmtYen } from '../lib/utils'
 
-/** 郵便番号を自動フォーマット（数字のみ抽出 → 3桁+4桁にハイフン挿入） */
+/** 郵便番号を自動フォーマット（全角→半角変換、数字のみ抽出 → 3桁+4桁にハイフン挿入） */
 function fmtPostalCode(v: string): string {
-  const digits = v.replace(/\D/g, '').slice(0, 7)
+  const half = v.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+  const digits = half.replace(/\D/g, '').slice(0, 7)
   if (digits.length <= 3) return digits
   return digits.slice(0, 3) + '-' + digits.slice(3)
 }

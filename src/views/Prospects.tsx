@@ -70,7 +70,7 @@ function AddModal({ onSave, onClose }: { onSave: (input: ProspectInput) => Promi
               <input className="form-input" value={form.site_address} onChange={e => set('site_address', e.target.value)} placeholder="茨城県鹿嶋市..." />
             </label>
             <label className="form-label">
-              設備費（円）
+              設備代（円）
               <input className="form-input" type="number" value={form.equipment} onChange={e => set('equipment', e.target.value)} />
             </label>
             <label className="form-label">
@@ -187,7 +187,7 @@ export function Prospects({
                 <th style={thStyle}>顧客名</th>
                 <th style={thStyle}>発電所名</th>
                 <th style={thStyle}>信販利用</th>
-                <th style={thStyle}>設備費</th>
+                <th style={thStyle}>設備代</th>
                 <th style={thStyle}>融資額</th>
                 <th style={thStyle}>申込</th>
                 <th style={thStyle}>契約</th>

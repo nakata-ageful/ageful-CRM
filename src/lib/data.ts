@@ -182,6 +182,15 @@ export async function getProjects(): Promise<ProjectRow[]> {
   })
 }
 
+export async function getProjectIdByCustomerId(customerId: number): Promise<number | null> {
+  if (!hasSupabaseEnv) {
+    const proj = projectStore.getAll().find(p => p.customer_id === customerId)
+    return proj?.id ?? null
+  }
+  const { data } = await db().from('projects').select('id').eq('customer_id', customerId).limit(1).single()
+  return data?.id ?? null
+}
+
 // ── Project Detail ────────────────────────────────────────
 
 export async function getProjectDetail(projectId: number): Promise<ProjectDetail | null> {

@@ -6,6 +6,7 @@ import {
   getDashboard, getCustomers, getProjects, getProjectDetail,
   getCustomerDetail, getMaintenanceResponses, getMaintenanceResponseById,
   getBillingRows, getBillingDetail, getProspects, getProspectById,
+  getProjectIdByCustomerId,
 } from './lib/data'
 import type {
   DashboardStats, Customer, ProjectRow, ProjectDetail,
@@ -360,6 +361,10 @@ export default function App() {
                 prospects={prospects}
                 onReload={reloadProspects}
                 onViewDetail={navToProspectDetail}
+                onViewProject={async (customerId) => {
+                  const projectId = await getProjectIdByCustomerId(customerId)
+                  if (projectId) navToProjectDetail(projectId)
+                }}
               />
             )}
             {view === 'prospect-detail' && prospectDetail && (

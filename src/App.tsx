@@ -359,6 +359,7 @@ export default function App() {
             {view === 'prospects' && (
               <Prospects
                 prospects={prospects}
+                customers={customers}
                 onReload={reloadProspects}
                 onViewDetail={navToProspectDetail}
                 onViewProject={async (customerId) => {

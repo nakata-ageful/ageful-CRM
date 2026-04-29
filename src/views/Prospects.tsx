@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import type { Prospect, ProspectApplyStatus, ProspectContractStatus, ProspectInput } from '../types'
+import { useState, useMemo } from 'react'
+import type { Prospect, ProspectApplyStatus, ProspectContractStatus, ProspectInput, Customer } from '../types'
 import { createProspect, deleteProspect } from '../lib/actions'
 import { fmtNum } from '../lib/utils'
 import { useToast } from '../components/Toast'
@@ -10,6 +10,16 @@ type ContractFilter = 'all' | ProspectContractStatus
 const APPLY_STATUSES: ProspectApplyStatus[] = ['未', '提出済', '通過', '不通', '不可']
 const CONTRACT_STATUSES: ProspectContractStatus[] = ['未', '完了', '不可']
 
+/** スペースを全て除去して正規化 */
+function normalizeName(name: string): string {
+  return name.replace(/[\s\u3000]/g, '')
+}
+
+type ExistingCustomerOption = {
+  name: string
+  name_kana: string
+  source: 'prospect' | 'customer'
+}
 
 function ApplyBadge({ status }: { status: ProspectApplyStatus }) {
   return <span className={`prospect-badge prospect-apply-${status}`}>{status}</span>
@@ -19,7 +29,13 @@ function ContractBadge({ status }: { status: ProspectContractStatus }) {
   return <span className={`prospect-badge prospect-contract-${status}`}>{status}</span>
 }
 
-function AddModal({ onSave, onClose }: { onSave: (input: ProspectInput) => Promise<void>; onClose: () => void }) {
+function AddModal({ onSave, onClose, existingCustomers }: {
+  onSave: (input: ProspectInput) => Promise<void>
+  onClose: () => void
+  existingCustomers: ExistingCustomerOption[]
+}) {
+  const [mode, setMode] = useState<'new' | 'existing'>('new')
+  const [selectedCustomer, setSelectedCustomer] = useState('')
   const [form, setForm] = useState<ProspectInput>({
     customer_name: '', customer_name_kana: '', project_name: '', loan_company: '',
     equipment: '', land_cost: '', loan_amount: '',
@@ -27,6 +43,26 @@ function AddModal({ onSave, onClose }: { onSave: (input: ProspectInput) => Promi
   })
   const [saving, setSaving] = useState(false)
   const set = (k: keyof ProspectInput, v: string) => setForm(f => ({ ...f, [k]: v }))
+
+  function handleSelectExisting(value: string) {
+    setSelectedCustomer(value)
+    const cust = existingCustomers.find(c => c.name === value)
+    if (cust) {
+      setForm(f => ({
+        ...f,
+        customer_name: cust.name,
+        customer_name_kana: cust.name_kana,
+      }))
+    }
+  }
+
+  function handleModeChange(newMode: 'new' | 'existing') {
+    setMode(newMode)
+    if (newMode === 'new') {
+      setSelectedCustomer('')
+      setForm(f => ({ ...f, customer_name: '', customer_name_kana: '' }))
+    }
+  }
 
   async function handleSave() {
     if (!form.customer_name.trim() || !form.project_name.trim()) return
@@ -43,15 +79,53 @@ function AddModal({ onSave, onClose }: { onSave: (input: ProspectInput) => Promi
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
         <div className="modal-body">
+          {/* 既存/新規切り替え */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+            <button
+              className={`filter-tab ${mode === 'existing' ? 'active' : ''}`}
+              onClick={() => handleModeChange('existing')}
+            >
+              既存顧客
+            </button>
+            <button
+              className={`filter-tab ${mode === 'new' ? 'active' : ''}`}
+              onClick={() => handleModeChange('new')}
+            >
+              新規顧客
+            </button>
+          </div>
+
           <div className="form-grid">
-            <label className="form-label required">
-              顧客名
-              <input className="form-input" value={form.customer_name} onChange={e => set('customer_name', e.target.value)} placeholder="山田 太郎" />
-            </label>
-            <label className="form-label">
-              ふりがな
-              <input className="form-input" value={form.customer_name_kana} onChange={e => set('customer_name_kana', e.target.value)} placeholder="やまだ たろう" />
-            </label>
+            {mode === 'existing' ? (
+              <>
+                <label className="form-label required">
+                  顧客を選択
+                  <select
+                    className="form-select"
+                    value={selectedCustomer}
+                    onChange={e => handleSelectExisting(e.target.value)}
+                  >
+                    <option value="">選択してください</option>
+                    {existingCustomers.map((c, i) => (
+                      <option key={`${c.name}-${i}`} value={c.name}>
+                        {c.name}{c.name_kana ? ` (${c.name_kana})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </>
+            ) : (
+              <>
+                <label className="form-label required">
+                  顧客名
+                  <input className="form-input" value={form.customer_name} onChange={e => set('customer_name', e.target.value)} placeholder="山田 太郎" />
+                </label>
+                <label className="form-label">
+                  ふりがな
+                  <input className="form-input" value={form.customer_name_kana} onChange={e => set('customer_name_kana', e.target.value)} placeholder="やまだ たろう" />
+                </label>
+              </>
+            )}
             <label className="form-label required">
               発電所名
               <input className="form-input" value={form.project_name} onChange={e => set('project_name', e.target.value)} placeholder="鹿嶋市武井" />
@@ -110,13 +184,21 @@ function AddModal({ onSave, onClose }: { onSave: (input: ProspectInput) => Promi
   )
 }
 
+type CustomerGroup = {
+  normalizedName: string
+  displayName: string
+  prospects: Prospect[]
+}
+
 export function Prospects({
   prospects,
+  customers,
   onReload,
   onViewDetail,
   onViewProject,
 }: {
   prospects: Prospect[]
+  customers: Customer[]
   onReload: () => void
   onViewDetail: (id: number) => void
   onViewProject: (customerId: number) => void
@@ -125,11 +207,57 @@ export function Prospects({
   const [applyFilter, setApplyFilter] = useState<ApplyFilter>('all')
   const [contractFilter, setContractFilter] = useState<ContractFilter>('all')
   const [showAdd, setShowAdd] = useState(false)
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
 
   const filtered = prospects.filter(p =>
     (applyFilter === 'all' || p.apply_status === applyFilter) &&
     (contractFilter === 'all' || p.contract_status === contractFilter)
   )
+
+  // グループ化: 正規化した顧客名でまとめる
+  const groups: CustomerGroup[] = useMemo(() => {
+    const map = new Map<string, CustomerGroup>()
+    for (const p of filtered) {
+      const key = normalizeName(p.customer_name)
+      if (!map.has(key)) {
+        map.set(key, { normalizedName: key, displayName: p.customer_name, prospects: [] })
+      }
+      map.get(key)!.prospects.push(p)
+    }
+    return Array.from(map.values())
+  }, [filtered])
+
+  // 既存顧客候補（見込み + 顧客タブ、重複除去）
+  const existingCustomers: ExistingCustomerOption[] = useMemo(() => {
+    const seen = new Set<string>()
+    const result: ExistingCustomerOption[] = []
+    // 見込みリストから
+    for (const p of prospects) {
+      const key = normalizeName(p.customer_name)
+      if (!seen.has(key)) {
+        seen.add(key)
+        result.push({ name: p.customer_name, name_kana: p.customer_name_kana ?? '', source: 'prospect' })
+      }
+    }
+    // 顧客タブから
+    for (const c of customers) {
+      const key = normalizeName(c.name)
+      if (!seen.has(key)) {
+        seen.add(key)
+        result.push({ name: c.name, name_kana: c.name_kana ?? '', source: 'customer' })
+      }
+    }
+    return result
+  }, [prospects, customers])
+
+  function toggleGroup(key: string) {
+    setExpandedGroups(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
 
   async function handleAdd(input: ProspectInput) {
     await createProspect(input)
@@ -176,7 +304,7 @@ export function Prospects({
       {/* テーブル */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '14px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: 13, color: '#64748b' }}>{filtered.length} 件</span>
+          <span style={{ fontSize: 13, color: '#64748b' }}>{filtered.length} 件（{groups.length} 顧客）</span>
           <button className="btn btn-main btn-sm" onClick={() => setShowAdd(true)}>＋ 案件を追加</button>
         </div>
         <div style={{ overflowX: 'auto' }}>
@@ -194,43 +322,109 @@ export function Prospects({
               </tr>
             </thead>
             <tbody>
-              {filtered.map(p => (
-                <tr
-                  key={p.id}
-                  className="clickable-row"
-                  onClick={() => onViewDetail(p.id)}
-                >
-                  <td style={{ ...tdStyle, fontWeight: 600 }}>
-                    {p.customer_name}
-                  </td>
-                  <td style={tdStyle} onClick={e => {
-                    if (p.converted_customer_id) {
-                      e.stopPropagation()
-                      onViewProject(p.converted_customer_id)
-                    }
-                  }}>
-                    {p.converted_customer_id ? (
-                      <span style={{ color: '#2563eb', cursor: 'pointer', textDecoration: 'underline' }}>{p.project_name}</span>
-                    ) : p.project_name}
-                  </td>
-                  <td style={tdStyle}>
-                    {p.loan_company && (
-                      <span style={{ background: '#e0f2fe', color: '#0369a1', fontSize: 11.5, fontWeight: 600, borderRadius: 99, padding: '2px 8px' }}>
-                        {p.loan_company}
+              {groups.map(group => {
+                const isMulti = group.prospects.length > 1
+                const isExpanded = expandedGroups.has(group.normalizedName)
+
+                if (!isMulti) {
+                  // 1件の場合はそのまま表示
+                  const p = group.prospects[0]
+                  return (
+                    <tr
+                      key={p.id}
+                      className="clickable-row"
+                      onClick={() => onViewDetail(p.id)}
+                    >
+                      <td style={{ ...tdStyle, fontWeight: 600 }}>
+                        {p.customer_name}
+                      </td>
+                      <td style={tdStyle} onClick={e => {
+                        if (p.converted_customer_id) {
+                          e.stopPropagation()
+                          onViewProject(p.converted_customer_id)
+                        }
+                      }}>
+                        {p.converted_customer_id ? (
+                          <span style={{ color: '#2563eb', cursor: 'pointer', textDecoration: 'underline' }}>{p.project_name}</span>
+                        ) : p.project_name}
+                      </td>
+                      <td style={tdStyle}>
+                        {p.loan_company && (
+                          <span style={{ background: '#e0f2fe', color: '#0369a1', fontSize: 11.5, fontWeight: 600, borderRadius: 99, padding: '2px 8px' }}>
+                            {p.loan_company}
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ ...tdStyle, fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>{fmtNum(p.equipment)}</td>
+                      <td style={{ ...tdStyle, fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>{fmtNum(p.loan_amount)}</td>
+                      <td style={tdStyle}><ApplyBadge status={p.apply_status} /></td>
+                      <td style={tdStyle}><ContractBadge status={p.contract_status} /></td>
+                      <td style={tdStyle} onClick={e => e.stopPropagation()}>
+                        <div className="row-actions">
+                          <button className="btn-icon btn-icon--danger" onClick={e => handleDelete(e, p)}>✕</button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                }
+
+                // 複数件の場合: グループヘッダー + 展開行
+                return [
+                  <tr
+                    key={`group-${group.normalizedName}`}
+                    className="clickable-row"
+                    onClick={() => toggleGroup(group.normalizedName)}
+                    style={{ background: '#f8fafc' }}
+                  >
+                    <td style={{ ...tdStyle, fontWeight: 600 }} colSpan={2}>
+                      <span style={{ marginRight: 6, fontSize: 11, color: '#94a3b8' }}>{isExpanded ? '▼' : '▶'}</span>
+                      {group.displayName}
+                      <span style={{ marginLeft: 8, fontSize: 11.5, color: '#64748b', fontWeight: 500 }}>
+                        ({group.prospects.length} 件)
                       </span>
-                    )}
-                  </td>
-                  <td style={{ ...tdStyle, fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>{fmtNum(p.equipment)}</td>
-                  <td style={{ ...tdStyle, fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>{fmtNum(p.loan_amount)}</td>
-                  <td style={tdStyle}><ApplyBadge status={p.apply_status} /></td>
-                  <td style={tdStyle}><ContractBadge status={p.contract_status} /></td>
-                  <td style={tdStyle} onClick={e => e.stopPropagation()}>
-                    <div className="row-actions">
-                      <button className="btn-icon btn-icon--danger" onClick={e => handleDelete(e, p)}>✕</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td style={tdStyle} colSpan={6}></td>
+                  </tr>,
+                  ...(isExpanded ? group.prospects.map(p => (
+                    <tr
+                      key={p.id}
+                      className="clickable-row"
+                      onClick={() => onViewDetail(p.id)}
+                      style={{ background: '#fefefe' }}
+                    >
+                      <td style={{ ...tdStyle, paddingLeft: 32, color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>
+                        └
+                      </td>
+                      <td style={tdStyle} onClick={e => {
+                        if (p.converted_customer_id) {
+                          e.stopPropagation()
+                          onViewProject(p.converted_customer_id)
+                        }
+                      }}>
+                        {p.converted_customer_id ? (
+                          <span style={{ color: '#2563eb', cursor: 'pointer', textDecoration: 'underline' }}>{p.project_name}</span>
+                        ) : p.project_name}
+                      </td>
+                      <td style={tdStyle}>
+                        {p.loan_company && (
+                          <span style={{ background: '#e0f2fe', color: '#0369a1', fontSize: 11.5, fontWeight: 600, borderRadius: 99, padding: '2px 8px' }}>
+                            {p.loan_company}
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ ...tdStyle, fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>{fmtNum(p.equipment)}</td>
+                      <td style={{ ...tdStyle, fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>{fmtNum(p.loan_amount)}</td>
+                      <td style={tdStyle}><ApplyBadge status={p.apply_status} /></td>
+                      <td style={tdStyle}><ContractBadge status={p.contract_status} /></td>
+                      <td style={tdStyle} onClick={e => e.stopPropagation()}>
+                        <div className="row-actions">
+                          <button className="btn-icon btn-icon--danger" onClick={e => handleDelete(e, p)}>✕</button>
+                        </div>
+                      </td>
+                    </tr>
+                  )) : []),
+                ]
+              })}
               {filtered.length === 0 && (
                 <tr><td colSpan={8} className="empty-cell">該当する案件がありません</td></tr>
               )}
@@ -239,7 +433,7 @@ export function Prospects({
         </div>
       </div>
 
-      {showAdd && <AddModal onSave={handleAdd} onClose={() => setShowAdd(false)} />}
+      {showAdd && <AddModal onSave={handleAdd} onClose={() => setShowAdd(false)} existingCustomers={existingCustomers} />}
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import type { Customer, CustomerInput } from '../types'
 import { Modal } from '../components/Modal'
 import { Confirm } from '../components/Confirm'
@@ -9,6 +9,17 @@ type Props = {
   customers: Customer[]
   onReload: () => void
   onViewDetail: (customerId: number) => void
+}
+
+/** スペースを全て除去して正規化 */
+function normalizeName(name: string): string {
+  return name.replace(/[\s\u3000]/g, '')
+}
+
+type CustomerGroup = {
+  primary: Customer
+  all: Customer[]
+  totalProjects: number
 }
 
 const emptyForm: CustomerInput = {
@@ -41,6 +52,22 @@ export function Customers({ customers, onReload, onViewDetail }: Props) {
       (c.email ?? '').toLowerCase().includes(q)
     )
   })
+
+  // 同一名の顧客をグループ化
+  const groups: CustomerGroup[] = useMemo(() => {
+    const map = new Map<string, CustomerGroup>()
+    for (const c of filtered) {
+      const key = normalizeName(c.name)
+      if (!map.has(key)) {
+        map.set(key, { primary: c, all: [c], totalProjects: c.project_count ?? 0 })
+      } else {
+        const g = map.get(key)!
+        g.all.push(c)
+        g.totalProjects += (c.project_count ?? 0)
+      }
+    }
+    return Array.from(map.values())
+  }, [filtered])
 
   function openCreate() {
     setForm(emptyForm)
@@ -103,7 +130,7 @@ export function Customers({ customers, onReload, onViewDetail }: Props) {
       </div>
 
       <div className="card">
-        <div className="table-meta">{filtered.length} 件</div>
+        <div className="table-meta">{groups.length} 件</div>
         <table>
           <thead>
             <tr>
@@ -112,19 +139,19 @@ export function Customers({ customers, onReload, onViewDetail }: Props) {
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 && (
+            {groups.length === 0 && (
               <tr><td colSpan={7} className="empty-cell">該当する顧客がいません</td></tr>
             )}
-            {filtered.map(c => (
-              <tr key={c.id} className="clickable-row" onClick={() => onViewDetail(c.id)}>
-                <td><strong>{c.name}</strong></td>
-                <td>{c.company_name ?? '-'}</td>
-                <td>{c.is_corporate ? '法人' : '個人'}</td>
-                <td>{c.phone ?? '-'}</td>
-                <td>{c.email ?? '-'}</td>
-                <td className="center">{c.project_count ?? 0}</td>
+            {groups.map(g => (
+              <tr key={g.primary.id} className="clickable-row" onClick={() => onViewDetail(g.primary.id)}>
+                <td><strong>{g.primary.name}</strong></td>
+                <td>{g.primary.company_name ?? '-'}</td>
+                <td>{g.primary.is_corporate ? '法人' : '個人'}</td>
+                <td>{g.primary.phone ?? '-'}</td>
+                <td>{g.primary.email ?? '-'}</td>
+                <td className="center">{g.totalProjects}</td>
                 <td onClick={e => e.stopPropagation()}>
-                  <button className="btn-icon" title="編集" onClick={() => openEdit(c)}>✎</button>
+                  <button className="btn-icon" title="編集" onClick={() => openEdit(g.primary)}>✎</button>
                 </td>
               </tr>
             ))}

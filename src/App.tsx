@@ -171,10 +171,28 @@ export default function App() {
 
   async function navToCustomerDetail(customerId: number) {
     const detail = await getCustomerDetail(customerId)
-    if (detail) {
-      setCustomerDetail(detail)
-      setView('customer-detail', customerId)
+    if (!detail) return
+
+    // 同一名の顧客レコードを統合（スペース除去で比較）
+    const normalize = (s: string) => s.replace(/[\s\u3000]/g, '')
+    const key = normalize(detail.customer.name)
+    const siblingIds = customers
+      .filter(c => c.id !== customerId && normalize(c.name) === key)
+      .map(c => c.id)
+
+    if (siblingIds.length > 0) {
+      const siblingDetails = await Promise.all(siblingIds.map(id => getCustomerDetail(id)))
+      for (const sd of siblingDetails) {
+        if (sd) {
+          detail.projects.push(...sd.projects)
+          detail.attachments.push(...sd.attachments)
+        }
+      }
+      detail.customer = { ...detail.customer, project_count: detail.projects.length }
     }
+
+    setCustomerDetail(detail)
+    setView('customer-detail', customerId)
   }
 
   async function navToMaintenanceDetail(id: number) {

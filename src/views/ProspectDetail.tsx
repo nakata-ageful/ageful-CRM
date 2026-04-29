@@ -293,7 +293,7 @@ export function ProspectDetailView({
       <div className="card">
         <div className="section-title">基本情報</div>
         <div className="info-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-          {/* 1行目: 顧客名 / ふりがな / パネル容量 */}
+          {/* 1行目: 顧客名 / フリガナ / 発電所名 */}
           <div className="info-field">
             <span>顧客名</span>
             <input
@@ -312,19 +312,6 @@ export function ProspectDetailView({
             />
           </div>
           <div className="info-field">
-            <span>パネル容量 (kW)</span>
-            <input
-              type="text" inputMode="decimal" className="form-input" style={{ marginTop: 4 }}
-              value={p.panel_kw ?? ''}
-              onChange={e => {
-                const v = e.target.value
-                if (v === '' || /^[\d.]*$/.test(v)) save({ panel_kw: v ? Number(v) : null })
-              }}
-              placeholder="0"
-            />
-          </div>
-          {/* 2行目: 発電所名 / 物件所在地 / 信販利用 */}
-          <div className="info-field">
             <span>発電所名</span>
             <input
               type="text" className="form-input" style={{ marginTop: 4 }}
@@ -332,15 +319,7 @@ export function ProspectDetailView({
               onChange={e => save({ project_name: e.target.value })}
             />
           </div>
-          <div className="info-field">
-            <span>物件所在地</span>
-            <input
-              type="text" className="form-input" style={{ marginTop: 4 }}
-              value={p.site_address ?? ''}
-              onChange={e => save({ site_address: e.target.value || null })}
-              placeholder="茨城県鹿嶋市..."
-            />
-          </div>
+          {/* 2行目: 信販利用 / 販売会社 / 紹介者 */}
           <div className="info-field">
             <span>信販利用</span>
             <select
@@ -354,7 +333,6 @@ export function ProspectDetailView({
               <option value="なし">なし</option>
             </select>
           </div>
-          {/* 3行目: 販売会社 / 紹介者 */}
           <div className="info-field">
             <span>販売会社</span>
             <input

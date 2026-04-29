@@ -52,14 +52,18 @@ function TaskPanel({
     ...allKeys.filter(n => !definedOrder.includes(n)),
   ]
 
-  // 定義にある小項目を既存データにマージ（新規追加された小項目が既存レコードにも表示されるように）
+  // 定義にある小項目を既存データにマージ（定義順を優先）
   const mergedSubTaskMap = { ...subTaskMap }
   for (const def of defs) {
     if (def.subTasks.length > 0 && allKeys.includes(def.name)) {
       const existing = mergedSubTaskMap[def.name] ?? {}
-      const merged = { ...existing }
+      // 定義順で並べ、定義にないカスタム項目は末尾に追加
+      const merged: Record<string, boolean> = {}
       for (const sub of def.subTasks) {
-        if (merged[sub] === undefined) merged[sub] = false
+        merged[sub] = existing[sub] ?? false
+      }
+      for (const sub of Object.keys(existing)) {
+        if (merged[sub] === undefined) merged[sub] = existing[sub]
       }
       mergedSubTaskMap[def.name] = merged
     }

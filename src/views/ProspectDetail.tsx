@@ -300,7 +300,7 @@ export function ProspectDetailView({
             />
           </div>
           <div className="info-field">
-            <span>ふりがな</span>
+            <span>フリガナ</span>
             <input
               type="text" className="form-input" style={{ marginTop: 4 }}
               value={p.customer_name_kana ?? ''}

@@ -147,31 +147,28 @@ export function Prospects({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* フィルター */}
-      <div className="card" style={{ padding: '12px 18px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.05em', minWidth: 36 }}>申込</span>
-          {(['all', ...APPLY_STATUSES] as (ApplyFilter)[]).map(s => (
-            <button
-              key={s}
-              className={`filter-tab ${applyFilter === s ? 'active' : ''}`}
-              onClick={() => setApplyFilter(s)}
-            >
-              {s === 'all' ? 'すべて' : s}
-            </button>
-          ))}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.05em', minWidth: 36 }}>契約</span>
-          {(['all', ...CONTRACT_STATUSES] as (ContractFilter)[]).map(s => (
-            <button
-              key={s}
-              className={`filter-tab ${contractFilter === s ? 'active' : ''}`}
-              onClick={() => setContractFilter(s)}
-            >
-              {s === 'all' ? 'すべて' : s}
-            </button>
-          ))}
-        </div>
+      <div className="card" style={{ padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '.05em' }}>申込</span>
+        {(['all', ...APPLY_STATUSES] as (ApplyFilter)[]).map(s => (
+          <button
+            key={s}
+            className={`filter-tab ${applyFilter === s ? 'active' : ''}`}
+            onClick={() => setApplyFilter(s)}
+          >
+            {s === 'all' ? 'すべて' : s}
+          </button>
+        ))}
+        <span style={{ width: 1, height: 18, background: '#e2e8f0', margin: '0 4px' }} />
+        <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '.05em' }}>契約</span>
+        {(['all', ...CONTRACT_STATUSES] as (ContractFilter)[]).map(s => (
+          <button
+            key={s}
+            className={`filter-tab ${contractFilter === s ? 'active' : ''}`}
+            onClick={() => setContractFilter(s)}
+          >
+            {s === 'all' ? 'すべて' : s}
+          </button>
+        ))}
       </div>
 
       {/* テーブル */}

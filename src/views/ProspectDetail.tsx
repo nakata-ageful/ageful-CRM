@@ -44,12 +44,26 @@ function TaskPanel({
   const [newSub, setNewSub] = useState('')
 
   // 定義順でソート、定義にないカスタム項目は末尾に追加
-  const definedOrder = tasksForCompany(mode, company).map(t => t.name)
+  const defs = tasksForCompany(mode, company)
+  const definedOrder = defs.map(t => t.name)
   const allKeys = Object.keys(checkedMap)
   const taskNames = [
     ...definedOrder.filter(n => allKeys.includes(n)),
     ...allKeys.filter(n => !definedOrder.includes(n)),
   ]
+
+  // 定義にある小項目を既存データにマージ（新規追加された小項目が既存レコードにも表示されるように）
+  const mergedSubTaskMap = { ...subTaskMap }
+  for (const def of defs) {
+    if (def.subTasks.length > 0 && allKeys.includes(def.name)) {
+      const existing = mergedSubTaskMap[def.name] ?? {}
+      const merged = { ...existing }
+      for (const sub of def.subTasks) {
+        if (merged[sub] === undefined) merged[sub] = false
+      }
+      mergedSubTaskMap[def.name] = merged
+    }
+  }
 
   function handleAddTask() {
     const name = newTask.trim()
@@ -78,7 +92,7 @@ function TaskPanel({
       {/* タスクリスト */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
         {taskNames.map(taskName => {
-          const subs = subTaskMap[taskName] ? Object.keys(subTaskMap[taskName]) : []
+          const subs = mergedSubTaskMap[taskName] ? Object.keys(mergedSubTaskMap[taskName]) : []
           return (
             <div key={taskName}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -110,7 +124,7 @@ function TaskPanel({
                         <input
                           type="checkbox"
                           className="prospect-checkbox"
-                          checked={Boolean(subTaskMap[taskName]?.[sub])}
+                          checked={Boolean(mergedSubTaskMap[taskName]?.[sub])}
                           onChange={e => onSubTaskChange(taskName, sub, e.target.checked)}
                         />
                         <span style={{ fontSize: 12.5, color: '#64748b' }}>{sub}</span>

@@ -259,7 +259,7 @@ export function Prospects({
             {s === 'all' ? 'すべて' : s}
           </button>
         ))}
-        <span style={{ width: 1, height: 18, background: '#e2e8f0', margin: '0 4px' }} />
+        <span style={{ width: 1, height: 18, background: '#cbd5e1', margin: '0 16px' }} />
         <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '.05em' }}>契約</span>
         {(['all', ...CONTRACT_STATUSES] as (ContractFilter)[]).map(s => (
           <button

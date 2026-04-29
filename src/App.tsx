@@ -245,20 +245,6 @@ export default function App() {
     }
   }
 
-  const viewTitle: Record<ViewKey, string> = {
-    dashboard: 'ダッシュボード',
-    prospects: '見込み管理',
-    'prospect-detail': prospectDetail ? `${prospectDetail.customer_name} / ${prospectDetail.project_name}` : '見込み詳細',
-    projects: '案件一覧',
-    'project-detail': projectDetail?.project.project_name ?? '案件詳細',
-    customers: '顧客一覧',
-    'customer-detail': customerDetail?.customer.company_name ?? customerDetail?.customer.name ?? '顧客詳細',
-    'maintenance-responses': '保守対応一覧',
-    'maintenance-response-detail': maintenanceDetail?.project_name ?? '保守対応詳細',
-    billing: '請求一覧',
-    'billing-detail': billingDetail?.project.project_name ?? '請求詳細',
-    import: 'CSVインポート',
-  }
 
   return (
     <ErrorBoundary>
@@ -289,10 +275,6 @@ export default function App() {
           </div>
         )}
         {error && <div className="notice notice-error">{error}</div>}
-
-        <div className="page-header">
-          <h1 className="page-title">{viewTitle[view]}</h1>
-        </div>
 
         {loading ? (
           <div className="card loading-card">読み込み中...</div>

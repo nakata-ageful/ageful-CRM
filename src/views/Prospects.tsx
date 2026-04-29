@@ -184,12 +184,6 @@ function AddModal({ onSave, onClose, existingCustomers }: {
   )
 }
 
-type CustomerGroup = {
-  normalizedName: string
-  displayName: string
-  prospects: Prospect[]
-}
-
 export function Prospects({
   prospects,
   customers,
@@ -207,25 +201,11 @@ export function Prospects({
   const [applyFilter, setApplyFilter] = useState<ApplyFilter>('all')
   const [contractFilter, setContractFilter] = useState<ContractFilter>('all')
   const [showAdd, setShowAdd] = useState(false)
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
 
   const filtered = prospects.filter(p =>
     (applyFilter === 'all' || p.apply_status === applyFilter) &&
     (contractFilter === 'all' || p.contract_status === contractFilter)
   )
-
-  // グループ化: 正規化した顧客名でまとめる
-  const groups: CustomerGroup[] = useMemo(() => {
-    const map = new Map<string, CustomerGroup>()
-    for (const p of filtered) {
-      const key = normalizeName(p.customer_name)
-      if (!map.has(key)) {
-        map.set(key, { normalizedName: key, displayName: p.customer_name, prospects: [] })
-      }
-      map.get(key)!.prospects.push(p)
-    }
-    return Array.from(map.values())
-  }, [filtered])
 
   // 既存顧客候補（見込み + 顧客タブ、重複除去）
   const existingCustomers: ExistingCustomerOption[] = useMemo(() => {
@@ -249,15 +229,6 @@ export function Prospects({
     }
     return result
   }, [prospects, customers])
-
-  function toggleGroup(key: string) {
-    setExpandedGroups(prev => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
-  }
 
   async function handleAdd(input: ProspectInput) {
     await createProspect(input)
@@ -304,7 +275,7 @@ export function Prospects({
       {/* テーブル */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '14px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: 13, color: '#64748b' }}>{filtered.length} 件（{groups.length} 顧客）</span>
+          <span style={{ fontSize: 13, color: '#64748b' }}>{filtered.length} 件</span>
           <button className="btn btn-main btn-sm" onClick={() => setShowAdd(true)}>＋ 案件を追加</button>
         </div>
         <div style={{ overflowX: 'auto' }}>
@@ -322,109 +293,43 @@ export function Prospects({
               </tr>
             </thead>
             <tbody>
-              {groups.map(group => {
-                const isMulti = group.prospects.length > 1
-                const isExpanded = expandedGroups.has(group.normalizedName)
-
-                if (!isMulti) {
-                  // 1件の場合はそのまま表示
-                  const p = group.prospects[0]
-                  return (
-                    <tr
-                      key={p.id}
-                      className="clickable-row"
-                      onClick={() => onViewDetail(p.id)}
-                    >
-                      <td style={{ ...tdStyle, fontWeight: 600 }}>
-                        {p.customer_name}
-                      </td>
-                      <td style={tdStyle} onClick={e => {
-                        if (p.converted_customer_id) {
-                          e.stopPropagation()
-                          onViewProject(p.converted_customer_id)
-                        }
-                      }}>
-                        {p.converted_customer_id ? (
-                          <span style={{ color: '#2563eb', cursor: 'pointer', textDecoration: 'underline' }}>{p.project_name}</span>
-                        ) : p.project_name}
-                      </td>
-                      <td style={tdStyle}>
-                        {p.loan_company && (
-                          <span style={{ background: '#e0f2fe', color: '#0369a1', fontSize: 11.5, fontWeight: 600, borderRadius: 99, padding: '2px 8px' }}>
-                            {p.loan_company}
-                          </span>
-                        )}
-                      </td>
-                      <td style={{ ...tdStyle, fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>{fmtNum(p.equipment)}</td>
-                      <td style={{ ...tdStyle, fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>{fmtNum(p.loan_amount)}</td>
-                      <td style={tdStyle}><ApplyBadge status={p.apply_status} /></td>
-                      <td style={tdStyle}><ContractBadge status={p.contract_status} /></td>
-                      <td style={tdStyle} onClick={e => e.stopPropagation()}>
-                        <div className="row-actions">
-                          <button className="btn-icon btn-icon--danger" onClick={e => handleDelete(e, p)}>✕</button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                }
-
-                // 複数件の場合: グループヘッダー + 展開行
-                return [
-                  <tr
-                    key={`group-${group.normalizedName}`}
-                    className="clickable-row"
-                    onClick={() => toggleGroup(group.normalizedName)}
-                    style={{ background: '#f8fafc' }}
-                  >
-                    <td style={{ ...tdStyle, fontWeight: 600 }} colSpan={2}>
-                      <span style={{ marginRight: 6, fontSize: 11, color: '#94a3b8' }}>{isExpanded ? '▼' : '▶'}</span>
-                      {group.displayName}
-                      <span style={{ marginLeft: 8, fontSize: 11.5, color: '#64748b', fontWeight: 500 }}>
-                        ({group.prospects.length} 件)
+              {filtered.map(p => (
+                <tr
+                  key={p.id}
+                  className="clickable-row"
+                  onClick={() => onViewDetail(p.id)}
+                >
+                  <td style={{ ...tdStyle, fontWeight: 600 }}>
+                    {p.customer_name}
+                  </td>
+                  <td style={tdStyle} onClick={e => {
+                    if (p.converted_customer_id) {
+                      e.stopPropagation()
+                      onViewProject(p.converted_customer_id)
+                    }
+                  }}>
+                    {p.converted_customer_id ? (
+                      <span style={{ color: '#2563eb', cursor: 'pointer', textDecoration: 'underline' }}>{p.project_name}</span>
+                    ) : p.project_name}
+                  </td>
+                  <td style={tdStyle}>
+                    {p.loan_company && (
+                      <span style={{ background: '#e0f2fe', color: '#0369a1', fontSize: 11.5, fontWeight: 600, borderRadius: 99, padding: '2px 8px' }}>
+                        {p.loan_company}
                       </span>
-                    </td>
-                    <td style={tdStyle} colSpan={6}></td>
-                  </tr>,
-                  ...(isExpanded ? group.prospects.map(p => (
-                    <tr
-                      key={p.id}
-                      className="clickable-row"
-                      onClick={() => onViewDetail(p.id)}
-                      style={{ background: '#fefefe' }}
-                    >
-                      <td style={{ ...tdStyle, paddingLeft: 32, color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>
-                        └
-                      </td>
-                      <td style={tdStyle} onClick={e => {
-                        if (p.converted_customer_id) {
-                          e.stopPropagation()
-                          onViewProject(p.converted_customer_id)
-                        }
-                      }}>
-                        {p.converted_customer_id ? (
-                          <span style={{ color: '#2563eb', cursor: 'pointer', textDecoration: 'underline' }}>{p.project_name}</span>
-                        ) : p.project_name}
-                      </td>
-                      <td style={tdStyle}>
-                        {p.loan_company && (
-                          <span style={{ background: '#e0f2fe', color: '#0369a1', fontSize: 11.5, fontWeight: 600, borderRadius: 99, padding: '2px 8px' }}>
-                            {p.loan_company}
-                          </span>
-                        )}
-                      </td>
-                      <td style={{ ...tdStyle, fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>{fmtNum(p.equipment)}</td>
-                      <td style={{ ...tdStyle, fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>{fmtNum(p.loan_amount)}</td>
-                      <td style={tdStyle}><ApplyBadge status={p.apply_status} /></td>
-                      <td style={tdStyle}><ContractBadge status={p.contract_status} /></td>
-                      <td style={tdStyle} onClick={e => e.stopPropagation()}>
-                        <div className="row-actions">
-                          <button className="btn-icon btn-icon--danger" onClick={e => handleDelete(e, p)}>✕</button>
-                        </div>
-                      </td>
-                    </tr>
-                  )) : []),
-                ]
-              })}
+                    )}
+                  </td>
+                  <td style={{ ...tdStyle, fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>{fmtNum(p.equipment)}</td>
+                  <td style={{ ...tdStyle, fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>{fmtNum(p.loan_amount)}</td>
+                  <td style={tdStyle}><ApplyBadge status={p.apply_status} /></td>
+                  <td style={tdStyle}><ContractBadge status={p.contract_status} /></td>
+                  <td style={tdStyle} onClick={e => e.stopPropagation()}>
+                    <div className="row-actions">
+                      <button className="btn-icon btn-icon--danger" onClick={e => handleDelete(e, p)}>✕</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
               {filtered.length === 0 && (
                 <tr><td colSpan={8} className="empty-cell">該当する案件がありません</td></tr>
               )}

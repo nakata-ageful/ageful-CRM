@@ -418,7 +418,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             <div className="info-field"><span>紹介者</span><b>{project.referrer ?? '-'}</b></div>
             <div className="info-field"><span>電力変更日</span><b>{project.power_change_date ?? '-'}</b></div>
             <div className="info-field"><span>引渡日</span><b>{project.handover_date ?? '-'}</b></div>
-            <div className="info-field"><span>販売価格（税込）</span><b>{fmtYen(project.sales_price)}</b></div>
+            <div className="info-field"><span>設備代</span><b>{fmtYen(project.sales_price)}</b></div>
             <div className="info-field"><span>土地代</span><b>{fmtYen(project.land_cost)}</b></div>
             <div className="info-field"><span>アプラス会員番号</span><b>{project.amuras_member_no ?? '-'}</b></div>
             <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap' }}>{project.notes || '-'}</b></div>
@@ -1201,7 +1201,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               <input className="form-input" type="date" value={projForm.handover_date} onChange={e => setProjForm(f => ({ ...f, handover_date: e.target.value }))} />
             </label>
             <label className="form-label">
-              販売価格（税込）
+              設備代
               <input className="form-input" inputMode="numeric" value={fmtFormNum(projForm.sales_price)} onChange={e => setProjForm(f => ({ ...f, sales_price: e.target.value.replace(/,/g, '') }))} />
             </label>
             <label className="form-label">

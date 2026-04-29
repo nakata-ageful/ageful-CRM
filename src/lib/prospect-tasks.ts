@@ -44,7 +44,7 @@ const APLUS_APPLY: TaskDef[] = [
 const JACCS_CONTRACT: TaskDef[] = [
   { name: '設備売買契約書',                          subTasks: [] },
   { name: '土地売買契約書',                          subTasks: [] },
-  { name: '土地登記変更（所有権移転・地上権設定）',  subTasks: ['登記申請'] },
+  { name: '土地登記変更（所有権移転・地上権設定）',  subTasks: ['抵当権抹消', '登記申請'] },
   { name: '土地登記変更（抵当権設定）',              subTasks: ['登記申請'] },
   { name: '住民票',                                  subTasks: [] },
   { name: '印鑑証明書',                              subTasks: [] },
@@ -60,7 +60,7 @@ const JACCS_CONTRACT: TaskDef[] = [
 const APLUS_CONTRACT: TaskDef[] = [
   { name: '設備売買契約書',                          subTasks: [] },
   { name: '土地売買契約書',                          subTasks: [] },
-  { name: '土地登記変更（所有権移転・地上権設定）',  subTasks: ['登記申請'] },
+  { name: '土地登記変更（所有権移転・地上権設定）',  subTasks: ['抵当権抹消', '登記申請'] },
   { name: '土地登記変更（抵当権設定）',              subTasks: ['登記申請'] },
   { name: '住民票',                                  subTasks: [] },
   { name: '印鑑証明書',                              subTasks: [] },
@@ -87,7 +87,7 @@ const NONE_APPLY: TaskDef[] = [
 const NONE_CONTRACT: TaskDef[] = [
   { name: '設備売買契約書',                          subTasks: [] },
   { name: '土地売買契約書',                          subTasks: [] },
-  { name: '土地登記変更（所有権移転・地上権設定）',  subTasks: ['登記申請'] },
+  { name: '土地登記変更（所有権移転・地上権設定）',  subTasks: ['抵当権抹消', '登記申請'] },
   { name: '土地登記変更（抵当権設定）',              subTasks: ['登記申請'] },
   { name: '住民票',                                  subTasks: [] },
   { name: '印鑑証明書',                              subTasks: [] },

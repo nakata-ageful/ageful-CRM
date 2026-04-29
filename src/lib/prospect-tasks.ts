@@ -101,6 +101,7 @@ const NONE_CONTRACT: TaskDef[] = [
 const TASK_MAP: Record<string, { apply: TaskDef[]; contract: TaskDef[] }> = {
   'ジャックス': { apply: JACCS_APPLY, contract: JACCS_CONTRACT },
   'アプラス':   { apply: APLUS_APPLY, contract: APLUS_CONTRACT },
+  'なし':       { apply: NONE_APPLY,  contract: NONE_CONTRACT },
   '無し':       { apply: NONE_APPLY,  contract: NONE_CONTRACT },
 }
 

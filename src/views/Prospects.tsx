@@ -136,7 +136,7 @@ function AddModal({ onSave, onClose, existingCustomers }: {
                 <option value="">選択してください</option>
                 <option value="ジャックス">ジャックス</option>
                 <option value="アプラス">アプラス</option>
-                <option value="無し">無し</option>
+                <option value="なし">なし</option>
               </select>
             </label>
             <label className="form-label">

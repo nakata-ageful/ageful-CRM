@@ -9,6 +9,13 @@ import {
 } from '../lib/actions'
 import { fmtYen } from '../lib/utils'
 
+/** 郵便番号を自動フォーマット（数字のみ抽出 → 3桁+4桁にハイフン挿入） */
+function fmtPostalCode(v: string): string {
+  const digits = v.replace(/\D/g, '').slice(0, 7)
+  if (digits.length <= 3) return digits
+  return digits.slice(0, 3) + '-' + digits.slice(3)
+}
+
 /** 住所文字列から都道府県を抽出 */
 function extractPrefecture(address: string): string {
   const m = address.match(/^(北海道|東京都|(?:京都|大阪)府|.{2,3}県)/)
@@ -387,6 +394,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           <div className="info-grid">
             <div className="info-field"><span>案件番号</span><b>{project.project_no ?? '-'}</b></div>
             <div className="info-field"><span>発電所名</span><b>{project.plant_name ?? '-'}</b></div>
+            <div className="info-field"><span>郵便番号</span><b>{project.site_postal_code ?? '-'}</b></div>
             <div className="info-field"><span>都道府県</span><b>{project.site_prefecture ?? '-'}</b></div>
             <div className="info-field" style={{ gridColumn: '1/-1' }}><span>設置住所</span><b>{project.site_address ?? '-'}</b></div>
             <div className="info-field"><span>Google座標</span><b>{project.google_coordinates ?? '-'}</b></div>
@@ -1065,7 +1073,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             </label>
             <label className="form-label">
               郵便番号（発電所）
-              <input className="form-input" value={projForm.site_postal_code} onChange={e => setProjForm(f => ({ ...f, site_postal_code: e.target.value }))} />
+              <input className="form-input" inputMode="numeric" placeholder="000-0000" value={projForm.site_postal_code} onChange={e => setProjForm(f => ({ ...f, site_postal_code: fmtPostalCode(e.target.value) }))} />
             </label>
             <label className="form-label">
               都道府県

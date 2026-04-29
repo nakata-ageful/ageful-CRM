@@ -525,7 +525,7 @@ const initProspects: Prospect[] = [
     apply_memo: null, contract_memo: null,
     site_address: null, panel_kw: null, sales_company: null, referrer: null,
     lead_date: null, apply_submit_date: null, apply_result_date: null,
-    sale_contract_date: null, land_contract_date: null, handover_date: null,
+    sale_contract_date: null, land_contract_date: null, loan_apply_date: null, handover_date: null,
     converted_customer_id: null, converted_at: null, created_at: '2026-03-01',
   },
   {
@@ -537,7 +537,7 @@ const initProspects: Prospect[] = [
     apply_memo: null, contract_memo: null,
     site_address: null, panel_kw: null, sales_company: null, referrer: null,
     lead_date: null, apply_submit_date: '2026-02-15', apply_result_date: null,
-    sale_contract_date: null, land_contract_date: null, handover_date: null,
+    sale_contract_date: null, land_contract_date: null, loan_apply_date: null, handover_date: null,
     converted_customer_id: null, converted_at: null, created_at: '2026-02-10',
   },
   {
@@ -549,7 +549,7 @@ const initProspects: Prospect[] = [
     apply_memo: null, contract_memo: null,
     site_address: '茨城県鹿嶋市武井', panel_kw: 45.9, sales_company: null, referrer: null,
     lead_date: '2026-01-10', apply_submit_date: '2026-01-20', apply_result_date: '2026-02-01',
-    sale_contract_date: null, land_contract_date: null, handover_date: null,
+    sale_contract_date: null, land_contract_date: null, loan_apply_date: null, handover_date: null,
     converted_customer_id: null, converted_at: null, created_at: '2026-01-10',
   },
 ]

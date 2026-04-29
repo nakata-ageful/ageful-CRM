@@ -399,11 +399,11 @@ export function ProspectDetailView({
             />
           </div>
           <div className="info-field">
-            <span>引渡し予定日</span>
+            <span>ローン申込日</span>
             <input
               type="date" className="form-input" style={{ marginTop: 4 }}
-              value={p.handover_date ?? ''}
-              onChange={e => save({ handover_date: e.target.value || null })}
+              value={p.loan_apply_date ?? ''}
+              onChange={e => save({ loan_apply_date: e.target.value || null })}
             />
           </div>
         </div>

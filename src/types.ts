@@ -313,6 +313,7 @@ export type Prospect = {
   apply_result_date: string | null
   sale_contract_date: string | null
   land_contract_date: string | null
+  loan_apply_date: string | null
   handover_date: string | null
   converted_customer_id: number | null
   converted_at: string | null

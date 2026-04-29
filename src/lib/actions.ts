@@ -859,6 +859,7 @@ export async function createProspect(input: ProspectInput): Promise<Prospect> {
     apply_result_date: null,
     sale_contract_date: null,
     land_contract_date: null,
+    loan_apply_date: null,
     handover_date: null,
     converted_customer_id: customer.id,
     converted_at: new Date().toISOString(),

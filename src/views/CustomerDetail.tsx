@@ -140,42 +140,28 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject }: 
           </button>
         </div>
         {customer.is_corporate ? (
-          <>
-            <div className="info-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-              <div className="info-field"><span>種別</span><b>法人</b></div>
-              <div className="info-field"><span>会社名</span><b>{customer.company_name ?? '-'}</b></div>
-              <div className="info-field"><span>電話</span><b>{customer.phone ?? '-'}</b></div>
-              <div className="info-field"><span>担当者名</span><b>{customer.name}</b></div>
-              <div className="info-field"><span>ふりがな</span><b>{customer.name_kana ?? '-'}</b></div>
-              <div className="info-field"><span>メール</span><b>{customer.email ?? '-'}</b></div>
-            </div>
-            <div className="info-grid">
-              <div className="info-field"><span>郵便番号</span><b>{customer.postal_code ?? '-'}</b></div>
-              <div className="info-field"><span>住所</span><b>{customer.address ?? '-'}</b></div>
-            </div>
-            <div className="info-grid">
-              <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap' }}>{customer.notes || '-'}</b></div>
-            </div>
-          </>
+          <div className="info-grid">
+            <div className="info-field"><span>種別</span><b>法人</b></div>
+            <div className="info-field"><span>会社名</span><b>{customer.company_name ?? '-'}</b></div>
+            <div className="info-field"><span>担当者名</span><b>{customer.name}</b></div>
+            <div className="info-field"><span>ふりがな</span><b>{customer.name_kana ?? '-'}</b></div>
+            <div className="info-field"><span>電話</span><b>{customer.phone ?? '-'}</b></div>
+            <div className="info-field"><span>メール</span><b>{customer.email ?? '-'}</b></div>
+            <div className="info-field"><span>郵便番号</span><b>{customer.postal_code ?? '-'}</b></div>
+            <div className="info-field"><span>住所</span><b>{customer.address ?? '-'}</b></div>
+            <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap', minHeight: '5lh' }}>{customer.notes || '-'}</b></div>
+          </div>
         ) : (
-          <>
-            <div className="info-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-              <div className="info-field"><span>種別</span><b>個人</b></div>
-              <div className="info-field"><span>顧客名</span><b>{customer.name}</b></div>
-              <div className="info-field"><span>ふりがな</span><b>{customer.name_kana ?? '-'}</b></div>
-            </div>
-            <div className="info-grid">
-              <div className="info-field"><span>電話</span><b>{customer.phone ?? '-'}</b></div>
-              <div className="info-field"><span>メール</span><b>{customer.email ?? '-'}</b></div>
-            </div>
-            <div className="info-grid">
-              <div className="info-field"><span>郵便番号</span><b>{customer.postal_code ?? '-'}</b></div>
-              <div className="info-field"><span>住所</span><b>{customer.address ?? '-'}</b></div>
-            </div>
-            <div className="info-grid">
-              <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap' }}>{customer.notes || '-'}</b></div>
-            </div>
-          </>
+          <div className="info-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+            <div className="info-field"><span>種別</span><b>個人</b></div>
+            <div className="info-field"><span>顧客名</span><b>{customer.name}</b></div>
+            <div className="info-field"><span>ふりがな</span><b>{customer.name_kana ?? '-'}</b></div>
+            <div className="info-field"><span>電話</span><b>{customer.phone ?? '-'}</b></div>
+            <div className="info-field" style={{ gridColumn: '2 / -1' }}><span>メール</span><b>{customer.email ?? '-'}</b></div>
+            <div className="info-field"><span>郵便番号</span><b>{customer.postal_code ?? '-'}</b></div>
+            <div className="info-field" style={{ gridColumn: '2 / -1' }}><span>住所</span><b>{customer.address ?? '-'}</b></div>
+            <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap', minHeight: '5lh' }}>{customer.notes || '-'}</b></div>
+          </div>
         )}
       </div>
 

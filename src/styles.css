@@ -368,9 +368,9 @@ tr:last-child td { border-bottom: none; }
 .info-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 12px 24px;
+  gap: 18px 24px;
 }
-.info-field { display: flex; flex-direction: column; gap: 2px; }
+.info-field { display: flex; flex-direction: column; gap: 4px; padding: 6px 0; }
 .info-field span { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: .04em; }
 .info-field b { font-size: 14px; color: #1e293b; font-weight: 600; }
 

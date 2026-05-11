@@ -148,7 +148,7 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
         <table>
           <thead>
             <tr>
-              <th>案件名</th><th>顧客</th><th>都道府県</th><th>FIT</th>
+              <th>発電所名</th><th>顧客</th><th>都道府県</th><th>FIT</th>
               <th>委託先</th><th>引渡日</th><th>監視</th><th style={{ width: 48 }}></th>
             </tr>
           </thead>

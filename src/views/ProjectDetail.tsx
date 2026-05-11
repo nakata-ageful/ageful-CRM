@@ -394,7 +394,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           </div>
           <div className="info-grid">
             <div className="info-field"><span>案件番号</span><b>{project.project_no ?? '-'}</b></div>
-            <div className="info-field"><span>発電所名</span><b>{project.plant_name ?? '-'}</b></div>
+            <div className="info-field"><span>発電所名</span><b>{project.plant_name || project.project_name || '-'}</b></div>
             <div className="info-field"><span>郵便番号</span><b>{project.site_postal_code ?? '-'}</b></div>
             <div className="info-field"><span>都道府県</span><b>{project.site_prefecture ?? '-'}</b></div>
             <div className="info-field" style={{ gridColumn: '1/-1' }}><span>設置住所</span><b>{project.site_address ?? '-'}</b></div>

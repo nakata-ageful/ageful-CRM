@@ -38,7 +38,7 @@ type ViewKey =
 const NAV: { key: ViewKey; label: string; icon: string }[] = [
   { key: 'dashboard',             label: 'ダッシュボード', icon: '◎' },
   { key: 'prospects',             label: '見込み管理',     icon: '📋' },
-  { key: 'projects',              label: '案件',           icon: '🏭' },
+  { key: 'projects',              label: '発電所',         icon: '🏭' },
   { key: 'customers',             label: '顧客',           icon: '👤' },
   { key: 'maintenance-responses', label: '保守対応',       icon: '🔧' },
   { key: 'billing',               label: '請求',           icon: '📄' },

@@ -53,7 +53,7 @@ export function MaintenanceResponseDetail({ response, onBack, onReload, onViewPr
       <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 16 }}>
         <span style={{ fontSize: 13, color: '#64748b' }}>発電所：</span>
         <button className="link-btn" onClick={() => onViewProject(response.project_id)}>
-          {response.project_name ?? '-'}
+          {response.plant_name || response.project_name || '-'}
         </button>
         <span style={{ fontSize: 13, color: '#64748b' }}>顧客：{response.customer_name ?? '-'}</span>
         <StatusBadge status={response.status} />

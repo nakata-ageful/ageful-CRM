@@ -249,7 +249,7 @@ export async function getMaintenanceResponses(): Promise<MaintenanceResponse[]> 
   const client = db()
   const { data, error } = await client
     .from('maintenance_responses')
-    .select('*, projects(project_name, customers(name, company_name))')
+    .select('*, projects(project_name, plant_name, customers(name, company_name))')
     .order('inquiry_date', { ascending: false })
     // TODO: 大規模データセットに対しては適切なページネーションを実装すべき
     .limit(1000)
@@ -260,6 +260,7 @@ export async function getMaintenanceResponses(): Promise<MaintenanceResponse[]> 
     return {
       ...(row as MaintenanceResponse),
       project_name: (proj?.project_name as string) ?? '不明',
+      plant_name: (proj?.plant_name as string) ?? null,
       customer_name: (cust?.company_name as string) ?? (cust?.name as string) ?? '不明',
     }
   })
@@ -268,8 +269,21 @@ export async function getMaintenanceResponses(): Promise<MaintenanceResponse[]> 
 export async function getMaintenanceResponseById(id: number): Promise<MaintenanceResponse | null> {
   if (!hasSupabaseEnv) return maintenanceResponseStore.getById(id)
   const client = db()
-  const { data } = await client.from('maintenance_responses').select('*').eq('id', id).single()
-  return (data as MaintenanceResponse) ?? null
+  const { data } = await client
+    .from('maintenance_responses')
+    .select('*, projects(project_name, plant_name, customers(name, company_name))')
+    .eq('id', id)
+    .single()
+  if (!data) return null
+  const row = data as Record<string, unknown>
+  const proj = row.projects as Record<string, unknown> | null
+  const cust = proj?.customers as Record<string, unknown> | null
+  return {
+    ...(row as MaintenanceResponse),
+    project_name: (proj?.project_name as string) ?? '不明',
+    plant_name: (proj?.plant_name as string) ?? null,
+    customer_name: (cust?.company_name as string) ?? (cust?.name as string) ?? '不明',
+  }
 }
 
 // ── Billing ───────────────────────────────────────────────

@@ -155,6 +155,7 @@ export type MaintenanceResponse = {
   created_at: string
   // joined
   project_name?: string
+  plant_name?: string | null
   customer_name?: string
 }
 

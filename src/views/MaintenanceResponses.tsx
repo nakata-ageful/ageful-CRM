@@ -19,6 +19,7 @@ export function MaintenanceResponses({ responses, onReload: _onReload, onViewDet
     if (!search) return true
     const q = search.toLowerCase()
     return (
+      (r.plant_name ?? '').toLowerCase().includes(q) ||
       (r.project_name ?? '').toLowerCase().includes(q) ||
       (r.customer_name ?? '').toLowerCase().includes(q) ||
       (r.target_area ?? '').toLowerCase().includes(q) ||
@@ -73,7 +74,7 @@ export function MaintenanceResponses({ responses, onReload: _onReload, onViewDet
             {filtered.map(r => (
               <tr key={r.id} className="clickable-row" onClick={() => onViewDetail(r.id)}>
                 <td>{r.response_no ?? '-'}</td>
-                <td><strong>{r.project_name ?? '-'}</strong></td>
+                <td><strong>{r.plant_name || r.project_name || '-'}</strong></td>
                 <td>{r.customer_name ?? '-'}</td>
                 <td>{r.inquiry_date ?? '-'}</td>
                 <td>{r.occurrence_date ?? '-'}</td>

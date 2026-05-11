@@ -8,12 +8,14 @@
 CREATE TABLE IF NOT EXISTS customers (
   id            BIGSERIAL PRIMARY KEY,
   name          TEXT        NOT NULL,          -- 個人名
+  name_kana     TEXT,                          -- ふりがな
   company_name  TEXT,                          -- 法人名
   is_corporate  BOOLEAN     NOT NULL DEFAULT false,
   email         TEXT,
   phone         TEXT,
   postal_code   TEXT,
   address       TEXT,
+  notes         TEXT,                          -- 備考
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -31,6 +33,7 @@ CREATE TABLE IF NOT EXISTS projects (
   site_address             TEXT,
   latitude                 NUMERIC(10,7),
   longitude                NUMERIC(10,7),
+  google_coordinates       TEXT,                -- "緯度,経度" 形式の文字列
   -- パネル情報
   panel_kw                 NUMERIC(10,2),
   panel_count              INTEGER,
@@ -180,6 +183,7 @@ CREATE TABLE IF NOT EXISTS attachments (
 CREATE TABLE IF NOT EXISTS prospects (
   id                    BIGSERIAL PRIMARY KEY,
   customer_name         TEXT        NOT NULL,
+  customer_name_kana    TEXT,
   project_name          TEXT        NOT NULL,
   loan_company          TEXT,
   equipment             NUMERIC,
@@ -197,12 +201,14 @@ CREATE TABLE IF NOT EXISTS prospects (
   contract_memo         TEXT,
   site_address          TEXT,
   panel_kw              NUMERIC,
+  sales_company         TEXT,
   referrer              TEXT,
   lead_date             DATE,
   apply_submit_date     DATE,
   apply_result_date     DATE,
   sale_contract_date    DATE,
   land_contract_date    DATE,
+  loan_apply_date       DATE,
   handover_date         DATE,
   converted_customer_id BIGINT REFERENCES customers(id) ON DELETE SET NULL,
   converted_at          TIMESTAMPTZ,

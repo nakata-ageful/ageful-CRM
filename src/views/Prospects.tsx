@@ -16,6 +16,7 @@ function normalizeName(name: string): string {
 }
 
 type ExistingCustomerOption = {
+  id: number
   name: string
   name_kana: string
   source: 'prospect' | 'customer'
@@ -52,6 +53,7 @@ function AddModal({ onSave, onClose, existingCustomers }: {
         ...f,
         customer_name: cust.name,
         customer_name_kana: cust.name_kana,
+        existing_customer_id: cust.id,
       }))
     }
   }
@@ -60,15 +62,20 @@ function AddModal({ onSave, onClose, existingCustomers }: {
     setMode(newMode)
     if (newMode === 'new') {
       setSelectedCustomer('')
-      setForm(f => ({ ...f, customer_name: '', customer_name_kana: '' }))
+      setForm(f => ({ ...f, customer_name: '', customer_name_kana: '', existing_customer_id: undefined }))
+    } else {
+      setForm(f => ({ ...f, existing_customer_id: undefined }))
     }
   }
 
   async function handleSave() {
     if (!form.customer_name.trim() || !form.project_name.trim()) return
     setSaving(true)
-    await onSave(form)
-    setSaving(false)
+    try {
+      await onSave(form)
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -113,6 +120,17 @@ function AddModal({ onSave, onClose, existingCustomers }: {
                     ))}
                   </select>
                 </label>
+                {selectedCustomer && (
+                  <label className="form-label">
+                    フリガナ
+                    <input
+                      className="form-input"
+                      value={form.customer_name_kana}
+                      onChange={e => set('customer_name_kana', e.target.value)}
+                      placeholder="やまだ たろう"
+                    />
+                  </label>
+                )}
               </>
             ) : (
               <>
@@ -121,7 +139,7 @@ function AddModal({ onSave, onClose, existingCustomers }: {
                   <input className="form-input" value={form.customer_name} onChange={e => set('customer_name', e.target.value)} placeholder="山田 太郎" />
                 </label>
                 <label className="form-label">
-                  ふりがな
+                  フリガナ
                   <input className="form-input" value={form.customer_name_kana} onChange={e => set('customer_name_kana', e.target.value)} placeholder="やまだ たろう" />
                 </label>
               </>
@@ -207,34 +225,40 @@ export function Prospects({
     (contractFilter === 'all' || p.contract_status === contractFilter)
   )
 
-  // 既存顧客候補（見込み + 顧客タブ、重複除去）
+  // 既存顧客候補（顧客タブ優先 → 見込み補完、重複除去）
+  // 既存顧客選択時に顧客IDで紐付けるため、customer源を優先して安定IDを確保する
   const existingCustomers: ExistingCustomerOption[] = useMemo(() => {
     const seen = new Set<string>()
     const result: ExistingCustomerOption[] = []
-    // 見込みリストから
-    for (const p of prospects) {
-      const key = normalizeName(p.customer_name)
-      if (!seen.has(key)) {
-        seen.add(key)
-        result.push({ name: p.customer_name, name_kana: p.customer_name_kana ?? '', source: 'prospect' })
-      }
-    }
-    // 顧客タブから
+    // 顧客タブから（IDが確実に存在）
     for (const c of customers) {
       const key = normalizeName(c.name)
       if (!seen.has(key)) {
         seen.add(key)
-        result.push({ name: c.name, name_kana: c.name_kana ?? '', source: 'customer' })
+        result.push({ id: c.id, name: c.name, name_kana: c.name_kana ?? '', source: 'customer' })
+      }
+    }
+    // 見込みリストから補完（converted_customer_id があるものだけ）
+    for (const p of prospects) {
+      const key = normalizeName(p.customer_name)
+      if (!seen.has(key) && p.converted_customer_id) {
+        seen.add(key)
+        result.push({ id: p.converted_customer_id, name: p.customer_name, name_kana: p.customer_name_kana ?? '', source: 'prospect' })
       }
     }
     return result
   }, [prospects, customers])
 
   async function handleAdd(input: ProspectInput) {
-    await createProspect(input)
-    setShowAdd(false)
-    onReload()
-    toast('見込みを追加しました')
+    try {
+      await createProspect(input)
+      setShowAdd(false)
+      onReload()
+      toast('見込みを追加しました')
+    } catch (e: any) {
+      toast(`保存に失敗しました: ${e?.message ?? e}`)
+      throw e
+    }
   }
 
   async function handleDelete(e: React.MouseEvent, p: Prospect) {

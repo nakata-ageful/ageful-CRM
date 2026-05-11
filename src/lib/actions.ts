@@ -808,17 +808,38 @@ export async function bulkImportBilling(
 
 export async function createProspect(input: ProspectInput): Promise<Prospect> {
   // 顧客+案件を同時作成（見込み段階から案件情報を入力可能にするため）
-  const customer = await createCustomer({
-    name: input.customer_name,
-    name_kana: input.customer_name_kana || '',
-    company_name: '',
-    is_corporate: false,
-    email: '',
-    phone: '',
-    postal_code: '',
-    address: input.site_address || '',
-    notes: '',
-  })
+  // 既存顧客IDが指定されていれば、新規顧客は作らずに使い回し、フリガナが未設定なら補完する。
+  let customer: Customer
+  if (input.existing_customer_id) {
+    const existing = hasSupabaseEnv
+      ? (await db().from('customers').select('*').eq('id', input.existing_customer_id).single()).data as Customer | null
+      : customerStore.getById(input.existing_customer_id)
+    if (!existing) throw new Error(`既存顧客 (id=${input.existing_customer_id}) が見つかりません`)
+    customer = existing
+    // 既存顧客のフリガナが空で、入力にフリガナがあれば補完
+    const incomingKana = input.customer_name_kana?.trim() || ''
+    const existingKana = (existing.name_kana ?? '').trim()
+    if (incomingKana && !existingKana) {
+      if (hasSupabaseEnv) {
+        await db().from('customers').update({ name_kana: incomingKana }).eq('id', existing.id)
+      } else {
+        customerStore.update(existing.id, { name_kana: incomingKana })
+      }
+      customer = { ...existing, name_kana: incomingKana }
+    }
+  } else {
+    customer = await createCustomer({
+      name: input.customer_name,
+      name_kana: input.customer_name_kana || '',
+      company_name: '',
+      is_corporate: false,
+      email: '',
+      phone: '',
+      postal_code: '',
+      address: input.site_address || '',
+      notes: '',
+    })
+  }
 
   await createProject({
     customer_id: customer.id,

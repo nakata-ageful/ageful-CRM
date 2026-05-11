@@ -384,6 +384,7 @@ export default function App() {
                   const projectId = await getProjectIdByCustomerId(customerId)
                   if (projectId) navToProjectDetail(projectId)
                 }}
+                onViewCustomer={navToCustomerDetail}
               />
             )}
             {view === 'prospect-detail' && prospectDetail && (

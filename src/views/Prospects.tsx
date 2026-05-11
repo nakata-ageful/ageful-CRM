@@ -208,12 +208,14 @@ export function Prospects({
   onReload,
   onViewDetail,
   onViewProject,
+  onViewCustomer,
 }: {
   prospects: Prospect[]
   customers: Customer[]
   onReload: () => void
   onViewDetail: (id: number) => void
   onViewProject: (customerId: number) => void
+  onViewCustomer: (customerId: number) => void
 }) {
   const toast = useToast()
   const [applyFilter, setApplyFilter] = useState<ApplyFilter>('all')
@@ -326,8 +328,15 @@ export function Prospects({
                   className="clickable-row"
                   onClick={() => onViewDetail(p.id)}
                 >
-                  <td style={{ ...tdStyle, fontWeight: 600 }}>
-                    {p.customer_name}
+                  <td style={{ ...tdStyle, fontWeight: 600 }} onClick={e => {
+                    if (p.converted_customer_id) {
+                      e.stopPropagation()
+                      onViewCustomer(p.converted_customer_id)
+                    }
+                  }}>
+                    {p.converted_customer_id ? (
+                      <span style={{ color: '#2563eb', cursor: 'pointer', textDecoration: 'underline' }}>{p.customer_name}</span>
+                    ) : p.customer_name}
                   </td>
                   <td style={tdStyle} onClick={e => {
                     if (p.converted_customer_id) {

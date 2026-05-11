@@ -50,16 +50,27 @@ export async function getDashboard(): Promise<DashboardStats> {
 export async function getCustomers(): Promise<Customer[]> {
   if (!hasSupabaseEnv) return customerStore.getAll()
   const client = db()
-  const { data, error } = await client
-    .from('customers')
-    .select('*, projects(id)')
-    .order('created_at', { ascending: false })
-    // TODO: 大規模データセットに対しては適切なページネーションを実装すべき
-    .limit(1000)
-  if (error) throw error
-  return (data ?? []).map((row: Record<string, unknown>) => ({
+  // customers と projects を別クエリで取得して案件数をローカル集計する。
+  // 以前は select('*, projects(id)') の埋め込みカウントを使っていたが、
+  // 詳細ビュー (projects を直接クエリ) と件数がずれるケースがあったため、
+  // 詳細と同じソースで集計するように変更。
+  const [{ data: custData, error: custErr }, { data: projData, error: projErr }] = await Promise.all([
+    client.from('customers')
+      .select('*')
+      .order('created_at', { ascending: false })
+      // TODO: 大規模データセットに対しては適切なページネーションを実装すべき
+      .limit(1000),
+    client.from('projects').select('customer_id'),
+  ])
+  if (custErr) throw custErr
+  if (projErr) throw projErr
+  const counts = new Map<number, number>()
+  for (const p of (projData ?? []) as { customer_id: number }[]) {
+    counts.set(p.customer_id, (counts.get(p.customer_id) ?? 0) + 1)
+  }
+  return (custData ?? []).map((row: Record<string, unknown>) => ({
     ...(row as Customer),
-    project_count: Array.isArray(row.projects) ? (row.projects as unknown[]).length : 0,
+    project_count: counts.get((row as Customer).id) ?? 0,
   }))
 }
 

@@ -322,6 +322,22 @@ export async function createPeriodicMaintenance(input: PeriodicMaintenanceInput)
   return data as PeriodicMaintenance
 }
 
+export async function updatePeriodicMaintenance(id: number, input: PeriodicMaintenanceInput): Promise<PeriodicMaintenance> {
+  const payload = {
+    record_date: input.record_date,
+    work_type: input.work_type || null,
+    content: input.content || null,
+  }
+  if (!hasSupabaseEnv) {
+    const updated = periodicMaintenanceStore.update(id, payload)
+    if (!updated) throw new Error('Not found')
+    return updated
+  }
+  const { data, error } = await db().from('periodic_maintenance').update(payload).eq('id', id).select().single()
+  if (error) throw error
+  return data as PeriodicMaintenance
+}
+
 export async function deletePeriodicMaintenance(id: number): Promise<void> {
   if (!hasSupabaseEnv) { periodicMaintenanceStore.delete(id); return }
   const { error } = await db().from('periodic_maintenance').delete().eq('id', id)

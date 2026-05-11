@@ -496,6 +496,10 @@ export const periodicMaintenanceStore = {
     periodicMaintenance = [...periodicMaintenance, m]
     return m
   },
+  update: (id: number, input: Partial<Omit<PeriodicMaintenance, 'id' | 'created_at'>>) => {
+    periodicMaintenance = periodicMaintenance.map(m => m.id === id ? { ...m, ...input } : m)
+    return periodicMaintenance.find(m => m.id === id) ?? null
+  },
   delete: (id: number) => { periodicMaintenance = periodicMaintenance.filter(m => m.id !== id) },
 }
 

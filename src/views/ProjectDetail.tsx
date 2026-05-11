@@ -4,7 +4,7 @@ import { StatusBadge } from '../components/StatusBadge'
 import { Modal } from '../components/Modal'
 import {
   createMaintenanceResponse, deleteMaintenanceResponse,
-  createPeriodicMaintenance, deletePeriodicMaintenance,
+  createPeriodicMaintenance, updatePeriodicMaintenance, deletePeriodicMaintenance,
   upsertAnnualRecord, updateAnnualRecordStatus, deleteAnnualRecord, createContract, updateContract, updateProject,
 } from '../lib/actions'
 import { fmtYen } from '../lib/utils'
@@ -39,7 +39,7 @@ function fmtFormNum(v: string | number | null | undefined): string {
 }
 import { useToast } from '../components/Toast'
 
-type Tab = '基本情報' | '保守対応' | '定期保守' | '請求'
+type Tab = '基本情報' | '保守対応' | '請求'
 
 type Props = {
   detail: ProjectDetail
@@ -51,7 +51,7 @@ type Props = {
 
 const WORK_TYPES = ['点検', '除草', '巡回', 'その他']
 
-const TABS: Tab[] = ['基本情報', '保守対応', '定期保守', '請求']
+const TABS: Tab[] = ['基本情報', '保守対応', '請求']
 
 function readTabFromHash(): Tab {
   const h = window.location.hash
@@ -89,6 +89,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
 
   // 定期保守フォーム
   const [pmModal, setPmModal] = useState(false)
+  const [pmEditId, setPmEditId] = useState<number | null>(null)
   const [pmForm, setPmForm] = useState<Omit<PeriodicMaintenanceInput, 'project_id'>>({
     record_date: '', work_type: '点検', content: '',
   })
@@ -278,15 +279,34 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
 
   // ── 定期保守 ─────────────────────────────────────────────
 
-  async function handleCreatePM() {
+  async function handleSavePM() {
     if (!pmForm.record_date) { setErr('記録日は必須です'); return }
     setSaving(true); setErr('')
     try {
-      await createPeriodicMaintenance({ ...pmForm, project_id: project.id })
+      if (pmEditId != null) {
+        await updatePeriodicMaintenance(pmEditId, { ...pmForm, project_id: project.id })
+      } else {
+        await createPeriodicMaintenance({ ...pmForm, project_id: project.id })
+      }
       setPmModal(false)
+      setPmEditId(null)
       onReload()
-      toast('定期保守を追加しました')
+      toast(pmEditId != null ? '定期保守を更新しました' : '定期保守を追加しました')
     } catch (e: unknown) { setErr(e instanceof Error ? e.message : JSON.stringify(e)) } finally { setSaving(false) }
+  }
+
+  function openPmEdit(m: { id: number; record_date: string; work_type: string | null; content: string | null }) {
+    setPmForm({ record_date: m.record_date, work_type: m.work_type ?? '', content: m.content ?? '' })
+    setPmEditId(m.id)
+    setErr('')
+    setPmModal(true)
+  }
+
+  function openPmCreate(workType: string) {
+    setPmForm({ record_date: '', work_type: workType, content: '' })
+    setPmEditId(null)
+    setErr('')
+    setPmModal(true)
   }
 
   async function handleDeletePM(id: number) {
@@ -398,7 +418,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
 
       {/* タブ */}
       <div className="tab-bar">
-        {(['基本情報', '保守対応', '定期保守', '請求'] as Tab[]).map(t => (
+        {(['基本情報', '保守対応', '請求'] as Tab[]).map(t => (
           <button
             key={t}
             className={`tab-btn ${tab === t ? 'active' : ''}`}
@@ -453,42 +473,41 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
         </div>
       )}
 
-      {/* ── 保守対応 ── */}
+      {/* ── 保守対応（保守対応記録 + 定期保守を統合） ── */}
       {tab === '保守対応' && (
-        <div className="card">
-          <div className="card-header-row">
-            <h3 className="section-title" style={{ margin: 0 }}>保守対応記録</h3>
-            <button className="btn btn-main btn-sm" onClick={() => { setMrForm({ inquiry_date: '', occurrence_date: '', target_area: '', situation: '', response_content: '', report: '' }); setErr(''); setMrModal(true) }}>
-              ＋ 追加
-            </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="card">
+            <div className="card-header-row">
+              <h3 className="section-title" style={{ margin: 0 }}>保守対応記録</h3>
+              <button className="btn btn-main btn-sm" onClick={() => { setMrForm({ inquiry_date: '', occurrence_date: '', target_area: '', situation: '', response_content: '', report: '' }); setErr(''); setMrModal(true) }}>
+                ＋ 追加
+              </button>
+            </div>
+            <table>
+              <thead>
+                <tr><th>管理番号</th><th>問合日</th><th>発生日</th><th>対象箇所</th><th>状態</th><th>操作</th></tr>
+              </thead>
+              <tbody>
+                {maintenanceResponses.length === 0 && (
+                  <tr><td colSpan={6} className="empty-cell">保守対応記録がありません</td></tr>
+                )}
+                {maintenanceResponses.map(m => (
+                  <tr key={m.id} className="clickable-row" onClick={() => onViewMaintenance(m.id)}>
+                    <td>{m.response_no ?? '-'}</td>
+                    <td>{m.inquiry_date ?? '-'}</td>
+                    <td>{m.occurrence_date ?? '-'}</td>
+                    <td>{m.target_area ?? '-'}</td>
+                    <td><StatusBadge status={m.status} /></td>
+                    <td onClick={e => e.stopPropagation()}>
+                      <button className="btn-icon" title="削除" onClick={() => handleDeleteMR(m.id)}>🗑</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          <table>
-            <thead>
-              <tr><th>管理番号</th><th>問合日</th><th>発生日</th><th>対象箇所</th><th>状態</th><th>操作</th></tr>
-            </thead>
-            <tbody>
-              {maintenanceResponses.length === 0 && (
-                <tr><td colSpan={6} className="empty-cell">保守対応記録がありません</td></tr>
-              )}
-              {maintenanceResponses.map(m => (
-                <tr key={m.id} className="clickable-row" onClick={() => onViewMaintenance(m.id)}>
-                  <td>{m.response_no ?? '-'}</td>
-                  <td>{m.inquiry_date ?? '-'}</td>
-                  <td>{m.occurrence_date ?? '-'}</td>
-                  <td>{m.target_area ?? '-'}</td>
-                  <td><StatusBadge status={m.status} /></td>
-                  <td onClick={e => e.stopPropagation()}>
-                    <button className="btn-icon" title="削除" onClick={() => handleDeleteMR(m.id)}>🗑</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* ── 定期保守 ── */}
-      {tab === '定期保守' && (() => {
+          {/* 定期保守セクション（旧「定期保守」タブの内容を統合） */}
+          {(() => {
         const currentYear = new Date().getFullYear()
         const categories: { key: string; label: string; planField: 'plan_inspection' | 'plan_weeding' | 'plan_emergency' }[] = [
           { key: '点検', label: '点検', planField: 'plan_inspection' },
@@ -557,7 +576,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                           </div>
                         )}
                       </div>
-                      <button className="btn btn-main btn-sm" onClick={() => { setPmForm({ record_date: '', work_type: cat.key, content: '' }); setErr(''); setPmModal(true) }}>
+                      <button className="btn btn-main btn-sm" onClick={() => openPmCreate(cat.key)}>
                         ＋
                       </button>
                     </div>
@@ -581,7 +600,10 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                                   </span>
                                 )}
                               </span>
-                              <button className="btn-icon" title="削除" onClick={() => handleDeletePM(m.id)} style={{ fontSize: 12 }}>🗑</button>
+                              <div style={{ display: 'flex', gap: 2 }}>
+                                <button className="btn-icon" title="編集" onClick={() => openPmEdit(m)} style={{ fontSize: 12 }}>✎</button>
+                                <button className="btn-icon" title="削除" onClick={() => handleDeletePM(m.id)} style={{ fontSize: 12 }}>🗑</button>
+                              </div>
                             </div>
                             {m.content && <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>{m.content}</div>}
                           </div>
@@ -597,7 +619,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                 <div className="card" style={{ margin: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                     <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>その他</div>
-                    <button className="btn btn-main btn-sm" onClick={() => { setPmForm({ record_date: '', work_type: 'その他', content: '' }); setErr(''); setPmModal(true) }}>
+                    <button className="btn btn-main btn-sm" onClick={() => openPmCreate('その他')}>
                       ＋
                     </button>
                   </div>
@@ -614,7 +636,10 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                             {m.record_date}
                             <span style={{ marginLeft: 6, fontSize: 10, color: '#8b5cf6', background: '#f5f3ff', borderRadius: 4, padding: '1px 5px' }}>{m.work_type}</span>
                           </span>
-                          <button className="btn-icon" title="削除" onClick={() => handleDeletePM(m.id)} style={{ fontSize: 12 }}>🗑</button>
+                          <div style={{ display: 'flex', gap: 2 }}>
+                            <button className="btn-icon" title="編集" onClick={() => openPmEdit(m)} style={{ fontSize: 12 }}>✎</button>
+                            <button className="btn-icon" title="削除" onClick={() => handleDeletePM(m.id)} style={{ fontSize: 12 }}>🗑</button>
+                          </div>
                         </div>
                         {m.content && <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>{m.content}</div>}
                       </div>
@@ -626,6 +651,8 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           </div>
         )
       })()}
+        </div>
+      )}
 
       {/* ── 請求 ── */}
       {tab === '請求' && (
@@ -813,7 +840,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
 
       {/* 定期保守モーダル */}
       {pmModal && (
-        <Modal title="定期保守記録を追加" onClose={() => setPmModal(false)}>
+        <Modal title={pmEditId != null ? '定期保守記録を編集' : '定期保守記録を追加'} onClose={() => { setPmModal(false); setPmEditId(null) }}>
           {err && <div className="form-error">{err}</div>}
           <div className="form-grid">
             <label className="form-label required">
@@ -832,8 +859,8 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             </label>
           </div>
           <div className="modal-footer">
-            <button className="btn btn-sub" onClick={() => setPmModal(false)}>キャンセル</button>
-            <button className="btn btn-main" onClick={handleCreatePM} disabled={saving}>{saving ? '保存中...' : '追加する'}</button>
+            <button className="btn btn-sub" onClick={() => { setPmModal(false); setPmEditId(null) }}>キャンセル</button>
+            <button className="btn btn-main" onClick={handleSavePM} disabled={saving}>{saving ? '保存中...' : pmEditId != null ? '保存する' : '追加する'}</button>
           </div>
         </Modal>
       )}

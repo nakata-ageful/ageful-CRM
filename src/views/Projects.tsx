@@ -102,7 +102,7 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
   }
 
   async function handleSave() {
-    if (!projectForm.project_name.trim()) { setError('案件名は必須です'); return }
+    if (!projectForm.plant_name.trim()) { setError('発電所名は必須です'); return }
     setSaving(true)
     try {
       let customerId: number
@@ -114,7 +114,8 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
         const newCustomer = await createCustomer(customerForm)
         customerId = newCustomer.id
       }
-      await createProject({ ...projectForm, customer_id: customerId })
+      // project_name は DB上 NOT NULL のため、発電所名と同期
+      await createProject({ ...projectForm, project_name: projectForm.plant_name, customer_id: customerId })
       setModal(false)
       onReload()
       toast('案件を追加しました')
@@ -159,7 +160,7 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
             {filtered.map(p => (
               <tr key={p.id} className="clickable-row" onClick={() => onViewDetail(p.id)}>
                 <td>
-                  <strong>{p.project_name}</strong>
+                  <strong>{p.plant_name || p.project_name}</strong>
                   {p.project_no && <div style={{ fontSize: 11, color: '#64748b' }}>{p.project_no}</div>}
                 </td>
                 <td>
@@ -247,8 +248,8 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
           <div className="form-section-title">案件基本情報</div>
           <div className="form-grid">
             <label className="form-label required" style={{ gridColumn: '1/-1' }}>
-              案件名
-              <input className="form-input" value={projectForm.project_name} onChange={pf('project_name')} />
+              発電所名
+              <input className="form-input" value={projectForm.plant_name} onChange={pf('plant_name')} />
             </label>
             <label className="form-label">
               案件番号

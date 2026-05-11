@@ -193,6 +193,7 @@ export type ProjectRow = {
   customer_id: number
   project_no: string | null
   project_name: string
+  plant_name: string | null
   site_prefecture: string | null
   site_address: string | null
   fit_period: number | null

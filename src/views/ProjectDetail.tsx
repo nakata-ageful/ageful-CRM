@@ -168,11 +168,13 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
   // ── 案件基本情報編集 ──────────────────────────────────────
 
   async function handleSaveProject() {
-    if (!projForm.project_name.trim()) { setErr('案件名は必須です'); return }
+    if (!projForm.plant_name.trim()) { setErr('発電所名は必須です'); return }
     setSaving(true); setErr('')
     try {
+      // project_name は DB上 NOT NULL のため、発電所名と同期
       await updateProject(project.id, {
         ...projForm,
+        project_name: projForm.plant_name,
         has_4g: projForm.has_4g === 'true' ? true : projForm.has_4g === 'false' ? false : (null as unknown as boolean),
         monitoring_user: projForm.monitoring_user,
       })
@@ -186,7 +188,8 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
     setProjForm({
       project_no: project.project_no ?? '',
       project_name: project.project_name,
-      plant_name: project.plant_name ?? '',
+      // plant_name が未設定でも、表示と編集で同じ値が見えるよう project_name にフォールバック
+      plant_name: project.plant_name || project.project_name,
       site_postal_code: project.site_postal_code ?? '',
       site_prefecture: project.site_prefecture ?? '',
       site_address: project.site_address ?? '',
@@ -1061,16 +1064,12 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           {err && <div className="form-error">{err}</div>}
           <div className="form-grid">
             <label className="form-label required" style={{ gridColumn: '1/-1' }}>
-              案件名
-              <input className="form-input" value={projForm.project_name} onChange={e => setProjForm(f => ({ ...f, project_name: e.target.value }))} />
+              発電所名
+              <input className="form-input" value={projForm.plant_name} onChange={e => setProjForm(f => ({ ...f, plant_name: e.target.value }))} />
             </label>
             <label className="form-label">
               案件番号
               <input className="form-input" value={projForm.project_no} onChange={e => setProjForm(f => ({ ...f, project_no: e.target.value }))} />
-            </label>
-            <label className="form-label">
-              発電所名
-              <input className="form-input" value={projForm.plant_name} onChange={e => setProjForm(f => ({ ...f, plant_name: e.target.value }))} />
             </label>
             <label className="form-label">
               郵便番号（発電所）

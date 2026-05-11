@@ -214,7 +214,18 @@ export function Customers({ customers, onReload, onViewDetail }: Props) {
             </label>
             <label className="form-label">
               郵便番号
-              <input className="form-input" value={form.postal_code} onChange={e => setForm(f => ({ ...f, postal_code: e.target.value }))} />
+              <input
+                className="form-input"
+                inputMode="numeric"
+                placeholder="000-0000"
+                value={form.postal_code}
+                onChange={e => {
+                  const half = e.target.value.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+                  const digits = half.replace(/\D/g, '').slice(0, 7)
+                  const formatted = digits.length <= 3 ? digits : digits.slice(0, 3) + '-' + digits.slice(3)
+                  setForm(f => ({ ...f, postal_code: formatted }))
+                }}
+              />
             </label>
             <label className="form-label" style={{ gridColumn: '1/-1' }}>
               住所

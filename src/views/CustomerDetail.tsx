@@ -6,6 +6,14 @@ import { createProject, updateCustomer, uploadAttachment, deleteAttachment } fro
 import { fmtDate } from '../lib/utils'
 import { useToast } from '../components/Toast'
 
+/** 郵便番号を「〒xxx-xxxx」形式で表示。値が空なら「-」を返す。 */
+function fmtPostalDisplay(v: string | null | undefined): string {
+  if (!v) return '-'
+  const digits = v.replace(/\D/g, '')
+  if (digits.length === 7) return `〒${digits.slice(0, 3)}-${digits.slice(3)}`
+  return `〒${v}`
+}
+
 type Props = {
   detail: CustomerDetailData
   onBack: () => void
@@ -145,10 +153,10 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject }: 
             <div className="info-field"><span>種別</span><b>法人</b></div>
             <div className="info-field"><span>会社名</span><b>{customer.company_name ?? '-'}</b></div>
             <div className="info-field"><span>担当者名</span><b>{customer.name}</b></div>
-            <div className="info-field"><span>ふりがな</span><b>{customer.name_kana ?? '-'}</b></div>
+            <div className="info-field"><span>担当者フリガナ</span><b>{customer.name_kana ?? '-'}</b></div>
             <div className="info-field"><span>電話</span><b>{customer.phone ?? '-'}</b></div>
             <div className="info-field"><span>メール</span><b>{customer.email ?? '-'}</b></div>
-            <div className="info-field"><span>郵便番号</span><b>{customer.postal_code ?? '-'}</b></div>
+            <div className="info-field"><span>郵便番号</span><b>{fmtPostalDisplay(customer.postal_code)}</b></div>
             <div className="info-field"><span>住所</span><b>{customer.address ?? '-'}</b></div>
             <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap', minHeight: '5lh' }}>{customer.notes || '-'}</b></div>
           </div>
@@ -156,10 +164,10 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject }: 
           <div className="info-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
             <div className="info-field"><span>種別</span><b>個人</b></div>
             <div className="info-field"><span>顧客名</span><b>{customer.name}</b></div>
-            <div className="info-field"><span>ふりがな</span><b>{customer.name_kana ?? '-'}</b></div>
+            <div className="info-field"><span>フリガナ</span><b>{customer.name_kana ?? '-'}</b></div>
             <div className="info-field"><span>電話</span><b>{customer.phone ?? '-'}</b></div>
             <div className="info-field" style={{ gridColumn: '2 / -1' }}><span>メール</span><b>{customer.email ?? '-'}</b></div>
-            <div className="info-field"><span>郵便番号</span><b>{customer.postal_code ?? '-'}</b></div>
+            <div className="info-field"><span>郵便番号</span><b>{fmtPostalDisplay(customer.postal_code)}</b></div>
             <div className="info-field" style={{ gridColumn: '2 / -1' }}><span>住所</span><b>{customer.address ?? '-'}</b></div>
             <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap', minHeight: '5lh' }}>{customer.notes || '-'}</b></div>
           </div>
@@ -282,7 +290,18 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject }: 
             </label>
             <label className="form-label">
               郵便番号
-              <input className="form-input" value={editForm.postal_code} onChange={e => setEditForm(f => ({ ...f, postal_code: e.target.value }))} />
+              <input
+                className="form-input"
+                inputMode="numeric"
+                placeholder="000-0000"
+                value={editForm.postal_code}
+                onChange={e => {
+                  const half = e.target.value.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+                  const digits = half.replace(/\D/g, '').slice(0, 7)
+                  const formatted = digits.length <= 3 ? digits : digits.slice(0, 3) + '-' + digits.slice(3)
+                  setEditForm(f => ({ ...f, postal_code: formatted }))
+                }}
+              />
             </label>
             <label className="form-label" style={{ gridColumn: '1/-1' }}>
               住所

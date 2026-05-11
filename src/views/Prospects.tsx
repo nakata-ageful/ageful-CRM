@@ -163,19 +163,19 @@ function AddModal({ onSave, onClose, existingCustomers }: {
             </label>
             <label className="form-label">
               設備代（円）
-              <input className="form-input" type="number" value={form.equipment} onChange={e => set('equipment', e.target.value)} />
+              <input className="form-input" inputMode="numeric" value={form.equipment} onChange={e => set('equipment', e.target.value)} />
             </label>
             <label className="form-label">
               土地費（円）
-              <input className="form-input" type="number" value={form.land_cost} onChange={e => set('land_cost', e.target.value)} />
+              <input className="form-input" inputMode="numeric" value={form.land_cost} onChange={e => set('land_cost', e.target.value)} />
             </label>
             <label className="form-label">
               融資額（円）
-              <input className="form-input" type="number" value={form.loan_amount} onChange={e => set('loan_amount', e.target.value)} />
+              <input className="form-input" inputMode="numeric" value={form.loan_amount} onChange={e => set('loan_amount', e.target.value)} />
             </label>
             <label className="form-label">
               kW数
-              <input className="form-input" type="number" value={form.panel_kw} onChange={e => set('panel_kw', e.target.value)} placeholder="45.9" />
+              <input className="form-input" inputMode="decimal" value={form.panel_kw} onChange={e => set('panel_kw', e.target.value)} placeholder="45.9" />
             </label>
             <label className="form-label">
               販売会社

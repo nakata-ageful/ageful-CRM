@@ -95,7 +95,8 @@ export function Customers({ customers, onReload, onViewDetail }: Props) {
   }
 
   async function handleSave() {
-    if (!form.name.trim()) { setError('顧客名は必須です'); return }
+    if (!form.name.trim()) { setError(form.is_corporate ? '担当者名は必須です' : '顧客名は必須です'); return }
+    if (form.is_corporate && !form.company_name.trim()) { setError('会社名は必須です'); return }
     setSaving(true)
     try {
       if (modal === 'create') await createCustomer(form)
@@ -168,17 +169,40 @@ export function Customers({ customers, onReload, onViewDetail }: Props) {
         >
           {error && <div className="form-error">{error}</div>}
           <div className="form-grid">
+            <div style={{ display: 'flex', gap: 8, gridColumn: '1/-1' }}>
+              <button
+                type="button"
+                className={`filter-tab ${!form.is_corporate ? 'active' : ''}`}
+                onClick={() => setForm(f => ({ ...f, is_corporate: false, company_name: '' }))}
+              >
+                個人
+              </button>
+              <button
+                type="button"
+                className={`filter-tab ${form.is_corporate ? 'active' : ''}`}
+                onClick={() => setForm(f => ({ ...f, is_corporate: true }))}
+              >
+                法人
+              </button>
+            </div>
+            {form.is_corporate && (
+              <label className="form-label required" style={{ gridColumn: '1/-1' }}>
+                会社名
+                <input
+                  className="form-input"
+                  value={form.company_name}
+                  onChange={e => setForm(f => ({ ...f, company_name: e.target.value }))}
+                  placeholder="株式会社〇〇"
+                />
+              </label>
+            )}
             <label className="form-label required">
-              顧客名（個人名）
+              {form.is_corporate ? '担当者名' : '顧客名（個人名）'}
               <input className="form-input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
             </label>
             <label className="form-label">
-              会社名（法人の場合）
-              <input
-                className="form-input"
-                value={form.company_name}
-                onChange={e => setForm(f => ({ ...f, company_name: e.target.value, is_corporate: !!e.target.value }))}
-              />
+              {form.is_corporate ? '担当者フリガナ' : 'フリガナ'}
+              <input className="form-input" value={form.name_kana} onChange={e => setForm(f => ({ ...f, name_kana: e.target.value }))} placeholder="やまだ たろう" />
             </label>
             <label className="form-label">
               電話番号

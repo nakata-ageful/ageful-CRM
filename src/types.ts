@@ -337,6 +337,8 @@ export type ProspectInput = {
   referrer: string
   lead_date: string
   existing_customer_id?: number
+  is_corporate?: boolean
+  company_name?: string
 }
 
 // ──────────────────────────────────────────────────────────

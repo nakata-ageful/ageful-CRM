@@ -58,7 +58,8 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject }: 
   const [error, setError] = useState('')
 
   async function handleSaveCustomer() {
-    if (!editForm.name.trim()) { setError('顧客名は必須です'); return }
+    if (!editForm.name.trim()) { setError(editForm.is_corporate ? '担当者名は必須です' : '顧客名は必須です'); return }
+    if (editForm.is_corporate && !editForm.company_name.trim()) { setError('会社名は必須です'); return }
     setSaving(true)
     try {
       await updateCustomer(customer.id, editForm)
@@ -241,17 +242,35 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject }: 
         <Modal title="顧客情報を編集" onClose={() => setEditModal(false)}>
           {error && <div className="form-error">{error}</div>}
           <div className="form-grid">
+            <div style={{ display: 'flex', gap: 8, gridColumn: '1/-1' }}>
+              <button
+                type="button"
+                className={`filter-tab ${!editForm.is_corporate ? 'active' : ''}`}
+                onClick={() => setEditForm(f => ({ ...f, is_corporate: false, company_name: '' }))}
+              >
+                個人
+              </button>
+              <button
+                type="button"
+                className={`filter-tab ${editForm.is_corporate ? 'active' : ''}`}
+                onClick={() => setEditForm(f => ({ ...f, is_corporate: true }))}
+              >
+                法人
+              </button>
+            </div>
+            {editForm.is_corporate && (
+              <label className="form-label required" style={{ gridColumn: '1/-1' }}>
+                会社名
+                <input className="form-input" value={editForm.company_name} onChange={e => setEditForm(f => ({ ...f, company_name: e.target.value }))} placeholder="株式会社〇〇" />
+              </label>
+            )}
             <label className="form-label required">
-              顧客名
+              {editForm.is_corporate ? '担当者名' : '顧客名'}
               <input className="form-input" value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
             </label>
             <label className="form-label">
-              ふりがな
+              {editForm.is_corporate ? '担当者フリガナ' : 'フリガナ'}
               <input className="form-input" value={editForm.name_kana} onChange={e => setEditForm(f => ({ ...f, name_kana: e.target.value }))} placeholder="やまだ たろう" />
-            </label>
-            <label className="form-label">
-              会社名（法人の場合）
-              <input className="form-input" value={editForm.company_name} onChange={e => setEditForm(f => ({ ...f, company_name: e.target.value, is_corporate: !!e.target.value }))} />
             </label>
             <label className="form-label">
               電話番号

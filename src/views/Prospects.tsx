@@ -19,6 +19,8 @@ type ExistingCustomerOption = {
   id: number
   name: string
   name_kana: string
+  is_corporate: boolean
+  company_name: string
   source: 'prospect' | 'customer'
 }
 
@@ -36,23 +38,28 @@ function AddModal({ onSave, onClose, existingCustomers }: {
   existingCustomers: ExistingCustomerOption[]
 }) {
   const [mode, setMode] = useState<'new' | 'existing'>('new')
+  const [customerType, setCustomerType] = useState<'individual' | 'corporate'>('individual')
   const [selectedCustomer, setSelectedCustomer] = useState('')
   const [form, setForm] = useState<ProspectInput>({
     customer_name: '', customer_name_kana: '', project_name: '', loan_company: '',
     equipment: '', land_cost: '', loan_amount: '',
     site_address: '', panel_kw: '', sales_company: '', referrer: '', lead_date: '',
+    is_corporate: false, company_name: '',
   })
   const [saving, setSaving] = useState(false)
   const set = (k: keyof ProspectInput, v: string) => setForm(f => ({ ...f, [k]: v }))
 
   function handleSelectExisting(value: string) {
     setSelectedCustomer(value)
-    const cust = existingCustomers.find(c => c.name === value)
+    const id = Number(value)
+    const cust = existingCustomers.find(c => c.id === id)
     if (cust) {
       setForm(f => ({
         ...f,
         customer_name: cust.name,
         customer_name_kana: cust.name_kana,
+        company_name: cust.company_name,
+        is_corporate: cust.is_corporate,
         existing_customer_id: cust.id,
       }))
     }
@@ -62,14 +69,20 @@ function AddModal({ onSave, onClose, existingCustomers }: {
     setMode(newMode)
     if (newMode === 'new') {
       setSelectedCustomer('')
-      setForm(f => ({ ...f, customer_name: '', customer_name_kana: '', existing_customer_id: undefined }))
+      setForm(f => ({ ...f, customer_name: '', customer_name_kana: '', company_name: '', existing_customer_id: undefined }))
     } else {
       setForm(f => ({ ...f, existing_customer_id: undefined }))
     }
   }
 
+  function handleCustomerTypeChange(t: 'individual' | 'corporate') {
+    setCustomerType(t)
+    setForm(f => ({ ...f, is_corporate: t === 'corporate', company_name: '' }))
+  }
+
   async function handleSave() {
     if (!form.customer_name.trim() || !form.project_name.trim()) return
+    if (mode === 'new' && customerType === 'corporate' && !(form.company_name ?? '').trim()) return
     setSaving(true)
     try {
       await onSave(form)
@@ -105,7 +118,7 @@ function AddModal({ onSave, onClose, existingCustomers }: {
           <div className="form-grid">
             {mode === 'existing' ? (
               <>
-                <label className="form-label required">
+                <label className="form-label required" style={{ gridColumn: '1/-1' }}>
                   顧客を選択
                   <select
                     className="form-select"
@@ -113,33 +126,74 @@ function AddModal({ onSave, onClose, existingCustomers }: {
                     onChange={e => handleSelectExisting(e.target.value)}
                   >
                     <option value="">選択してください</option>
-                    {existingCustomers.map((c, i) => (
-                      <option key={`${c.name}-${i}`} value={c.name}>
-                        {c.name}{c.name_kana ? ` (${c.name_kana})` : ''}
-                      </option>
-                    ))}
+                    {existingCustomers.map(c => {
+                      const label = c.is_corporate && c.company_name
+                        ? `${c.company_name} / ${c.name}${c.name_kana ? ` (${c.name_kana})` : ''}`
+                        : `${c.name}${c.name_kana ? ` (${c.name_kana})` : ''}`
+                      return (
+                        <option key={c.id} value={c.id}>{label}</option>
+                      )
+                    })}
                   </select>
                 </label>
+                {selectedCustomer && form.is_corporate && (
+                  <div className="info-field" style={{ gridColumn: '1/-1' }}>
+                    <span>会社名</span><b>{form.company_name || '-'}</b>
+                  </div>
+                )}
                 {selectedCustomer && (
-                  <label className="form-label">
-                    フリガナ
-                    <input
-                      className="form-input"
-                      value={form.customer_name_kana}
-                      onChange={e => set('customer_name_kana', e.target.value)}
-                      placeholder="やまだ たろう"
-                    />
-                  </label>
+                  <>
+                    <label className="form-label">
+                      {form.is_corporate ? '担当者名' : '顧客名'}
+                      <input
+                        className="form-input"
+                        value={form.customer_name}
+                        readOnly
+                        style={{ background: '#f1f5f9' }}
+                      />
+                    </label>
+                    <label className="form-label">
+                      {form.is_corporate ? '担当者フリガナ' : 'フリガナ'}
+                      <input
+                        className="form-input"
+                        value={form.customer_name_kana}
+                        onChange={e => set('customer_name_kana', e.target.value)}
+                        placeholder="やまだ たろう"
+                      />
+                    </label>
+                  </>
                 )}
               </>
             ) : (
               <>
+                <div style={{ display: 'flex', gap: 8, gridColumn: '1/-1' }}>
+                  <button
+                    type="button"
+                    className={`filter-tab ${customerType === 'individual' ? 'active' : ''}`}
+                    onClick={() => handleCustomerTypeChange('individual')}
+                  >
+                    個人
+                  </button>
+                  <button
+                    type="button"
+                    className={`filter-tab ${customerType === 'corporate' ? 'active' : ''}`}
+                    onClick={() => handleCustomerTypeChange('corporate')}
+                  >
+                    法人
+                  </button>
+                </div>
+                {customerType === 'corporate' && (
+                  <label className="form-label required" style={{ gridColumn: '1/-1' }}>
+                    会社名
+                    <input className="form-input" value={form.company_name ?? ''} onChange={e => set('company_name', e.target.value)} placeholder="株式会社〇〇" />
+                  </label>
+                )}
                 <label className="form-label required">
-                  顧客名
+                  {customerType === 'corporate' ? '担当者名' : '顧客名'}
                   <input className="form-input" value={form.customer_name} onChange={e => set('customer_name', e.target.value)} placeholder="山田 太郎" />
                 </label>
                 <label className="form-label">
-                  フリガナ
+                  {customerType === 'corporate' ? '担当者フリガナ' : 'フリガナ'}
                   <input className="form-input" value={form.customer_name_kana} onChange={e => set('customer_name_kana', e.target.value)} placeholder="やまだ たろう" />
                 </label>
               </>
@@ -224,20 +278,39 @@ export function Prospects({
   const existingCustomers: ExistingCustomerOption[] = useMemo(() => {
     const seen = new Set<string>()
     const result: ExistingCustomerOption[] = []
-    // 顧客タブから（IDが確実に存在）
+    // 顧客タブから（IDが確実に存在、法人/個人情報も取れる）
     for (const c of customers) {
-      const key = normalizeName(c.name)
+      const key = c.is_corporate && c.company_name
+        ? `corp:${normalizeName(c.company_name)}:${normalizeName(c.name)}`
+        : `ind:${normalizeName(c.name)}`
       if (!seen.has(key)) {
         seen.add(key)
-        result.push({ id: c.id, name: c.name, name_kana: c.name_kana ?? '', source: 'customer' })
+        result.push({
+          id: c.id,
+          name: c.name,
+          name_kana: c.name_kana ?? '',
+          is_corporate: c.is_corporate,
+          company_name: c.company_name ?? '',
+          source: 'customer',
+        })
       }
     }
-    // 見込みリストから補完（converted_customer_id があるものだけ）
+    // 見込みリストから補完（converted_customer_id があるもの、かつ顧客タブで未取得のもの）
     for (const p of prospects) {
-      const key = normalizeName(p.customer_name)
-      if (!seen.has(key) && p.converted_customer_id) {
+      if (!p.converted_customer_id) continue
+      // 既に customer 側で取得済みなら id で重複判定（同一顧客IDは1度だけ）
+      if (result.some(r => r.id === p.converted_customer_id)) continue
+      const key = `ind:${normalizeName(p.customer_name)}`
+      if (!seen.has(key)) {
         seen.add(key)
-        result.push({ id: p.converted_customer_id, name: p.customer_name, name_kana: p.customer_name_kana ?? '', source: 'prospect' })
+        result.push({
+          id: p.converted_customer_id,
+          name: p.customer_name,
+          name_kana: p.customer_name_kana ?? '',
+          is_corporate: false,
+          company_name: '',
+          source: 'prospect',
+        })
       }
     }
     return result

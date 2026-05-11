@@ -831,8 +831,8 @@ export async function createProspect(input: ProspectInput): Promise<Prospect> {
     customer = await createCustomer({
       name: input.customer_name,
       name_kana: input.customer_name_kana || '',
-      company_name: '',
-      is_corporate: false,
+      company_name: input.company_name || '',
+      is_corporate: input.is_corporate ?? false,
       email: '',
       phone: '',
       postal_code: '',

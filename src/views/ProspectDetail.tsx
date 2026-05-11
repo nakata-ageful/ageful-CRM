@@ -401,6 +401,14 @@ export function ProspectDetailView({
             />
           </div>
           <div className="info-field">
+            <span>ローン申込日</span>
+            <input
+              type="date" className="form-input" style={{ marginTop: 4 }}
+              value={p.loan_apply_date ?? ''}
+              onChange={e => save({ loan_apply_date: e.target.value || null })}
+            />
+          </div>
+          <div className="info-field">
             <span>売買契約日</span>
             <input
               type="date" className="form-input" style={{ marginTop: 4 }}
@@ -414,14 +422,6 @@ export function ProspectDetailView({
               type="date" className="form-input" style={{ marginTop: 4 }}
               value={p.land_contract_date ?? ''}
               onChange={e => save({ land_contract_date: e.target.value || null })}
-            />
-          </div>
-          <div className="info-field">
-            <span>ローン申込日</span>
-            <input
-              type="date" className="form-input" style={{ marginTop: 4 }}
-              value={p.loan_apply_date ?? ''}
-              onChange={e => save({ loan_apply_date: e.target.value || null })}
             />
           </div>
         </div>

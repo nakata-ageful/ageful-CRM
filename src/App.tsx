@@ -55,7 +55,9 @@ const ALL_VIEWS: ViewKey[] = [
 
 function parseHash(): { view: ViewKey; detailId: number | null } {
   const h = window.location.hash.replace('#', '')
-  const [viewPart, idPart] = h.split('/')
+  // クエリ部 (?tab=...) を切り離してから view/id を分割する
+  const [pathPart] = h.split('?')
+  const [viewPart, idPart] = pathPart.split('/')
   const view = ALL_VIEWS.includes(viewPart as ViewKey) ? (viewPart as ViewKey) : 'dashboard'
   const detailId = idPart ? Number(idPart) : null
   return { view, detailId: detailId && !isNaN(detailId) ? detailId : null }
@@ -351,7 +353,16 @@ export default function App() {
             {view === 'maintenance-response-detail' && maintenanceDetail && (
               <MaintenanceResponseDetail
                 response={maintenanceDetail}
-                onBack={() => { setView('maintenance-responses'); loadAll(true) }}
+                onBack={() => {
+                  // ブラウザ履歴を1つ戻す。popstate ハンドラで view が直前の画面に復元される。
+                  // 履歴が無い場合（直接URL等）は保守対応一覧に遷移するフォールバック。
+                  if (window.history.length > 1) {
+                    window.history.back()
+                  } else {
+                    setView('maintenance-responses')
+                    loadAll(true)
+                  }
+                }}
                 onReload={reloadMaintenanceDetail}
                 onViewProject={navToProjectDetail}
               />

@@ -51,10 +51,34 @@ type Props = {
 
 const WORK_TYPES = ['点検', '除草', '巡回', 'その他']
 
+const TABS: Tab[] = ['基本情報', '保守対応', '定期保守', '請求']
+
+function readTabFromHash(): Tab {
+  const h = window.location.hash
+  const q = h.includes('?') ? h.split('?')[1] : ''
+  const params = new URLSearchParams(q)
+  const t = params.get('tab')
+  return (TABS as string[]).includes(t ?? '') ? (t as Tab) : '基本情報'
+}
+
+function writeTabToHash(t: Tab) {
+  const h = window.location.hash
+  const [pathPart] = h.split('?')
+  const newHash = t === '基本情報' ? pathPart : `${pathPart}?tab=${encodeURIComponent(t)}`
+  if (window.location.hash !== newHash) {
+    window.history.replaceState(null, '', newHash || '#')
+  }
+}
+
 export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, onViewMaintenance }: Props) {
   const toast = useToast()
   const { project, customer, contract, annualRecords, maintenanceResponses, periodicMaintenance } = detail
-  const [tab, setTab] = useState<Tab>('基本情報')
+  const [tab, setTabState] = useState<Tab>(() => readTabFromHash())
+  // タブ切り替え時に URL ハッシュに ?tab= を反映し、戻る操作で復元できるようにする
+  const setTab = (t: Tab) => {
+    setTabState(t)
+    writeTabToHash(t)
+  }
 
   // 保守対応フォーム
   const [mrModal, setMrModal] = useState(false)

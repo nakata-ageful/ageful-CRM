@@ -250,7 +250,7 @@ export async function getMaintenanceResponses(): Promise<MaintenanceResponse[]> 
   const { data, error } = await client
     .from('maintenance_responses')
     .select('*, projects(project_name, plant_name, customers(name, company_name))')
-    .order('inquiry_date', { ascending: false })
+    .order('response_no', { ascending: false, nullsFirst: false })
     // TODO: 大規模データセットに対しては適切なページネーションを実装すべき
     .limit(1000)
   if (error) throw error

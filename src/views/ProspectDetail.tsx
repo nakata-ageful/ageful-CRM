@@ -20,7 +20,7 @@ function ContractBadge({ status }: { status: ProspectContractStatus }) {
 function TaskPanel({
   title, mode, company, checkedMap, subTaskMap, status, memo, statuses,
   onTaskChange, onSubTaskChange, onStatusChange, onMemoChange,
-  onAddTask, onRemoveTask, onAddSubTask, onRemoveSubTask,
+  onAddTask, onRemoveTask, onAddSubTask, onRemoveSubTask, onRenameSubTask,
 }: {
   title: string
   mode: 'apply' | 'contract'
@@ -38,10 +38,28 @@ function TaskPanel({
   onRemoveTask: (name: string) => void
   onAddSubTask: (taskName: string, subName: string) => void
   onRemoveSubTask: (taskName: string, subName: string) => void
+  onRenameSubTask: (taskName: string, oldName: string, newName: string) => void
 }) {
   const [newTask, setNewTask] = useState('')
   const [addingSubFor, setAddingSubFor] = useState<string | null>(null)
   const [newSub, setNewSub] = useState('')
+  const [editingSub, setEditingSub] = useState<{ task: string; sub: string } | null>(null)
+  const [editSubName, setEditSubName] = useState('')
+
+  function commitEditSub() {
+    if (!editingSub) return
+    const newName = editSubName.trim()
+    if (!newName || newName === editingSub.sub) {
+      setEditingSub(null)
+      return
+    }
+    if (subTaskMap[editingSub.task]?.[newName] !== undefined) {
+      alert(`「${newName}」は既に存在します`)
+      return
+    }
+    onRenameSubTask(editingSub.task, editingSub.sub, newName)
+    setEditingSub(null)
+  }
 
   // 定義順でソート、定義にないカスタム項目は末尾に追加
   const defs = tasksForCompany(mode, company)
@@ -122,24 +140,56 @@ function TaskPanel({
               </div>
               {subs.length > 0 && (
                 <div style={{ marginLeft: 24, marginTop: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                  {subs.map(sub => (
-                    <div key={sub} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <label className="prospect-task-line" style={{ flex: 1 }}>
-                        <input
-                          type="checkbox"
-                          className="prospect-checkbox"
-                          checked={Boolean(mergedSubTaskMap[taskName]?.[sub])}
-                          onChange={e => onSubTaskChange(taskName, sub, e.target.checked)}
-                        />
-                        <span style={{ fontSize: 12.5, color: '#64748b' }}>{sub}</span>
-                      </label>
-                      <button
-                        onClick={() => { if (confirm(`「${sub}」を削除しますか？`)) onRemoveSubTask(taskName, sub) }}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: '#cbd5e1', padding: '2px 4px' }}
-                        title="削除"
-                      >✕</button>
-                    </div>
-                  ))}
+                  {subs.map(sub => {
+                    const isEditing = editingSub?.task === taskName && editingSub?.sub === sub
+                    return (
+                      <div key={sub} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {isEditing ? (
+                          <>
+                            <input
+                              type="text"
+                              className="form-input"
+                              style={{ fontSize: 12, padding: '3px 8px', flex: 1 }}
+                              value={editSubName}
+                              onChange={e => setEditSubName(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter' && !e.nativeEvent.isComposing) commitEditSub()
+                                if (e.key === 'Escape') setEditingSub(null)
+                              }}
+                              onBlur={commitEditSub}
+                              autoFocus
+                            />
+                            <button
+                              onClick={commitEditSub}
+                              style={{ fontSize: 11, padding: '3px 8px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 5, cursor: 'pointer' }}
+                            >保存</button>
+                          </>
+                        ) : (
+                          <>
+                            <label className="prospect-task-line" style={{ flex: 1 }}>
+                              <input
+                                type="checkbox"
+                                className="prospect-checkbox"
+                                checked={Boolean(mergedSubTaskMap[taskName]?.[sub])}
+                                onChange={e => onSubTaskChange(taskName, sub, e.target.checked)}
+                              />
+                              <span style={{ fontSize: 12.5, color: '#64748b' }}>{sub}</span>
+                            </label>
+                            <button
+                              onClick={() => { setEditingSub({ task: taskName, sub }); setEditSubName(sub) }}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: '#94a3b8', padding: '2px 4px' }}
+                              title="編集"
+                            >✎</button>
+                            <button
+                              onClick={() => { if (confirm(`「${sub}」を削除しますか？`)) onRemoveSubTask(taskName, sub) }}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: '#cbd5e1', padding: '2px 4px' }}
+                              title="削除"
+                            >✕</button>
+                          </>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               )}
               {addingSubFor === taskName && (
@@ -457,6 +507,15 @@ export function ProspectDetailView({
             const { [subName]: _, ...rest } = (p.apply_sub_tasks[taskName] ?? {})
             save({ apply_sub_tasks: { ...p.apply_sub_tasks, [taskName]: rest } })
           }}
+          onRenameSubTask={(taskName, oldName, newName) => {
+            const current = p.apply_sub_tasks[taskName] ?? {}
+            // 順序を保持しながらキー名だけ差し替える
+            const renamed: Record<string, boolean> = {}
+            for (const k of Object.keys(current)) {
+              renamed[k === oldName ? newName : k] = current[k]
+            }
+            save({ apply_sub_tasks: { ...p.apply_sub_tasks, [taskName]: renamed } })
+          }}
         />
         <TaskPanel
           title="契約"
@@ -485,6 +544,14 @@ export function ProspectDetailView({
           onRemoveSubTask={(taskName, subName) => {
             const { [subName]: _, ...rest } = (p.contract_sub_tasks[taskName] ?? {})
             save({ contract_sub_tasks: { ...p.contract_sub_tasks, [taskName]: rest } })
+          }}
+          onRenameSubTask={(taskName, oldName, newName) => {
+            const current = p.contract_sub_tasks[taskName] ?? {}
+            const renamed: Record<string, boolean> = {}
+            for (const k of Object.keys(current)) {
+              renamed[k === oldName ? newName : k] = current[k]
+            }
+            save({ contract_sub_tasks: { ...p.contract_sub_tasks, [taskName]: renamed } })
           }}
         />
       </div>

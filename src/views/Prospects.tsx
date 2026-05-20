@@ -4,9 +4,6 @@ import { createProspect, deleteProspect } from '../lib/actions'
 import { fmtNum } from '../lib/utils'
 import { useToast } from '../components/Toast'
 
-type ApplyFilter = 'all' | ProspectApplyStatus
-type ContractFilter = 'all' | ProspectContractStatus
-
 const APPLY_STATUSES: ProspectApplyStatus[] = ['未', '提出済', '通過', '不通', '不可']
 const CONTRACT_STATUSES: ProspectContractStatus[] = ['未', '完了', '不可']
 
@@ -330,13 +327,21 @@ export function Prospects({
   onViewCustomer: (customerId: number) => void
 }) {
   const toast = useToast()
-  const [applyFilter, setApplyFilter] = useState<ApplyFilter>('all')
-  const [contractFilter, setContractFilter] = useState<ContractFilter>('all')
+  // 複数選択フィルター: 空配列 = 全件、非空 = OR 条件で絞り込み
+  const [applyFilters, setApplyFilters] = useState<ProspectApplyStatus[]>([])
+  const [contractFilters, setContractFilters] = useState<ProspectContractStatus[]>([])
   const [showAdd, setShowAdd] = useState(false)
 
+  function toggleApply(s: ProspectApplyStatus) {
+    setApplyFilters(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])
+  }
+  function toggleContract(s: ProspectContractStatus) {
+    setContractFilters(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])
+  }
+
   const filtered = prospects.filter(p =>
-    (applyFilter === 'all' || p.apply_status === applyFilter) &&
-    (contractFilter === 'all' || p.contract_status === contractFilter)
+    (applyFilters.length === 0 || applyFilters.includes(p.apply_status)) &&
+    (contractFilters.length === 0 || contractFilters.includes(p.contract_status))
   )
 
   // 既存顧客候補（顧客タブ優先 → 見込み補完、重複除去）
@@ -412,25 +417,37 @@ export function Prospects({
       <div style={{ display: 'flex', gap: 12 }}>
         <div className="card" style={{ padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '.05em' }}>申込</span>
-          {(['all', ...APPLY_STATUSES] as (ApplyFilter)[]).map(s => (
+          <button
+            className={`filter-tab ${applyFilters.length === 0 ? 'active' : ''}`}
+            onClick={() => setApplyFilters([])}
+          >
+            すべて
+          </button>
+          {APPLY_STATUSES.map(s => (
             <button
               key={s}
-              className={`filter-tab ${applyFilter === s ? 'active' : ''}`}
-              onClick={() => setApplyFilter(s)}
+              className={`filter-tab ${applyFilters.includes(s) ? 'active' : ''}`}
+              onClick={() => toggleApply(s)}
             >
-              {s === 'all' ? 'すべて' : s}
+              {s}
             </button>
           ))}
         </div>
         <div className="card" style={{ padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '.05em' }}>契約</span>
-          {(['all', ...CONTRACT_STATUSES] as (ContractFilter)[]).map(s => (
+          <button
+            className={`filter-tab ${contractFilters.length === 0 ? 'active' : ''}`}
+            onClick={() => setContractFilters([])}
+          >
+            すべて
+          </button>
+          {CONTRACT_STATUSES.map(s => (
             <button
               key={s}
-              className={`filter-tab ${contractFilter === s ? 'active' : ''}`}
-              onClick={() => setContractFilter(s)}
+              className={`filter-tab ${contractFilters.includes(s) ? 'active' : ''}`}
+              onClick={() => toggleContract(s)}
             >
-              {s === 'all' ? 'すべて' : s}
+              {s}
             </button>
           ))}
         </div>

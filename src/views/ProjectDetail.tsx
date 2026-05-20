@@ -473,39 +473,9 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
         </div>
       )}
 
-      {/* ── 保守対応（保守対応記録 + 定期保守を統合） ── */}
+      {/* ── 保守対応（定期保守 + 保守対応記録を統合。保守対応は記録が増えていくため下に配置） ── */}
       {tab === '保守対応' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div className="card">
-            <div className="card-header-row">
-              <h3 className="section-title" style={{ margin: 0 }}>保守対応記録</h3>
-              <button className="btn btn-main btn-sm" onClick={() => { setMrForm({ inquiry_date: '', occurrence_date: '', target_area: '', situation: '', response_content: '', report: '' }); setErr(''); setMrModal(true) }}>
-                ＋ 追加
-              </button>
-            </div>
-            <table>
-              <thead>
-                <tr><th>管理番号</th><th>問合日</th><th>発生日</th><th>対象箇所</th><th>状態</th><th>操作</th></tr>
-              </thead>
-              <tbody>
-                {maintenanceResponses.length === 0 && (
-                  <tr><td colSpan={6} className="empty-cell">保守対応記録がありません</td></tr>
-                )}
-                {maintenanceResponses.map(m => (
-                  <tr key={m.id} className="clickable-row" onClick={() => onViewMaintenance(m.id)}>
-                    <td>{m.response_no ?? '-'}</td>
-                    <td>{m.inquiry_date ?? '-'}</td>
-                    <td>{m.occurrence_date ?? '-'}</td>
-                    <td>{m.target_area ?? '-'}</td>
-                    <td><StatusBadge status={m.status} /></td>
-                    <td onClick={e => e.stopPropagation()}>
-                      <button className="btn-icon" title="削除" onClick={() => handleDeleteMR(m.id)}>🗑</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
           {/* 定期保守セクション（旧「定期保守」タブの内容を統合） */}
           {(() => {
         const currentYear = new Date().getFullYear()
@@ -517,42 +487,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
         const otherRecords = periodicMaintenance.filter(m => !['点検', '除草', '巡回'].includes(m.work_type ?? ''))
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {/* プラン概要 */}
-            {contract && (contract.plan_inspection || contract.plan_weeding || contract.plan_emergency) && (
-              <div className="card" style={{ padding: '16px 20px' }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 12 }}>保守プラン（{currentYear}年度 実施状況）</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-                  {categories.map(cat => {
-                    const plan = contract[cat.planField]
-                    if (!plan) return null
-                    const records = periodicMaintenance.filter(m => m.work_type === cat.key && m.record_date.startsWith(String(currentYear)))
-                    const count = records.length
-                    const limit = plan === '無制限' ? null : plan === '年1回' ? 1 : 0
-                    const isDone = limit !== null && limit > 0 && count >= limit
-                    const isNone = plan === 'なし'
-                    return (
-                      <div key={cat.key} style={{
-                        background: isNone ? '#f8fafc' : isDone ? '#ecfdf5' : '#fffbeb',
-                        borderRadius: 8,
-                        padding: '12px 14px',
-                        borderLeft: `3px solid ${isNone ? '#cbd5e1' : isDone ? '#10b981' : '#f59e0b'}`,
-                      }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>{cat.label}</div>
-                        <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>契約: {plan}</div>
-                        {!isNone && (
-                          <div style={{ fontSize: 20, fontWeight: 800, color: isDone ? '#059669' : '#d97706' }}>
-                            {count}{limit !== null ? <span style={{ fontSize: 13, fontWeight: 500, color: '#94a3b8' }}> / {limit}回</span> : <span style={{ fontSize: 13, fontWeight: 500, color: '#94a3b8' }}>回</span>}
-                          </div>
-                        )}
-                        {isNone && <div style={{ fontSize: 13, color: '#94a3b8' }}>—</div>}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* カテゴリ別記録（縦カラム） */}
+            {/* カテゴリ別記録（縦カラム）。進捗表示は撤去し、見出しは「ラベル + 契約回数」のみ */}
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(${categories.filter(cat => {
               const plan = contract?.[cat.planField]
               const records = periodicMaintenance.filter(m => m.work_type === cat.key)
@@ -564,16 +499,13 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                   .sort((a, b) => b.record_date.localeCompare(a.record_date))
                 const plan = contract?.[cat.planField]
                 if (records.length === 0 && (!plan || plan === 'なし')) return null
-                const thisYearCount = records.filter(r => r.record_date.startsWith(String(currentYear))).length
                 return (
                   <div className="card" key={cat.key} style={{ margin: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                       <div>
                         <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>{cat.label}</div>
                         {plan && plan !== 'なし' && (
-                          <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
-                            {currentYear}年: {thisYearCount}回 / 契約: {plan}
-                          </div>
+                          <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>契約: {plan}</div>
                         )}
                       </div>
                       <button className="btn btn-main btn-sm" onClick={() => openPmCreate(cat.key)}>
@@ -651,6 +583,36 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           </div>
         )
       })()}
+          <div className="card">
+            <div className="card-header-row">
+              <h3 className="section-title" style={{ margin: 0 }}>保守対応記録</h3>
+              <button className="btn btn-main btn-sm" onClick={() => { setMrForm({ inquiry_date: '', occurrence_date: '', target_area: '', situation: '', response_content: '', report: '' }); setErr(''); setMrModal(true) }}>
+                ＋ 追加
+              </button>
+            </div>
+            <table>
+              <thead>
+                <tr><th>管理番号</th><th>問合日</th><th>発生日</th><th>対象箇所</th><th>状態</th><th>操作</th></tr>
+              </thead>
+              <tbody>
+                {maintenanceResponses.length === 0 && (
+                  <tr><td colSpan={6} className="empty-cell">保守対応記録がありません</td></tr>
+                )}
+                {maintenanceResponses.map(m => (
+                  <tr key={m.id} className="clickable-row" onClick={() => onViewMaintenance(m.id)}>
+                    <td>{m.response_no ?? '-'}</td>
+                    <td>{m.inquiry_date ?? '-'}</td>
+                    <td>{m.occurrence_date ?? '-'}</td>
+                    <td>{m.target_area ?? '-'}</td>
+                    <td><StatusBadge status={m.status} /></td>
+                    <td onClick={e => e.stopPropagation()}>
+                      <button className="btn-icon" title="削除" onClick={() => handleDeleteMR(m.id)}>🗑</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

@@ -40,6 +40,8 @@ function AddModal({ onSave, onClose, existingCustomers }: {
   const [mode, setMode] = useState<'new' | 'existing'>('new')
   const [customerType, setCustomerType] = useState<'individual' | 'corporate'>('individual')
   const [selectedCustomer, setSelectedCustomer] = useState('')
+  const [customerSearch, setCustomerSearch] = useState('')
+  const [comboOpen, setComboOpen] = useState(false)
   const [form, setForm] = useState<ProspectInput>({
     customer_name: '', customer_name_kana: '', project_name: '', loan_company: '',
     equipment: '', land_cost: '', loan_amount: '',
@@ -54,6 +56,11 @@ function AddModal({ onSave, onClose, existingCustomers }: {
     const id = Number(value)
     const cust = existingCustomers.find(c => c.id === id)
     if (cust) {
+      const label = cust.is_corporate && cust.company_name
+        ? `${cust.company_name} / ${cust.name}${cust.name_kana ? ` (${cust.name_kana})` : ''}`
+        : `${cust.name}${cust.name_kana ? ` (${cust.name_kana})` : ''}`
+      setCustomerSearch(label)
+      setComboOpen(false)
       setForm(f => ({
         ...f,
         customer_name: cust.name,
@@ -67,6 +74,8 @@ function AddModal({ onSave, onClose, existingCustomers }: {
 
   function handleModeChange(newMode: 'new' | 'existing') {
     setMode(newMode)
+    setCustomerSearch('')
+    setComboOpen(false)
     if (newMode === 'new') {
       setSelectedCustomer('')
       setForm(f => ({ ...f, customer_name: '', customer_name_kana: '', company_name: '', existing_customer_id: undefined }))
@@ -118,23 +127,80 @@ function AddModal({ onSave, onClose, existingCustomers }: {
           <div className="form-grid">
             {mode === 'existing' ? (
               <>
-                <label className="form-label required" style={{ gridColumn: '1/-1' }}>
-                  顧客を選択
-                  <select
-                    className="form-select"
-                    value={selectedCustomer}
-                    onChange={e => handleSelectExisting(e.target.value)}
-                  >
-                    <option value="">選択してください</option>
-                    {existingCustomers.map(c => {
-                      const label = c.is_corporate && c.company_name
-                        ? `${c.company_name} / ${c.name}${c.name_kana ? ` (${c.name_kana})` : ''}`
-                        : `${c.name}${c.name_kana ? ` (${c.name_kana})` : ''}`
-                      return (
-                        <option key={c.id} value={c.id}>{label}</option>
-                      )
-                    })}
-                  </select>
+                <label className="form-label required" style={{ gridColumn: '1/-1', position: 'relative' }}>
+                  顧客を選択（入力で絞り込み）
+                  <input
+                    className="form-input"
+                    value={customerSearch}
+                    placeholder="会社名・氏名・フリガナで検索"
+                    onFocus={() => setComboOpen(true)}
+                    onChange={e => {
+                      setCustomerSearch(e.target.value)
+                      setComboOpen(true)
+                      // 入力を変更したら既存の選択を解除（新しい候補を選び直す前提）
+                      if (selectedCustomer) {
+                        setSelectedCustomer('')
+                        setForm(f => ({ ...f, customer_name: '', customer_name_kana: '', company_name: '', existing_customer_id: undefined }))
+                      }
+                    }}
+                    onBlur={() => {
+                      // クリック確定を捕まえるため少し遅延してから閉じる
+                      setTimeout(() => setComboOpen(false), 150)
+                    }}
+                  />
+                  {comboOpen && (() => {
+                    const q = customerSearch.trim().toLowerCase()
+                    const filtered = q && !selectedCustomer
+                      ? existingCustomers.filter(c =>
+                          c.name.toLowerCase().includes(q) ||
+                          c.name_kana.toLowerCase().includes(q) ||
+                          c.company_name.toLowerCase().includes(q)
+                        )
+                      : existingCustomers
+                    return (
+                      <div style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        zIndex: 20,
+                        marginTop: 2,
+                        background: '#fff',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: 6,
+                        maxHeight: 260,
+                        overflowY: 'auto',
+                        boxShadow: '0 4px 12px rgba(15,23,42,0.08)',
+                      }}>
+                        {filtered.length === 0 ? (
+                          <div style={{ padding: '10px 12px', fontSize: 13, color: '#94a3b8' }}>該当なし</div>
+                        ) : (
+                          filtered.map(c => {
+                            const label = c.is_corporate && c.company_name
+                              ? `${c.company_name} / ${c.name}${c.name_kana ? ` (${c.name_kana})` : ''}`
+                              : `${c.name}${c.name_kana ? ` (${c.name_kana})` : ''}`
+                            return (
+                              <div
+                                key={c.id}
+                                onMouseDown={e => { e.preventDefault(); handleSelectExisting(String(c.id)) }}
+                                style={{
+                                  padding: '8px 12px',
+                                  fontSize: 13,
+                                  cursor: 'pointer',
+                                  borderBottom: '1px solid #f1f5f9',
+                                  background: String(c.id) === selectedCustomer ? '#eff6ff' : 'transparent',
+                                }}
+                                onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                                onMouseLeave={e => (e.currentTarget.style.background = String(c.id) === selectedCustomer ? '#eff6ff' : 'transparent')}
+                              >
+                                {label}
+                              </div>
+                            )
+                          })
+                        )}
+                      </div>
+                    )
+                  })()}
                 </label>
                 {selectedCustomer && form.is_corporate && (
                   <div className="info-field" style={{ gridColumn: '1/-1' }}>
@@ -313,6 +379,10 @@ export function Prospects({
         })
       }
     }
+    // 五十音順に並び替え。フリガナがあればそれを優先、無ければ表示名（法人は会社名、個人は氏名）でソート。
+    const sortKey = (o: ExistingCustomerOption) =>
+      o.name_kana || (o.is_corporate ? o.company_name : o.name)
+    result.sort((a, b) => sortKey(a).localeCompare(sortKey(b), 'ja'))
     return result
   }, [prospects, customers])
 

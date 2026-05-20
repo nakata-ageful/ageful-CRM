@@ -103,10 +103,12 @@ export default function App() {
   const [billingDetail, setBillingDetail] = useState<BillingDetail | null>(null)
   const [prospectDetail, setProspectDetail] = useState<Prospect | null>(null)
 
-  // Wrap setView to also update the URL hash
+  // Wrap setView to also update the URL hash + reset scroll position
   const setView = useCallback((v: ViewKey, detailId?: number) => {
     setViewRaw(v)
     pushHash(v, detailId)
+    // ビュー切替時は常にページ先頭にスクロールする（前画面のスクロール位置を引き継がない）
+    window.scrollTo({ top: 0, left: 0 })
   }, [])
 
   // Listen for browser back/forward
@@ -117,6 +119,7 @@ export default function App() {
       if (detailId && DETAIL_VIEWS.includes(v)) {
         setPendingDetailId(detailId)
       }
+      window.scrollTo({ top: 0, left: 0 })
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)

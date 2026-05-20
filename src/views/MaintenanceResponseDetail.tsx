@@ -135,11 +135,11 @@ export function MaintenanceResponseDetail({ response, onBack, onReload, onViewPr
               対象箇所
               <select className="form-select" value={form.target_area} onChange={e => setForm(f => ({ ...f, target_area: e.target.value }))}>
                 <option value="">選択してください</option>
-                {['パネル', 'パワコン', '遠隔監視', '停電', 'その他'].map(t => (
+                {['パネル', 'パワコン', '遠隔監視', '停電', '出力制御', 'その他'].map(t => (
                   <option key={t} value={t}>{t}</option>
                 ))}
                 {/* 既存データが選択肢外なら互換のため追加 */}
-                {form.target_area && !['パネル', 'パワコン', '遠隔監視', '停電', 'その他'].includes(form.target_area) && (
+                {form.target_area && !['パネル', 'パワコン', '遠隔監視', '停電', '出力制御', 'その他'].includes(form.target_area) && (
                   <option value={form.target_area}>{form.target_area}</option>
                 )}
               </select>

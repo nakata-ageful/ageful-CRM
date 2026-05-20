@@ -780,10 +780,10 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               対象箇所
               <select className="form-select" value={mrForm.target_area} onChange={e => setMrForm(f => ({ ...f, target_area: e.target.value }))}>
                 <option value="">選択してください</option>
-                {['パネル', 'パワコン', '遠隔監視', '停電', 'その他'].map(t => (
+                {['パネル', 'パワコン', '遠隔監視', '停電', '出力制御', 'その他'].map(t => (
                   <option key={t} value={t}>{t}</option>
                 ))}
-                {mrForm.target_area && !['パネル', 'パワコン', '遠隔監視', '停電', 'その他'].includes(mrForm.target_area) && (
+                {mrForm.target_area && !['パネル', 'パワコン', '遠隔監視', '停電', '出力制御', 'その他'].includes(mrForm.target_area) && (
                   <option value={mrForm.target_area}>{mrForm.target_area}</option>
                 )}
               </select>

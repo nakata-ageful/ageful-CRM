@@ -39,7 +39,7 @@ function fmtFormNum(v: string | number | null | undefined): string {
 }
 import { useToast } from '../components/Toast'
 
-type Tab = '基本情報' | '保守対応' | '請求'
+type Tab = '基本情報' | '設備情報' | '契約情報' | '保守情報' | '請求情報' | 'その他' | '保守対応' | '年次請求記録'
 
 type Props = {
   detail: ProjectDetail
@@ -51,7 +51,8 @@ type Props = {
 
 const WORK_TYPES = ['点検', '除草', '巡回', 'その他']
 
-const TABS: Tab[] = ['基本情報', '保守対応', '請求']
+
+const TABS: Tab[] = ['基本情報', '設備情報', '契約情報', '保守情報', '請求情報', 'その他', '保守対応', '年次請求記録']
 
 function readTabFromHash(): Tab {
   const h = window.location.hash
@@ -106,7 +107,36 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
     status: '',
   })
 
-  // 案件基本情報編集フォーム
+  // 中項目ごとの編集モーダル切り替え用キー
+  type EditSectionKey =
+    | 'summary' | 'meti' | 'power-company'
+    | 'panel' | 'pcs' | 'monitoring'
+    | 'equipment-contract' | 'land-contract'
+    | 'maintenance-contract' | 'maintenance-content' | 'subcontract'
+    | 'billing'
+    | 'other-notes'
+  const [editSection, setEditSection] = useState<EditSectionKey | null>(null)
+  const SECTION_TITLES: Record<EditSectionKey, string> = {
+    'summary': '概要を編集',
+    'meti': '経済産業省を編集',
+    'power-company': '電力会社を編集',
+    'panel': 'パネルを編集',
+    'pcs': 'パワコンを編集',
+    'monitoring': '遠隔監視を編集',
+    'equipment-contract': '設備契約を編集',
+    'land-contract': '土地契約を編集',
+    'maintenance-contract': '保守契約を編集',
+    'maintenance-content': '保守内容を編集',
+    'subcontract': '委託契約を編集',
+    'billing': '請求情報を編集',
+    'other-notes': '備考を編集',
+  }
+  // どのセクションが projects テーブルを書き換えるか
+  const PROJECT_SECTIONS: EditSectionKey[] = ['summary', 'meti', 'power-company', 'panel', 'pcs', 'monitoring', 'equipment-contract', 'land-contract', 'maintenance-content', 'other-notes']
+  // どのセクションが contracts テーブルを書き換えるか
+  const CONTRACT_SECTIONS: EditSectionKey[] = ['equipment-contract', 'land-contract', 'maintenance-contract', 'maintenance-content', 'subcontract', 'billing']
+
+  // 案件基本情報編集フォーム（既存。中項目編集時にも使う）
   const [projModal, setProjModal] = useState(false)
   const [projForm, setProjForm] = useState({
     project_no: project.project_no ?? '',
@@ -186,6 +216,13 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
     plan_weeding: contract?.plan_weeding ?? '',
     plan_emergency: contract?.plan_emergency ?? '',
     notes: contract?.notes ?? '',
+    // 新規追加カラム（Phase 2）
+    ownership_transfer_date: contract?.ownership_transfer_date ?? '',
+    maintenance_contractor: contract?.maintenance_contractor ?? '',
+    equipment_contract_notes: contract?.equipment_contract_notes ?? '',
+    land_contract_notes: contract?.land_contract_notes ?? '',
+    maintenance_content_notes: contract?.maintenance_content_notes ?? '',
+    subcontract_notes: contract?.subcontract_notes ?? '',
   })
 
   const [saving, setSaving] = useState(false)
@@ -210,58 +247,6 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       onReload()
       toast('案件情報を保存しました')
     } catch (e: unknown) { setErr(e instanceof Error ? e.message : JSON.stringify(e)) } finally { setSaving(false) }
-  }
-
-  function openProjEdit() {
-    setProjForm({
-      project_no: project.project_no ?? '',
-      project_name: project.project_name,
-      // plant_name が未設定でも、表示と編集で同じ値が見えるよう project_name にフォールバック
-      plant_name: project.plant_name || project.project_name,
-      site_postal_code: project.site_postal_code ?? '',
-      site_prefecture: project.site_prefecture ?? '',
-      site_address: project.site_address ?? '',
-      latitude: project.latitude != null ? String(project.latitude) : '',
-      longitude: project.longitude != null ? String(project.longitude) : '',
-      google_coordinates: project.google_coordinates ?? '',
-      panel_kw: project.panel_kw != null ? String(project.panel_kw) : '',
-      panel_count: project.panel_count != null ? String(project.panel_count) : '',
-      panel_maker: project.panel_maker ?? '',
-      panel_model: project.panel_model ?? '',
-      pcs_kw: project.pcs_kw != null ? String(project.pcs_kw) : '',
-      pcs_count: project.pcs_count != null ? String(project.pcs_count) : '',
-      pcs_maker: project.pcs_maker ?? '',
-      pcs_model: project.pcs_model ?? '',
-      grid_id: project.grid_id ?? '',
-      grid_certified_at: project.grid_certified_at ?? '',
-      fit_period: project.fit_period != null ? String(project.fit_period) : '',
-      fit_term_years: project.fit_term_years != null ? String(project.fit_term_years) : '',
-      power_supply_start_date: project.power_supply_start_date ?? '',
-      customer_number: project.customer_number ?? '',
-      generation_point_id: project.generation_point_id ?? '',
-      meter_reading_day: project.meter_reading_day ?? '',
-      monitoring_system: project.monitoring_system ?? '',
-      monitoring_id: project.monitoring_id ?? '',
-      monitoring_user: project.monitoring_user ?? '',
-      monitoring_pw: project.monitoring_pw ?? '',
-      has_4g: project.has_4g == null ? '' : project.has_4g ? 'true' : 'false',
-      key_number: project.key_number ?? '',
-      local_association: project.local_association ?? '',
-      old_owner: project.old_owner ?? '',
-      sales_company: project.sales_company ?? '',
-      referrer: project.referrer ?? '',
-      customer_referrer: project.customer_referrer ?? '',
-      project_referrer: project.project_referrer ?? '',
-      power_change_date: project.power_change_date ?? '',
-      handover_date: project.handover_date ?? '',
-      sales_price: project.sales_price != null ? String(project.sales_price) : '',
-      reference_price: project.reference_price != null ? String(project.reference_price) : '',
-      land_cost: project.land_cost != null ? String(project.land_cost) : '',
-      amuras_member_no: project.amuras_member_no ?? '',
-      notes: project.notes ?? '',
-    })
-    setErr('')
-    setProjModal(true)
   }
 
   // ── 保守対応 ─────────────────────────────────────────────
@@ -396,6 +381,12 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
         plan_weeding: (contractForm.plan_weeding || null) as MaintenancePlanLevel | null,
         plan_emergency: (contractForm.plan_emergency || null) as MaintenancePlanLevel | null,
         notes: contractForm.notes || null,
+        ownership_transfer_date: contractForm.ownership_transfer_date || null,
+        maintenance_contractor: contractForm.maintenance_contractor || null,
+        equipment_contract_notes: contractForm.equipment_contract_notes || null,
+        land_contract_notes: contractForm.land_contract_notes || null,
+        maintenance_content_notes: contractForm.maintenance_content_notes || null,
+        subcontract_notes: contractForm.subcontract_notes || null,
       }
       if (contract) {
         await updateContract(contract.id, payload)
@@ -406,6 +397,165 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       onReload()
       toast(contract ? '契約情報を保存しました' : '契約情報を作成しました')
     } catch (e: unknown) { setErr(e instanceof Error ? e.message : JSON.stringify(e)) } finally { setSaving(false) }
+  }
+
+  // ── 中項目ごとの編集モーダル（ステップC-2）─────────────
+  /** 中項目編集モーダルを開く。projForm/contractForm を最新値で再初期化してから開く。 */
+  function openSectionEdit(key: EditSectionKey) {
+    // projects フォームを最新値で初期化
+    setProjForm({
+      project_no: project.project_no ?? '',
+      project_name: project.project_name,
+      plant_name: project.plant_name || project.project_name,
+      site_postal_code: project.site_postal_code ?? '',
+      site_prefecture: project.site_prefecture ?? '',
+      site_address: project.site_address ?? '',
+      latitude: project.latitude != null ? String(project.latitude) : '',
+      longitude: project.longitude != null ? String(project.longitude) : '',
+      google_coordinates: project.google_coordinates ?? '',
+      panel_kw: project.panel_kw != null ? String(project.panel_kw) : '',
+      panel_count: project.panel_count != null ? String(project.panel_count) : '',
+      panel_maker: project.panel_maker ?? '',
+      panel_model: project.panel_model ?? '',
+      pcs_kw: project.pcs_kw != null ? String(project.pcs_kw) : '',
+      pcs_count: project.pcs_count != null ? String(project.pcs_count) : '',
+      pcs_maker: project.pcs_maker ?? '',
+      pcs_model: project.pcs_model ?? '',
+      grid_id: project.grid_id ?? '',
+      grid_certified_at: project.grid_certified_at ?? '',
+      fit_period: project.fit_period != null ? String(project.fit_period) : '',
+      fit_term_years: project.fit_term_years != null ? String(project.fit_term_years) : '',
+      power_supply_start_date: project.power_supply_start_date ?? '',
+      customer_number: project.customer_number ?? '',
+      generation_point_id: project.generation_point_id ?? '',
+      meter_reading_day: project.meter_reading_day ?? '',
+      monitoring_system: project.monitoring_system ?? '',
+      monitoring_id: project.monitoring_id ?? '',
+      monitoring_user: project.monitoring_user ?? '',
+      monitoring_pw: project.monitoring_pw ?? '',
+      has_4g: project.has_4g == null ? '' : project.has_4g ? 'true' : 'false',
+      key_number: project.key_number ?? '',
+      local_association: project.local_association ?? '',
+      old_owner: project.old_owner ?? '',
+      sales_company: project.sales_company ?? '',
+      referrer: project.referrer ?? '',
+      customer_referrer: project.customer_referrer ?? '',
+      project_referrer: project.project_referrer ?? '',
+      power_change_date: project.power_change_date ?? '',
+      handover_date: project.handover_date ?? '',
+      sales_price: project.sales_price != null ? String(project.sales_price) : '',
+      reference_price: project.reference_price != null ? String(project.reference_price) : '',
+      land_cost: project.land_cost != null ? String(project.land_cost) : '',
+      amuras_member_no: project.amuras_member_no ?? '',
+      notes: project.notes ?? '',
+    })
+    // contracts フォームを最新値で初期化（契約レコードがある場合のみ）
+    if (contract) {
+      setContractForm({
+        billing_method: contract.billing_method ?? '',
+        billing_due_day: contract.billing_due_day ?? '',
+        billing_amount_ex: contract.billing_amount_ex != null ? String(contract.billing_amount_ex) : '',
+        billing_amount_inc: contract.billing_amount_inc != null ? String(contract.billing_amount_inc) : '',
+        annual_maintenance_ex: contract.annual_maintenance_ex != null ? String(contract.annual_maintenance_ex) : '',
+        annual_maintenance_inc: contract.annual_maintenance_inc != null ? String(contract.annual_maintenance_inc) : '',
+        billing_count: contract.billing_count != null ? String(contract.billing_count) : '',
+        land_cost_monthly: contract.land_cost_monthly != null ? String(contract.land_cost_monthly) : '',
+        insurance_fee: contract.insurance_fee != null ? String(contract.insurance_fee) : '',
+        other_fee: contract.other_fee != null ? String(contract.other_fee) : '',
+        transfer_fee: contract.transfer_fee != null ? String(contract.transfer_fee) : '',
+        sale_contract_date: contract.sale_contract_date ?? '',
+        equipment_contract_date: contract.equipment_contract_date ?? '',
+        land_contract_date: contract.land_contract_date ?? '',
+        maintenance_contract_date: contract.maintenance_contract_date ?? '',
+        sales_to_neosys: contract.sales_to_neosys ?? '',
+        neosys_to_referrer: contract.neosys_to_referrer ?? '',
+        contractor_name: contract.contractor_name ?? '',
+        subcontractor: contract.subcontractor ?? '',
+        subcontract_fee_ex: contract.subcontract_fee_ex != null ? String(contract.subcontract_fee_ex) : '',
+        subcontract_fee_inc: contract.subcontract_fee_inc != null ? String(contract.subcontract_fee_inc) : '',
+        subcontract_billing_day: contract.subcontract_billing_day ?? '',
+        subcontract_start_date: contract.subcontract_start_date ?? '',
+        maintenance_start_date: contract.maintenance_start_date ?? '',
+        plan_inspection: contract.plan_inspection ?? '',
+        plan_weeding: contract.plan_weeding ?? '',
+        plan_emergency: contract.plan_emergency ?? '',
+        notes: contract.notes ?? '',
+        ownership_transfer_date: contract.ownership_transfer_date ?? '',
+        maintenance_contractor: contract.maintenance_contractor ?? '',
+        equipment_contract_notes: contract.equipment_contract_notes ?? '',
+        land_contract_notes: contract.land_contract_notes ?? '',
+        maintenance_content_notes: contract.maintenance_content_notes ?? '',
+        subcontract_notes: contract.subcontract_notes ?? '',
+      })
+    }
+    setErr('')
+    setEditSection(key)
+  }
+
+  /** 中項目編集モーダルを保存する。section に応じて projects / contracts / 両方 を更新。 */
+  async function handleSaveSection() {
+    if (!editSection) return
+    const writesProject = PROJECT_SECTIONS.includes(editSection)
+    const writesContract = CONTRACT_SECTIONS.includes(editSection)
+    // 概要 (summary) は plant_name が必須
+    if (editSection === 'summary' && !projForm.plant_name.trim()) { setErr('発電所名は必須です'); return }
+    const toNum = (v: string) => v ? parseInt(v.replace(/,/g, ''), 10) : null
+    setSaving(true); setErr('')
+    try {
+      if (writesProject) {
+        await updateProject(project.id, {
+          ...projForm,
+          project_name: projForm.plant_name,
+          has_4g: projForm.has_4g === 'true' ? true : projForm.has_4g === 'false' ? false : (null as unknown as boolean),
+          monitoring_user: projForm.monitoring_user,
+        })
+      }
+      if (writesContract && contract) {
+        await updateContract(contract.id, {
+          billing_method: contractForm.billing_method || null,
+          billing_due_day: contractForm.billing_due_day || null,
+          billing_amount_ex: toNum(contractForm.billing_amount_ex),
+          billing_amount_inc: toNum(contractForm.billing_amount_inc),
+          annual_maintenance_ex: toNum(contractForm.annual_maintenance_ex),
+          annual_maintenance_inc: toNum(contractForm.annual_maintenance_inc),
+          billing_count: toNum(contractForm.billing_count),
+          land_cost_monthly: toNum(contractForm.land_cost_monthly),
+          insurance_fee: toNum(contractForm.insurance_fee),
+          other_fee: toNum(contractForm.other_fee),
+          transfer_fee: toNum(contractForm.transfer_fee),
+          sale_contract_date: contractForm.sale_contract_date || null,
+          equipment_contract_date: contractForm.equipment_contract_date || null,
+          land_contract_date: contractForm.land_contract_date || null,
+          maintenance_contract_date: contractForm.maintenance_contract_date || null,
+          sales_to_neosys: contractForm.sales_to_neosys || null,
+          neosys_to_referrer: contractForm.neosys_to_referrer || null,
+          contractor_name: contractForm.contractor_name || null,
+          subcontractor: contractForm.subcontractor || null,
+          subcontract_fee_ex: toNum(contractForm.subcontract_fee_ex),
+          subcontract_fee_inc: toNum(contractForm.subcontract_fee_inc),
+          subcontract_billing_day: contractForm.subcontract_billing_day || null,
+          subcontract_start_date: contractForm.subcontract_start_date || null,
+          maintenance_start_date: contractForm.maintenance_start_date || null,
+          plan_inspection: (contractForm.plan_inspection || null) as MaintenancePlanLevel | null,
+          plan_weeding: (contractForm.plan_weeding || null) as MaintenancePlanLevel | null,
+          plan_emergency: (contractForm.plan_emergency || null) as MaintenancePlanLevel | null,
+          notes: contractForm.notes || null,
+          ownership_transfer_date: contractForm.ownership_transfer_date || null,
+          maintenance_contractor: contractForm.maintenance_contractor || null,
+          equipment_contract_notes: contractForm.equipment_contract_notes || null,
+          land_contract_notes: contractForm.land_contract_notes || null,
+          maintenance_content_notes: contractForm.maintenance_content_notes || null,
+          subcontract_notes: contractForm.subcontract_notes || null,
+        })
+      }
+      setEditSection(null)
+      onReload()
+      toast('保存しました')
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : JSON.stringify(e))
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -424,7 +574,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
 
       {/* タブ */}
       <div className="tab-bar">
-        {(['基本情報', '保守対応', '請求'] as Tab[]).map(t => (
+        {TABS.map(t => (
           <button
             key={t}
             className={`tab-btn ${tab === t ? 'active' : ''}`}
@@ -438,43 +588,229 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
         ))}
       </div>
 
-      {/* ── 基本情報 ── */}
+      {/* ── 基本情報タブ ── */}
       {tab === '基本情報' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* 中項目: 概要 */}
+          <div className="card">
+            <div className="card-header-row">
+              <h3 className="section-title" style={{ margin: 0 }}>概要</h3>
+              <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('summary')}>編集</button>
+            </div>
+            <div className="info-grid">
+              <div className="info-field"><span>案件番号</span><b>{project.project_no ?? '-'}</b></div>
+              <div className="info-field"><span>発電所名</span><b>{project.plant_name || project.project_name || '-'}</b></div>
+              <div className="info-field"><span>郵便番号</span><b>{project.site_postal_code ? `〒${project.site_postal_code}` : '-'}</b></div>
+              <div className="info-field"><span>都道府県</span><b>{project.site_prefecture ?? '-'}</b></div>
+              <div className="info-field" style={{ gridColumn: '1/-1' }}><span>住所</span><b>{project.site_address ?? '-'}</b></div>
+              <div className="info-field"><span>座標</span><b>{project.google_coordinates ?? '-'}</b></div>
+            </div>
+          </div>
+
+          {/* 中項目: 経済産業省 */}
+          <div className="card">
+            <div className="card-header-row">
+              <h3 className="section-title" style={{ margin: 0 }}>経済産業省</h3>
+              <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('meti')}>編集</button>
+            </div>
+            <div className="info-grid">
+              <div className="info-field"><span>設備ID</span><b>{project.grid_id ?? '-'}</b></div>
+              <div className="info-field"><span>認定日</span><b>{project.grid_certified_at ?? '-'}</b></div>
+            </div>
+          </div>
+
+          {/* 中項目: 電力会社 */}
+          <div className="card">
+            <div className="card-header-row">
+              <h3 className="section-title" style={{ margin: 0 }}>電力会社</h3>
+              <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('power-company')}>編集</button>
+            </div>
+            <div className="info-grid">
+              <div className="info-field"><span>受給地点番号</span><b>{project.generation_point_id ?? '-'}</b></div>
+              <div className="info-field"><span>お客様番号</span><b>{project.customer_number ?? '-'}</b></div>
+              <div className="info-field"><span>受給開始日</span><b>{project.power_supply_start_date ?? '-'}</b></div>
+              <div className="info-field"><span>FIT</span><b>{project.fit_period != null ? `${project.fit_period}円` : '-'}</b></div>
+              <div className="info-field"><span>FIT期間</span><b>{project.fit_term_years != null ? `${project.fit_term_years}年` : '-'}</b></div>
+              <div className="info-field"><span>電力変更日</span><b>{project.power_change_date ?? '-'}</b></div>
+              <div className="info-field"><span>検針日</span><b>{project.meter_reading_day ?? '-'}</b></div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 設備情報タブ ── */}
+      {tab === '設備情報' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* 中項目: パネル */}
+          <div className="card">
+            <div className="card-header-row">
+              <h3 className="section-title" style={{ margin: 0 }}>パネル</h3>
+              <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('panel')}>編集</button>
+            </div>
+            <div className="info-grid">
+              <div className="info-field"><span>KW</span><b>{project.panel_kw != null ? `${project.panel_kw}kW` : '-'}</b></div>
+              <div className="info-field"><span>メーカー</span><b>{project.panel_maker ?? '-'}</b></div>
+              <div className="info-field"><span>型式</span><b>{project.panel_model ?? '-'}</b></div>
+              <div className="info-field"><span>w/枚</span><b>{project.panel_kw != null && project.panel_count != null && project.panel_count > 0 ? `${Math.round(project.panel_kw * 1000 / project.panel_count)}W` : '-'}</b></div>
+              <div className="info-field"><span>枚数</span><b>{project.panel_count != null ? `${project.panel_count}枚` : '-'}</b></div>
+            </div>
+          </div>
+
+          {/* 中項目: パワコン */}
+          <div className="card">
+            <div className="card-header-row">
+              <h3 className="section-title" style={{ margin: 0 }}>パワコン</h3>
+              <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('pcs')}>編集</button>
+            </div>
+            <div className="info-grid">
+              <div className="info-field"><span>KW</span><b>{project.pcs_kw != null ? `${project.pcs_kw}kW` : '-'}</b></div>
+              <div className="info-field"><span>メーカー</span><b>{project.pcs_maker ?? '-'}</b></div>
+              <div className="info-field"><span>型式</span><b>{project.pcs_model ?? '-'}</b></div>
+              <div className="info-field"><span>kw/台</span><b>{project.pcs_kw != null && project.pcs_count != null && project.pcs_count > 0 ? `${(project.pcs_kw / project.pcs_count).toFixed(1)}kW` : '-'}</b></div>
+              <div className="info-field"><span>台数</span><b>{project.pcs_count != null ? `${project.pcs_count}台` : '-'}</b></div>
+            </div>
+          </div>
+
+          {/* 中項目: 遠隔監視 */}
+          <div className="card">
+            <div className="card-header-row">
+              <h3 className="section-title" style={{ margin: 0 }}>遠隔監視</h3>
+              <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('monitoring')}>編集</button>
+            </div>
+            <div className="info-grid">
+              <div className="info-field"><span>メーカー</span><b>{project.monitoring_system ?? '-'}</b></div>
+              <div className="info-field"><span>ID</span><b>{project.monitoring_id ?? '-'}</b></div>
+              <div className="info-field"><span>パスワード</span><b>{project.monitoring_pw ?? '-'}</b></div>
+              <div className="info-field"><span>4G対応</span><b>{project.has_4g == null ? '-' : project.has_4g ? 'あり' : 'なし'}</b></div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 契約情報タブ ── */}
+      {tab === '契約情報' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* 中項目: 設備契約 */}
+          <div className="card">
+            <div className="card-header-row">
+              <h3 className="section-title" style={{ margin: 0 }}>設備契約</h3>
+              {contract && <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('equipment-contract')}>編集</button>}
+            </div>
+            <div className="info-grid">
+              <div className="info-field"><span>契約者名</span><b>{contract?.contractor_name ?? '-'}</b></div>
+              <div className="info-field"><span>販売会社</span><b>{project.sales_company ?? '-'}</b></div>
+              <div className="info-field"><span>設備代</span><b>{fmtYen(project.sales_price)}</b></div>
+              <div className="info-field"><span>設備契約日</span><b>{contract?.equipment_contract_date ?? contract?.sale_contract_date ?? '-'}</b></div>
+              <div className="info-field"><span>引渡日</span><b>{project.handover_date ?? '-'}</b></div>
+              <div className="info-field"><span>顧客紹介者</span><b>{project.customer_referrer ?? '-'}</b></div>
+              <div className="info-field"><span>案件紹介者</span><b>{project.project_referrer ?? '-'}</b></div>
+              <div className="info-field"><span>旧所有者</span><b>{project.old_owner ?? '-'}</b></div>
+              <div className="info-field"><span>販売店→ネオシス</span><b>{contract?.sales_to_neosys ?? '-'}</b></div>
+              <div className="info-field"><span>ネオシス→紹介者</span><b>{contract?.neosys_to_referrer ?? '-'}</b></div>
+              <div className="info-field"><span>アプラス会員番号</span><b>{project.amuras_member_no ?? '-'}</b></div>
+              <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap' }}>{contract?.equipment_contract_notes || '-'}</b></div>
+            </div>
+          </div>
+
+          {/* 中項目: 土地契約 */}
+          <div className="card">
+            <div className="card-header-row">
+              <h3 className="section-title" style={{ margin: 0 }}>土地契約</h3>
+              {contract && <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('land-contract')}>編集</button>}
+            </div>
+            <div className="info-grid">
+              <div className="info-field"><span>土地代</span><b>{fmtYen(project.land_cost)}</b></div>
+              <div className="info-field"><span>土地契約日</span><b>{contract?.land_contract_date ?? '-'}</b></div>
+              <div className="info-field"><span>所有権移転日</span><b>{contract?.ownership_transfer_date ?? '-'}</b></div>
+              <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap' }}>{contract?.land_contract_notes || '-'}</b></div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 保守情報タブ ── */}
+      {tab === '保守情報' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* 中項目: 保守契約 */}
+          <div className="card">
+            <div className="card-header-row">
+              <h3 className="section-title" style={{ margin: 0 }}>保守契約</h3>
+              {contract && <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('maintenance-contract')}>編集</button>}
+            </div>
+            <div className="info-grid">
+              <div className="info-field"><span>受託会社</span><b>{contract?.maintenance_contractor ?? '-'}</b></div>
+              <div className="info-field"><span>年次保守料（税別）</span><b>{fmtYen(contract?.annual_maintenance_ex)}</b></div>
+              <div className="info-field"><span>年次保守料（税込）</span><b>{fmtYen(contract?.annual_maintenance_inc)}</b></div>
+              <div className="info-field"><span>保守契約日</span><b>{contract?.maintenance_contract_date ?? '-'}</b></div>
+              <div className="info-field"><span>保守開始日</span><b>{contract?.maintenance_start_date ?? '-'}</b></div>
+            </div>
+          </div>
+
+          {/* 中項目: 保守内容 */}
+          <div className="card">
+            <div className="card-header-row">
+              <h3 className="section-title" style={{ margin: 0 }}>保守内容</h3>
+              {contract && <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('maintenance-content')}>編集</button>}
+            </div>
+            <div className="info-grid">
+              <div className="info-field"><span>除草（回）</span><b>{contract?.plan_weeding ?? '-'}</b></div>
+              <div className="info-field"><span>点検</span><b>{contract?.plan_inspection ?? '-'}</b></div>
+              <div className="info-field"><span>駆付</span><b>{contract?.plan_emergency ?? '-'}</b></div>
+              <div className="info-field"><span>鍵番号</span><b>{project.key_number ?? '-'}</b></div>
+              <div className="info-field"><span>自治会</span><b>{project.local_association ?? '-'}</b></div>
+              <div className="info-field"><span>保険料</span><b>{fmtYen(contract?.insurance_fee)}</b></div>
+              <div className="info-field"><span>その他費用</span><b>{fmtYen(contract?.other_fee)}</b></div>
+              <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap' }}>{contract?.maintenance_content_notes || '-'}</b></div>
+            </div>
+          </div>
+
+          {/* 中項目: 委託契約 */}
+          <div className="card">
+            <div className="card-header-row">
+              <h3 className="section-title" style={{ margin: 0 }}>委託契約</h3>
+              {contract && <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('subcontract')}>編集</button>}
+            </div>
+            <div className="info-grid">
+              <div className="info-field"><span>保守委託先</span><b>{contract?.subcontractor ?? '-'}</b></div>
+              <div className="info-field"><span>委託料（税別）</span><b>{fmtYen(contract?.subcontract_fee_ex)}</b></div>
+              <div className="info-field"><span>委託料（税込）</span><b>{fmtYen(contract?.subcontract_fee_inc)}</b></div>
+              <div className="info-field"><span>委託開始日</span><b>{contract?.subcontract_start_date ?? '-'}</b></div>
+              <div className="info-field"><span>委託請求日</span><b>{contract?.subcontract_billing_day ?? '-'}</b></div>
+              <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap' }}>{contract?.subcontract_notes || '-'}</b></div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 請求情報タブ ── */}
+      {tab === '請求情報' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="card">
+            <div className="card-header-row">
+              <h3 className="section-title" style={{ margin: 0 }}>請求情報</h3>
+              {contract && <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('billing')}>編集</button>}
+            </div>
+            <div className="info-grid">
+              <div className="info-field"><span>請求方法</span><b>{contract?.billing_method ?? '-'}</b></div>
+              <div className="info-field"><span>請求回数</span><b>{contract?.billing_count != null ? `年${contract.billing_count}回` : '-'}</b></div>
+              <div className="info-field"><span>請求予定日</span><b>{contract?.billing_due_day ?? '-'}</b></div>
+              <div className="info-field"><span>請求額（税別）</span><b>{fmtYen(contract?.billing_amount_ex)}</b></div>
+              <div className="info-field"><span>請求額（税込）</span><b>{fmtYen(contract?.billing_amount_inc)}</b></div>
+              <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap' }}>{contract?.notes || '-'}</b></div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── その他タブ ── */}
+      {tab === 'その他' && (
         <div className="card">
           <div className="card-header-row">
-            <h3 className="section-title" style={{ margin: 0 }}>案件情報</h3>
-            <button className="btn btn-sub btn-sm" onClick={openProjEdit}>編集</button>
+            <h3 className="section-title" style={{ margin: 0 }}>備考</h3>
+            <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('other-notes')}>編集</button>
           </div>
           <div className="info-grid">
-            <div className="info-field"><span>案件番号</span><b>{project.project_no ?? '-'}</b></div>
-            <div className="info-field"><span>発電所名</span><b>{project.plant_name || project.project_name || '-'}</b></div>
-            <div className="info-field"><span>郵便番号</span><b>{project.site_postal_code ?? '-'}</b></div>
-            <div className="info-field"><span>都道府県</span><b>{project.site_prefecture ?? '-'}</b></div>
-            <div className="info-field" style={{ gridColumn: '1/-1' }}><span>設置住所</span><b>{project.site_address ?? '-'}</b></div>
-            <div className="info-field"><span>Google座標</span><b>{project.google_coordinates ?? '-'}</b></div>
-            <div className="info-field"><span>系統ID</span><b>{project.grid_id ?? '-'}</b></div>
-            <div className="info-field"><span>系統認定日</span><b>{project.grid_certified_at ?? '-'}</b></div>
-            <div className="info-field"><span>FIT</span><b>{project.fit_period != null ? `${project.fit_period}円` : '-'}</b></div>
-            <div className="info-field"><span>給電開始日</span><b>{project.power_supply_start_date ?? '-'}</b></div>
-            <div className="info-field"><span>お客さま番号</span><b>{project.customer_number ?? '-'}</b></div>
-            <div className="info-field"><span>発電地点特定番号</span><b>{project.generation_point_id ?? '-'}</b></div>
-            <div className="info-field"><span>パネル</span><b>{project.panel_kw != null ? `${project.panel_kw}kW` : '-'} / {project.panel_count != null ? `${project.panel_count}枚` : '-'}</b></div>
-            <div className="info-field"><span>パネルメーカー</span><b>{project.panel_maker ?? '-'} {project.panel_model ?? ''}</b></div>
-            <div className="info-field"><span>PCS</span><b>{project.pcs_kw != null ? `${project.pcs_kw}kW` : '-'} / {project.pcs_count != null ? `${project.pcs_count}台` : '-'}</b></div>
-            <div className="info-field"><span>PCSメーカー</span><b>{project.pcs_maker ?? '-'} {project.pcs_model ?? ''}</b></div>
-            <div className="info-field"><span>監視システム</span><b>{project.monitoring_system ?? '-'}</b></div>
-            <div className="info-field"><span>監視ID</span><b>{project.monitoring_id ?? '-'}</b></div>
-            <div className="info-field"><span>4G</span><b>{project.has_4g == null ? '-' : project.has_4g ? 'あり' : 'なし'}</b></div>
-            <div className="info-field"><span>キー番号</span><b>{project.key_number ?? '-'}</b></div>
-            <div className="info-field"><span>旧所有者</span><b>{project.old_owner ?? '-'}</b></div>
-            <div className="info-field"><span>販売会社</span><b>{project.sales_company ?? '-'}</b></div>
-            <div className="info-field"><span>紹介者</span><b>{project.referrer ?? '-'}</b></div>
-            <div className="info-field"><span>電力変更日</span><b>{project.power_change_date ?? '-'}</b></div>
-            <div className="info-field"><span>引渡日</span><b>{project.handover_date ?? '-'}</b></div>
-            <div className="info-field"><span>設備代</span><b>{fmtYen(project.sales_price)}</b></div>
-            <div className="info-field"><span>土地代</span><b>{fmtYen(project.land_cost)}</b></div>
-            <div className="info-field"><span>アプラス会員番号</span><b>{project.amuras_member_no ?? '-'}</b></div>
-            <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap' }}>{project.notes || '-'}</b></div>
+            <div className="info-field" style={{ gridColumn: '1/-1' }}><b style={{ whiteSpace: 'pre-wrap' }}>{project.notes || '-'}</b></div>
           </div>
         </div>
       )}
@@ -623,102 +959,9 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       )}
 
       {/* ── 請求 ── */}
-      {tab === '請求' && (
+      {/* ── 年次請求記録タブ ── */}
+      {tab === '年次請求記録' && (
         <>
-          <div className="card">
-            <div className="card-header-row">
-              <h3 className="section-title" style={{ margin: 0 }}>契約情報</h3>
-              {contract && (
-                <button className="btn btn-sub btn-sm" onClick={() => { setContractForm({
-                  billing_method: contract.billing_method ?? '',
-                  billing_due_day: contract.billing_due_day ?? '',
-                  billing_amount_ex: contract.billing_amount_ex != null ? String(contract.billing_amount_ex) : '',
-                  billing_amount_inc: contract.billing_amount_inc != null ? String(contract.billing_amount_inc) : '',
-                  annual_maintenance_ex: contract.annual_maintenance_ex != null ? String(contract.annual_maintenance_ex) : '',
-                  annual_maintenance_inc: contract.annual_maintenance_inc != null ? String(contract.annual_maintenance_inc) : '',
-                  billing_count: contract.billing_count != null ? String(contract.billing_count) : '',
-                  land_cost_monthly: contract.land_cost_monthly != null ? String(contract.land_cost_monthly) : '',
-                  insurance_fee: contract.insurance_fee != null ? String(contract.insurance_fee) : '',
-                  other_fee: contract.other_fee != null ? String(contract.other_fee) : '',
-                  transfer_fee: contract.transfer_fee != null ? String(contract.transfer_fee) : '',
-                  sale_contract_date: contract.sale_contract_date ?? '',
-                  equipment_contract_date: contract.equipment_contract_date ?? '',
-                  land_contract_date: contract.land_contract_date ?? '',
-                  maintenance_contract_date: contract.maintenance_contract_date ?? '',
-                  sales_to_neosys: contract.sales_to_neosys ?? '',
-                  neosys_to_referrer: contract.neosys_to_referrer ?? '',
-                  contractor_name: contract.contractor_name ?? '',
-                  subcontractor: contract.subcontractor ?? '',
-                  subcontract_fee_ex: contract.subcontract_fee_ex != null ? String(contract.subcontract_fee_ex) : '',
-                  subcontract_fee_inc: contract.subcontract_fee_inc != null ? String(contract.subcontract_fee_inc) : '',
-                  subcontract_billing_day: contract.subcontract_billing_day ?? '',
-                  subcontract_start_date: contract.subcontract_start_date ?? '',
-                  maintenance_start_date: contract.maintenance_start_date ?? '',
-                  plan_inspection: contract.plan_inspection ?? '',
-                  plan_weeding: contract.plan_weeding ?? '',
-                  plan_emergency: contract.plan_emergency ?? '',
-                  notes: contract.notes ?? '',
-                }); setErr(''); setContractModal(true) }}>
-                  編集
-                </button>
-              )}
-            </div>
-            {!contract ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0' }}>
-                <p className="empty-cell" style={{ margin: 0 }}>契約情報がありません</p>
-                <button className="btn btn-sub btn-sm" onClick={() => {
-                  setContractForm({
-                    billing_method: '', billing_due_day: '',
-                    billing_amount_ex: '', billing_amount_inc: '',
-                    annual_maintenance_ex: '', annual_maintenance_inc: '',
-                    billing_count: '',
-                    land_cost_monthly: '', insurance_fee: '', other_fee: '',
-                    transfer_fee: '',
-                    sale_contract_date: '', equipment_contract_date: '',
-                    land_contract_date: '', maintenance_contract_date: '',
-                    sales_to_neosys: '', neosys_to_referrer: '',
-                    contractor_name: '', subcontractor: '',
-                    subcontract_fee_ex: '', subcontract_fee_inc: '',
-                    subcontract_billing_day: '', subcontract_start_date: '',
-                    maintenance_start_date: '',
-                    plan_inspection: '', plan_weeding: '', plan_emergency: '',
-                    notes: '',
-                  }); setErr(''); setContractModal(true)
-                }}>＋ 契約情報を追加</button>
-              </div>
-            ) : (
-              <div className="info-grid">
-                <div className="info-field"><span>請求方法</span><b>{contract.billing_method ?? '-'}</b></div>
-                <div className="info-field"><span>請求予定日</span><b>{contract.billing_due_day ?? '-'}</b></div>
-                <div className="info-field"><span>年次保守料（税抜）</span><b>{fmtYen(contract.annual_maintenance_ex)}</b></div>
-                <div className="info-field"><span>年次保守料（税込）</span><b>{fmtYen(contract.annual_maintenance_inc)}</b></div>
-                <div className="info-field"><span>請求額（税抜）</span><b>{fmtYen(contract.billing_amount_ex)}</b></div>
-                <div className="info-field"><span>請求額（税込）</span><b>{fmtYen(contract.billing_amount_inc)}</b></div>
-                <div className="info-field"><span>土地賃料（月額）</span><b>{fmtYen(contract.land_cost_monthly)}</b></div>
-                <div className="info-field"><span>保険料</span><b>{fmtYen(contract.insurance_fee)}</b></div>
-                <div className="info-field"><span>その他費用</span><b>{fmtYen(contract.other_fee)}</b></div>
-                <div className="info-field"><span>振替手数料</span><b>{fmtYen(contract.transfer_fee)}</b></div>
-                <div className="info-field"><span>売買契約日</span><b>{contract.sale_contract_date ?? '-'}</b></div>
-                <div className="info-field"><span>設備契約日</span><b>{contract.equipment_contract_date ?? '-'}</b></div>
-                <div className="info-field"><span>土地契約日</span><b>{contract.land_contract_date ?? '-'}</b></div>
-                <div className="info-field"><span>保守契約日</span><b>{contract.maintenance_contract_date ?? '-'}</b></div>
-                <div className="info-field"><span>販売店→ネオシス</span><b>{contract.sales_to_neosys ?? '-'}</b></div>
-                <div className="info-field"><span>ネオシス→紹介者</span><b>{contract.neosys_to_referrer ?? '-'}</b></div>
-                <div className="info-field"><span>契約者名</span><b>{contract.contractor_name ?? '-'}</b></div>
-                <div className="info-field"><span>保守委託先</span><b>{contract.subcontractor ?? '-'}</b></div>
-                <div className="info-field"><span>委託料（税抜）</span><b>{fmtYen(contract.subcontract_fee_ex)}</b></div>
-                <div className="info-field"><span>委託料（税込）</span><b>{fmtYen(contract.subcontract_fee_inc)}</b></div>
-                <div className="info-field"><span>委託請求日</span><b>{contract.subcontract_billing_day ?? '-'}</b></div>
-                <div className="info-field"><span>委託開始日</span><b>{contract.subcontract_start_date ?? '-'}</b></div>
-                <div className="info-field"><span>保守開始日</span><b>{contract.maintenance_start_date ?? '-'}</b></div>
-                <div className="info-field"><span>点検プラン</span><b>{contract.plan_inspection ?? '-'}</b></div>
-                <div className="info-field"><span>除草プラン</span><b>{contract.plan_weeding ?? '-'}</b></div>
-                <div className="info-field"><span>駆けつけプラン</span><b>{contract.plan_emergency ?? '-'}</b></div>
-                {contract.notes && <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap' }}>{contract.notes}</b></div>}
-              </div>
-            )}
-          </div>
-
           <div className="card">
             <div className="card-header-row">
               <h3 className="section-title" style={{ margin: 0 }}>年次記録</h3>
@@ -1246,6 +1489,413 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           <div className="modal-footer">
             <button className="btn btn-sub" onClick={() => setProjModal(false)}>キャンセル</button>
             <button className="btn btn-main" onClick={handleSaveProject} disabled={saving}>{saving ? '保存中...' : '保存する'}</button>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── 中項目ごとの編集モーダル（ステップ C-2） ── */}
+      {editSection && (
+        <Modal title={SECTION_TITLES[editSection]} onClose={() => setEditSection(null)}>
+          {err && <div className="form-error">{err}</div>}
+          <div className="form-grid">
+
+            {/* 概要 */}
+            {editSection === 'summary' && (
+              <>
+                <label className="form-label required" style={{ gridColumn: '1/-1' }}>
+                  発電所名
+                  <input className="form-input" value={projForm.plant_name} onChange={e => setProjForm(f => ({ ...f, plant_name: e.target.value }))} />
+                </label>
+                <label className="form-label">
+                  案件番号
+                  <input className="form-input" value={projForm.project_no} onChange={e => setProjForm(f => ({ ...f, project_no: e.target.value }))} />
+                </label>
+                <label className="form-label">
+                  郵便番号
+                  <input className="form-input" inputMode="numeric" placeholder="000-0000" value={projForm.site_postal_code} onChange={e => setProjForm(f => ({ ...f, site_postal_code: fmtPostalCode(e.target.value) }))} />
+                </label>
+                <label className="form-label">
+                  都道府県
+                  <input className="form-input" value={projForm.site_prefecture} onChange={e => setProjForm(f => ({ ...f, site_prefecture: e.target.value }))} />
+                </label>
+                <label className="form-label" style={{ gridColumn: '1/-1' }}>
+                  住所
+                  <input className="form-input" value={projForm.site_address} onChange={e => {
+                    const addr = e.target.value
+                    const pref = extractPrefecture(addr)
+                    setProjForm(f => ({ ...f, site_address: addr, ...(pref ? { site_prefecture: pref } : {}) }))
+                  }} />
+                </label>
+                <label className="form-label" style={{ gridColumn: '1/-1' }}>
+                  座標（Google）
+                  <input className="form-input" value={projForm.google_coordinates} onChange={e => setProjForm(f => ({ ...f, google_coordinates: e.target.value }))} placeholder="35.6812, 139.7671" />
+                </label>
+              </>
+            )}
+
+            {/* 経済産業省 */}
+            {editSection === 'meti' && (
+              <>
+                <label className="form-label">
+                  設備ID
+                  <input className="form-input" value={projForm.grid_id} onChange={e => setProjForm(f => ({ ...f, grid_id: e.target.value }))} />
+                </label>
+                <label className="form-label">
+                  認定日
+                  <input className="form-input" type="date" value={projForm.grid_certified_at} onChange={e => setProjForm(f => ({ ...f, grid_certified_at: e.target.value }))} />
+                </label>
+              </>
+            )}
+
+            {/* 電力会社 */}
+            {editSection === 'power-company' && (
+              <>
+                <label className="form-label">
+                  受給地点番号
+                  <input className="form-input" value={projForm.generation_point_id} onChange={e => setProjForm(f => ({ ...f, generation_point_id: e.target.value }))} />
+                </label>
+                <label className="form-label">
+                  お客様番号
+                  <input className="form-input" value={projForm.customer_number} onChange={e => setProjForm(f => ({ ...f, customer_number: e.target.value }))} />
+                </label>
+                <label className="form-label">
+                  受給開始日
+                  <input className="form-input" type="date" value={projForm.power_supply_start_date} onChange={e => setProjForm(f => ({ ...f, power_supply_start_date: e.target.value }))} />
+                </label>
+                <label className="form-label">
+                  FIT（円）
+                  <input className="form-input" inputMode="numeric" value={fmtFormNum(projForm.fit_period)} onChange={e => setProjForm(f => ({ ...f, fit_period: e.target.value.replace(/,/g, '') }))} />
+                </label>
+                <label className="form-label">
+                  FIT期間（年）
+                  <input className="form-input" inputMode="numeric" value={fmtFormNum(projForm.fit_term_years)} onChange={e => setProjForm(f => ({ ...f, fit_term_years: e.target.value.replace(/,/g, '') }))} />
+                </label>
+                <label className="form-label">
+                  電力変更日
+                  <input className="form-input" type="date" value={projForm.power_change_date} onChange={e => setProjForm(f => ({ ...f, power_change_date: e.target.value }))} />
+                </label>
+                <label className="form-label">
+                  検針日
+                  <input className="form-input" value={projForm.meter_reading_day} onChange={e => setProjForm(f => ({ ...f, meter_reading_day: e.target.value }))} placeholder="例: 20日" />
+                </label>
+              </>
+            )}
+
+            {/* パネル */}
+            {editSection === 'panel' && (
+              <>
+                <label className="form-label">
+                  KW
+                  <input className="form-input" inputMode="numeric" value={fmtFormNum(projForm.panel_kw)} onChange={e => setProjForm(f => ({ ...f, panel_kw: e.target.value.replace(/,/g, '') }))} />
+                </label>
+                <label className="form-label">
+                  メーカー
+                  <input className="form-input" value={projForm.panel_maker} onChange={e => setProjForm(f => ({ ...f, panel_maker: e.target.value }))} />
+                </label>
+                <label className="form-label">
+                  型式
+                  <input className="form-input" value={projForm.panel_model} onChange={e => setProjForm(f => ({ ...f, panel_model: e.target.value }))} />
+                </label>
+                <label className="form-label">
+                  枚数
+                  <input className="form-input" inputMode="numeric" value={fmtFormNum(projForm.panel_count)} onChange={e => setProjForm(f => ({ ...f, panel_count: e.target.value.replace(/,/g, '') }))} />
+                </label>
+                <div className="info-field" style={{ gridColumn: '1/-1' }}>
+                  <span>w/枚（自動計算）</span>
+                  <b>{projForm.panel_kw && projForm.panel_count && Number(projForm.panel_count) > 0 ? `${Math.round(Number(projForm.panel_kw) * 1000 / Number(projForm.panel_count))}W` : '-'}</b>
+                </div>
+              </>
+            )}
+
+            {/* パワコン */}
+            {editSection === 'pcs' && (
+              <>
+                <label className="form-label">
+                  KW
+                  <input className="form-input" inputMode="numeric" value={fmtFormNum(projForm.pcs_kw)} onChange={e => setProjForm(f => ({ ...f, pcs_kw: e.target.value.replace(/,/g, '') }))} />
+                </label>
+                <label className="form-label">
+                  メーカー
+                  <input className="form-input" value={projForm.pcs_maker} onChange={e => setProjForm(f => ({ ...f, pcs_maker: e.target.value }))} />
+                </label>
+                <label className="form-label">
+                  型式
+                  <input className="form-input" value={projForm.pcs_model} onChange={e => setProjForm(f => ({ ...f, pcs_model: e.target.value }))} />
+                </label>
+                <label className="form-label">
+                  台数
+                  <input className="form-input" inputMode="numeric" value={fmtFormNum(projForm.pcs_count)} onChange={e => setProjForm(f => ({ ...f, pcs_count: e.target.value.replace(/,/g, '') }))} />
+                </label>
+                <div className="info-field" style={{ gridColumn: '1/-1' }}>
+                  <span>kw/台（自動計算）</span>
+                  <b>{projForm.pcs_kw && projForm.pcs_count && Number(projForm.pcs_count) > 0 ? `${(Number(projForm.pcs_kw) / Number(projForm.pcs_count)).toFixed(1)}kW` : '-'}</b>
+                </div>
+              </>
+            )}
+
+            {/* 遠隔監視 */}
+            {editSection === 'monitoring' && (
+              <>
+                <label className="form-label">
+                  メーカー
+                  <input className="form-input" value={projForm.monitoring_system} onChange={e => setProjForm(f => ({ ...f, monitoring_system: e.target.value }))} />
+                </label>
+                <label className="form-label">
+                  ID
+                  <input className="form-input" value={projForm.monitoring_id} onChange={e => setProjForm(f => ({ ...f, monitoring_id: e.target.value }))} />
+                </label>
+                <label className="form-label">
+                  パスワード
+                  <input className="form-input" value={projForm.monitoring_pw} onChange={e => setProjForm(f => ({ ...f, monitoring_pw: e.target.value }))} />
+                </label>
+                <label className="form-label">
+                  4G対応
+                  <select className="form-select" value={projForm.has_4g} onChange={e => setProjForm(f => ({ ...f, has_4g: e.target.value }))}>
+                    <option value="">未設定</option>
+                    <option value="true">あり</option>
+                    <option value="false">なし</option>
+                  </select>
+                </label>
+              </>
+            )}
+
+            {/* 設備契約 */}
+            {editSection === 'equipment-contract' && (
+              <>
+                <label className="form-label">
+                  契約者名
+                  <input className="form-input" value={contractForm.contractor_name} onChange={e => setContractForm(f => ({ ...f, contractor_name: e.target.value }))} />
+                </label>
+                <label className="form-label">
+                  販売会社
+                  <input className="form-input" value={projForm.sales_company} onChange={e => setProjForm(f => ({ ...f, sales_company: e.target.value }))} />
+                </label>
+                <label className="form-label">
+                  設備代（円）
+                  <input className="form-input" inputMode="numeric" value={fmtFormNum(projForm.sales_price)} onChange={e => setProjForm(f => ({ ...f, sales_price: e.target.value.replace(/,/g, '') }))} />
+                </label>
+                <label className="form-label">
+                  設備契約日
+                  <input className="form-input" type="date" value={contractForm.equipment_contract_date} onChange={e => setContractForm(f => ({ ...f, equipment_contract_date: e.target.value }))} />
+                </label>
+                <label className="form-label">
+                  引渡日
+                  <input className="form-input" type="date" value={projForm.handover_date} onChange={e => setProjForm(f => ({ ...f, handover_date: e.target.value }))} />
+                </label>
+                <label className="form-label">
+                  顧客紹介者
+                  <input className="form-input" value={projForm.customer_referrer} onChange={e => setProjForm(f => ({ ...f, customer_referrer: e.target.value }))} />
+                </label>
+                <label className="form-label">
+                  案件紹介者
+                  <input className="form-input" value={projForm.project_referrer} onChange={e => setProjForm(f => ({ ...f, project_referrer: e.target.value }))} />
+                </label>
+                <label className="form-label">
+                  旧所有者
+                  <input className="form-input" value={projForm.old_owner} onChange={e => setProjForm(f => ({ ...f, old_owner: e.target.value }))} />
+                </label>
+                <label className="form-label">
+                  販売店→ネオシス
+                  <input className="form-input" value={contractForm.sales_to_neosys} onChange={e => setContractForm(f => ({ ...f, sales_to_neosys: e.target.value }))} />
+                </label>
+                <label className="form-label">
+                  ネオシス→紹介者
+                  <input className="form-input" value={contractForm.neosys_to_referrer} onChange={e => setContractForm(f => ({ ...f, neosys_to_referrer: e.target.value }))} />
+                </label>
+                <label className="form-label">
+                  アプラス会員番号
+                  <input className="form-input" value={projForm.amuras_member_no} onChange={e => setProjForm(f => ({ ...f, amuras_member_no: e.target.value }))} />
+                </label>
+                <label className="form-label" style={{ gridColumn: '1/-1' }}>
+                  備考
+                  <textarea className="form-input" rows={4} value={contractForm.equipment_contract_notes} onChange={e => setContractForm(f => ({ ...f, equipment_contract_notes: e.target.value }))} style={{ resize: 'vertical' }} />
+                </label>
+              </>
+            )}
+
+            {/* 土地契約 */}
+            {editSection === 'land-contract' && (
+              <>
+                <label className="form-label">
+                  土地代（円）
+                  <input className="form-input" inputMode="numeric" value={fmtFormNum(projForm.land_cost)} onChange={e => setProjForm(f => ({ ...f, land_cost: e.target.value.replace(/,/g, '') }))} />
+                </label>
+                <label className="form-label">
+                  土地契約日
+                  <input className="form-input" type="date" value={contractForm.land_contract_date} onChange={e => setContractForm(f => ({ ...f, land_contract_date: e.target.value }))} />
+                </label>
+                <label className="form-label">
+                  所有権移転日
+                  <input className="form-input" type="date" value={contractForm.ownership_transfer_date} onChange={e => setContractForm(f => ({ ...f, ownership_transfer_date: e.target.value }))} />
+                </label>
+                <label className="form-label" style={{ gridColumn: '1/-1' }}>
+                  備考
+                  <textarea className="form-input" rows={4} value={contractForm.land_contract_notes} onChange={e => setContractForm(f => ({ ...f, land_contract_notes: e.target.value }))} style={{ resize: 'vertical' }} />
+                </label>
+              </>
+            )}
+
+            {/* 保守契約 */}
+            {editSection === 'maintenance-contract' && (
+              <>
+                <label className="form-label">
+                  受託会社
+                  <input className="form-input" value={contractForm.maintenance_contractor} onChange={e => setContractForm(f => ({ ...f, maintenance_contractor: e.target.value }))} />
+                </label>
+                <label className="form-label">
+                  年次保守料（税別）
+                  <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.annual_maintenance_ex)} onChange={e => setContractForm(f => ({ ...f, annual_maintenance_ex: e.target.value.replace(/,/g, '') }))} />
+                </label>
+                <label className="form-label">
+                  年次保守料（税込）
+                  <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.annual_maintenance_inc)} onChange={e => setContractForm(f => ({ ...f, annual_maintenance_inc: e.target.value.replace(/,/g, '') }))} />
+                </label>
+                <label className="form-label">
+                  保守契約日
+                  <input className="form-input" type="date" value={contractForm.maintenance_contract_date} onChange={e => setContractForm(f => ({ ...f, maintenance_contract_date: e.target.value }))} />
+                </label>
+                <label className="form-label">
+                  保守開始日
+                  <input className="form-input" type="date" value={contractForm.maintenance_start_date} onChange={e => setContractForm(f => ({ ...f, maintenance_start_date: e.target.value }))} />
+                </label>
+              </>
+            )}
+
+            {/* 保守内容 */}
+            {editSection === 'maintenance-content' && (
+              <>
+                <label className="form-label">
+                  除草（回）
+                  <select className="form-select" value={contractForm.plan_weeding} onChange={e => setContractForm(f => ({ ...f, plan_weeding: e.target.value }))}>
+                    <option value="">未設定</option>
+                    <option value="なし">なし</option>
+                    <option value="年1回">年1回</option>
+                    <option value="年2回">年2回</option>
+                    <option value="年3回">年3回</option>
+                    <option value="無制限">無制限</option>
+                  </select>
+                </label>
+                <label className="form-label">
+                  点検
+                  <select className="form-select" value={contractForm.plan_inspection} onChange={e => setContractForm(f => ({ ...f, plan_inspection: e.target.value }))}>
+                    <option value="">未設定</option>
+                    <option value="なし">なし</option>
+                    <option value="年1回">年1回</option>
+                    <option value="年2回">年2回</option>
+                    <option value="年3回">年3回</option>
+                    <option value="無制限">無制限</option>
+                  </select>
+                </label>
+                <label className="form-label">
+                  駆付
+                  <select className="form-select" value={contractForm.plan_emergency} onChange={e => setContractForm(f => ({ ...f, plan_emergency: e.target.value }))}>
+                    <option value="">未設定</option>
+                    <option value="なし">なし</option>
+                    <option value="年1回">年1回</option>
+                    <option value="年2回">年2回</option>
+                    <option value="年3回">年3回</option>
+                    <option value="無制限">無制限</option>
+                  </select>
+                </label>
+                <label className="form-label">
+                  鍵番号
+                  <input className="form-input" value={projForm.key_number} onChange={e => setProjForm(f => ({ ...f, key_number: e.target.value }))} />
+                </label>
+                <label className="form-label">
+                  自治会
+                  <input className="form-input" value={projForm.local_association} onChange={e => setProjForm(f => ({ ...f, local_association: e.target.value }))} />
+                </label>
+                <label className="form-label">
+                  保険料（円）
+                  <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.insurance_fee)} onChange={e => setContractForm(f => ({ ...f, insurance_fee: e.target.value.replace(/,/g, '') }))} />
+                </label>
+                <label className="form-label">
+                  その他費用（円）
+                  <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.other_fee)} onChange={e => setContractForm(f => ({ ...f, other_fee: e.target.value.replace(/,/g, '') }))} />
+                </label>
+                <label className="form-label" style={{ gridColumn: '1/-1' }}>
+                  備考
+                  <textarea className="form-input" rows={4} value={contractForm.maintenance_content_notes} onChange={e => setContractForm(f => ({ ...f, maintenance_content_notes: e.target.value }))} style={{ resize: 'vertical' }} />
+                </label>
+              </>
+            )}
+
+            {/* 委託契約 */}
+            {editSection === 'subcontract' && (
+              <>
+                <label className="form-label">
+                  保守委託先
+                  <input className="form-input" value={contractForm.subcontractor} onChange={e => setContractForm(f => ({ ...f, subcontractor: e.target.value }))} />
+                </label>
+                <label className="form-label">
+                  委託料（税別）
+                  <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.subcontract_fee_ex)} onChange={e => setContractForm(f => ({ ...f, subcontract_fee_ex: e.target.value.replace(/,/g, '') }))} />
+                </label>
+                <label className="form-label">
+                  委託料（税込）
+                  <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.subcontract_fee_inc)} onChange={e => setContractForm(f => ({ ...f, subcontract_fee_inc: e.target.value.replace(/,/g, '') }))} />
+                </label>
+                <label className="form-label">
+                  委託開始日
+                  <input className="form-input" type="date" value={contractForm.subcontract_start_date} onChange={e => setContractForm(f => ({ ...f, subcontract_start_date: e.target.value }))} />
+                </label>
+                <label className="form-label">
+                  委託請求日
+                  <input className="form-input" value={contractForm.subcontract_billing_day} onChange={e => setContractForm(f => ({ ...f, subcontract_billing_day: e.target.value }))} placeholder="例: 月末" />
+                </label>
+                <label className="form-label" style={{ gridColumn: '1/-1' }}>
+                  備考
+                  <textarea className="form-input" rows={4} value={contractForm.subcontract_notes} onChange={e => setContractForm(f => ({ ...f, subcontract_notes: e.target.value }))} style={{ resize: 'vertical' }} />
+                </label>
+              </>
+            )}
+
+            {/* 請求情報 */}
+            {editSection === 'billing' && (
+              <>
+                <label className="form-label">
+                  請求方法
+                  <select className="form-select" value={contractForm.billing_method} onChange={e => setContractForm(f => ({ ...f, billing_method: e.target.value }))}>
+                    <option value="">未設定</option>
+                    <option value="請求書">請求書</option>
+                    <option value="口座振替">口座振替</option>
+                  </select>
+                </label>
+                <label className="form-label">
+                  請求回数（年）
+                  <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.billing_count)} onChange={e => setContractForm(f => ({ ...f, billing_count: e.target.value.replace(/,/g, '') }))} />
+                </label>
+                <label className="form-label">
+                  請求予定日
+                  <input className="form-input" value={contractForm.billing_due_day} onChange={e => setContractForm(f => ({ ...f, billing_due_day: e.target.value }))} placeholder="例: 12月1日" />
+                </label>
+                <label className="form-label">
+                  請求額（税別）
+                  <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.billing_amount_ex)} onChange={e => setContractForm(f => ({ ...f, billing_amount_ex: e.target.value.replace(/,/g, '') }))} />
+                </label>
+                <label className="form-label">
+                  請求額（税込）
+                  <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.billing_amount_inc)} onChange={e => setContractForm(f => ({ ...f, billing_amount_inc: e.target.value.replace(/,/g, '') }))} />
+                </label>
+                <label className="form-label" style={{ gridColumn: '1/-1' }}>
+                  備考
+                  <textarea className="form-input" rows={4} value={contractForm.notes} onChange={e => setContractForm(f => ({ ...f, notes: e.target.value }))} style={{ resize: 'vertical' }} />
+                </label>
+              </>
+            )}
+
+            {/* その他 (備考) */}
+            {editSection === 'other-notes' && (
+              <label className="form-label" style={{ gridColumn: '1/-1' }}>
+                備考
+                <textarea className="form-input" rows={10} value={projForm.notes} onChange={e => setProjForm(f => ({ ...f, notes: e.target.value }))} style={{ resize: 'vertical' }} />
+              </label>
+            )}
+
+          </div>
+          <div className="modal-footer">
+            <button className="btn btn-sub" onClick={() => setEditSection(null)}>キャンセル</button>
+            <button className="btn btn-main" onClick={handleSaveSection} disabled={saving}>{saving ? '保存中...' : '保存する'}</button>
           </div>
         </Modal>
       )}

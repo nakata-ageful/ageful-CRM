@@ -52,7 +52,7 @@ type Props = {
 const WORK_TYPES = ['点検', '除草', '巡回', 'その他']
 
 
-const TABS: Tab[] = ['基本情報', '設備情報', '契約情報', '保守情報', '請求情報', 'その他', '保守対応', '年次請求記録']
+const TABS: Tab[] = ['基本情報', '設備情報', '契約情報', '保守情報', '請求情報', '保守対応', '年次請求記録', 'その他']
 
 function readTabFromHash(): Tab {
   const h = window.location.hash

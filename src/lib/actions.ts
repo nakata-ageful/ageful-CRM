@@ -984,12 +984,42 @@ async function syncProspectToCustomerProject(
   if ('land_cost' in data) projectUpdate.land_cost = data.land_cost
   if ('handover_date' in data) projectUpdate.handover_date = data.handover_date
 
+  let projectId: number | null = null
   if (Object.keys(projectUpdate).length > 0) {
     if (!hasSupabaseEnv) {
       const proj = projectStore.getAll().find((p: { customer_id: number }) => p.customer_id === customerId)
-      if (proj) projectStore.update(proj.id, projectUpdate)
+      if (proj) {
+        projectStore.update(proj.id, projectUpdate)
+        projectId = proj.id
+      }
     } else {
       await db().from('projects').update(projectUpdate).eq('customer_id', customerId)
+    }
+  }
+
+  // 契約テーブルへの同期: 見込みの設備売買契約日 → contracts.equipment_contract_date、土地契約日 → contracts.land_contract_date
+  const contractUpdate: Record<string, unknown> = {}
+  if ('sale_contract_date' in data) contractUpdate.equipment_contract_date = data.sale_contract_date
+  if ('land_contract_date' in data) contractUpdate.land_contract_date = data.land_contract_date
+
+  if (Object.keys(contractUpdate).length > 0) {
+    if (!hasSupabaseEnv) {
+      // mockではprojectId経由でcontract取得→更新
+      if (projectId == null) {
+        const proj = projectStore.getAll().find((p: { customer_id: number }) => p.customer_id === customerId)
+        projectId = proj?.id ?? null
+      }
+      if (projectId != null) {
+        const con = contractStore.getByProjectId(projectId)
+        if (con) contractStore.update(con.id, contractUpdate)
+      }
+    } else {
+      // Supabaseでは customer_id 経由で contracts を絞り込む（projects 経由）
+      const { data: projs } = await db().from('projects').select('id').eq('customer_id', customerId).limit(1)
+      const pid = (projs?.[0] as { id: number } | undefined)?.id
+      if (pid != null) {
+        await db().from('contracts').update(contractUpdate).eq('project_id', pid)
+      }
     }
   }
 }

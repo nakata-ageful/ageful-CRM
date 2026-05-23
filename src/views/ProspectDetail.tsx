@@ -459,7 +459,7 @@ export function ProspectDetailView({
             />
           </div>
           <div className="info-field">
-            <span>売買契約日</span>
+            <span>設備売買契約日</span>
             <input
               type="date" className="form-input" style={{ marginTop: 4 }}
               value={p.sale_contract_date ?? ''}

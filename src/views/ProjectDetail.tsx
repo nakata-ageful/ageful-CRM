@@ -700,7 +700,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               <div className="info-field"><span>契約者名</span><b>{contract?.contractor_name ?? '-'}</b></div>
               <div className="info-field"><span>販売会社</span><b>{project.sales_company ?? '-'}</b></div>
               <div className="info-field"><span>設備代</span><b>{fmtYen(project.sales_price)}</b></div>
-              <div className="info-field"><span>設備契約日</span><b>{contract?.equipment_contract_date ?? contract?.sale_contract_date ?? '-'}</b></div>
+              <div className="info-field"><span>設備売買契約日</span><b>{contract?.equipment_contract_date ?? contract?.sale_contract_date ?? '-'}</b></div>
               <div className="info-field"><span>引渡日</span><b>{project.handover_date ?? '-'}</b></div>
               <div className="info-field"><span>顧客紹介者</span><b>{project.customer_referrer ?? '-'}</b></div>
               <div className="info-field"><span>案件紹介者</span><b>{project.project_referrer ?? '-'}</b></div>
@@ -1684,7 +1684,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                   <input className="form-input" inputMode="numeric" value={fmtFormNum(projForm.sales_price)} onChange={e => setProjForm(f => ({ ...f, sales_price: e.target.value.replace(/,/g, '') }))} />
                 </label>
                 <label className="form-label">
-                  設備契約日
+                  設備売買契約日
                   <input className="form-input" type="date" value={contractForm.equipment_contract_date} onChange={e => setContractForm(f => ({ ...f, equipment_contract_date: e.target.value }))} />
                 </label>
                 <label className="form-label">

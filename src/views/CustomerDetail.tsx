@@ -26,11 +26,12 @@ const emptyProject: Omit<ProjectInput, 'customer_id'> = {
   site_address: '', latitude: '', longitude: '', google_coordinates: '',
   panel_kw: '', panel_count: '', panel_maker: '', panel_model: '',
   pcs_kw: '', pcs_count: '', pcs_maker: '', pcs_model: '',
-  grid_id: '', grid_certified_at: '', fit_period: '', power_supply_start_date: '',
+  grid_id: '', grid_certified_at: '', fit_period: '', fit_term_years: '', power_supply_start_date: '',
   customer_number: '', generation_point_id: '', meter_reading_day: '',
   monitoring_system: '', monitoring_id: '', monitoring_user: '', monitoring_pw: '',
   has_4g: false, key_number: '', local_association: '', old_owner: '',
-  sales_company: '', referrer: '', power_change_date: '', handover_date: '', sales_price: '',
+  sales_company: '', referrer: '', customer_referrer: '', project_referrer: '',
+  power_change_date: '', handover_date: '', sales_price: '',
   reference_price: '', land_cost: '', amuras_member_no: '', notes: '',
 }
 

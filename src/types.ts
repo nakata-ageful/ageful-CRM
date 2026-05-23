@@ -44,6 +44,7 @@ export type Project = {
   grid_id: string | null
   grid_certified_at: string | null
   fit_period: number | null
+  fit_term_years: number | null         // FIT期間（年）
   power_supply_start_date: string | null
   customer_number: string | null
   generation_point_id: string | null
@@ -60,6 +61,8 @@ export type Project = {
   old_owner: string | null
   sales_company: string | null
   referrer: string | null
+  customer_referrer: string | null  // 顧客紹介者
+  project_referrer: string | null   // 案件紹介者
   power_change_date: string | null  // 電力変更日
   handover_date: string | null
   sales_price: number | null
@@ -90,6 +93,7 @@ export type Contract = {
   sale_contract_date: string | null       // 売買契約日
   equipment_contract_date: string | null  // 設備契約日
   land_contract_date: string | null       // 土地契約日
+  ownership_transfer_date: string | null  // 所有権移転日
   maintenance_contract_date: string | null // 保守契約日
   // 販売経路
   sales_to_neosys: string | null    // 販売店→ネオシス
@@ -104,11 +108,17 @@ export type Contract = {
   subcontract_billing_day: string | null
   subcontract_start_date: string | null
   maintenance_start_date: string | null
+  maintenance_contractor: string | null  // 受託会社
   // 保守プラン
   plan_inspection: MaintenancePlanLevel | null  // 点検
   plan_weeding: MaintenancePlanLevel | null     // 除草
   plan_emergency: MaintenancePlanLevel | null   // 駆けつけ
   notes: string | null
+  // セクション別備考（請求情報の備考は既存 notes を使用）
+  equipment_contract_notes: string | null  // 設備契約備考
+  land_contract_notes: string | null       // 土地契約備考
+  maintenance_content_notes: string | null // 保守内容備考
+  subcontract_notes: string | null         // 委託契約備考
   created_at: string
 }
 

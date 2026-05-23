@@ -135,6 +135,7 @@ export type ProjectInput = {
   grid_id: string
   grid_certified_at: string
   fit_period: string
+  fit_term_years: string
   power_supply_start_date: string
   customer_number: string
   generation_point_id: string
@@ -149,6 +150,8 @@ export type ProjectInput = {
   old_owner: string
   sales_company: string
   referrer: string
+  customer_referrer: string
+  project_referrer: string
   power_change_date: string
   handover_date: string
   sales_price: string
@@ -180,6 +183,7 @@ function projectPayload(input: Omit<ProjectInput, 'customer_id'>): Omit<Project,
     grid_id: input.grid_id || null,
     grid_certified_at: toDate(input.grid_certified_at),
     fit_period: toInt(input.fit_period),
+    fit_term_years: toInt(input.fit_term_years),
     power_supply_start_date: toDate(input.power_supply_start_date),
     customer_number: input.customer_number || null,
     generation_point_id: input.generation_point_id || null,
@@ -194,6 +198,8 @@ function projectPayload(input: Omit<ProjectInput, 'customer_id'>): Omit<Project,
     old_owner: input.old_owner || null,
     sales_company: input.sales_company || null,
     referrer: input.referrer || null,
+    customer_referrer: input.customer_referrer || null,
+    project_referrer: input.project_referrer || null,
     power_change_date: toDate(input.power_change_date),
     handover_date: toDate(input.handover_date),
     sales_price: toInt(input.sales_price),
@@ -531,6 +537,7 @@ export async function bulkImportProjects(
         grid_id: row.grid_id || null,
         grid_certified_at: toDate(row.grid_certified_at),
         fit_period: toInt(row.fit_period),
+        fit_term_years: null,
         power_supply_start_date: toDate(row.power_supply_start_date),
         customer_number: row.customer_number || null,
         generation_point_id: row.generation_point_id || null,
@@ -545,6 +552,8 @@ export async function bulkImportProjects(
         old_owner: row.old_owner || null,
         sales_company: row.sales_company || null,
         referrer: row.referrer || null,
+        customer_referrer: row.referrer || null,
+        project_referrer: null,
         power_change_date: toDate(row.power_change_date ?? ''),
         handover_date: toDate(row.handover_date),
         sales_price: toInt(row.sales_price),
@@ -614,6 +623,12 @@ export async function bulkImportProjects(
           billing_count: null,
           plan_inspection: null, plan_weeding: null, plan_emergency: null,
           notes: row.contract_notes || null,
+          ownership_transfer_date: null,
+          maintenance_contractor: null,
+          equipment_contract_notes: null,
+          land_contract_notes: null,
+          maintenance_content_notes: null,
+          subcontract_notes: null,
         }
         // 既存契約があれば更新、なければ作成
         if (!hasSupabaseEnv) {
@@ -749,6 +764,12 @@ export async function bulkImportBilling(
         billing_count: null,
         plan_inspection: null, plan_weeding: null, plan_emergency: null,
         notes: [row.notes, row.auto_recovery ? `自動復旧: ${row.auto_recovery}` : ''].filter(Boolean).join('\n') || null,
+        ownership_transfer_date: null,
+        maintenance_contractor: null,
+        equipment_contract_notes: null,
+        land_contract_notes: null,
+        maintenance_content_notes: null,
+        subcontract_notes: null,
       }
 
       if (contractId) {
@@ -857,23 +878,30 @@ export async function createProspect(input: ProspectInput): Promise<Prospect> {
     })
   }
 
-  await createProject({
+  const project = await createProject({
     customer_id: customer.id,
     project_no: '', project_name: input.project_name, plant_name: input.project_name,
     site_postal_code: '', site_prefecture: '', site_address: input.site_address || '',
     latitude: '', longitude: '', google_coordinates: '',
     panel_kw: input.panel_kw || '', panel_count: '',
     panel_maker: '', panel_model: '', pcs_kw: '', pcs_count: '', pcs_maker: '', pcs_model: '',
-    grid_id: '', grid_certified_at: '', fit_period: '', power_supply_start_date: '',
+    grid_id: '', grid_certified_at: '', fit_period: '', fit_term_years: '', power_supply_start_date: '',
     customer_number: '', generation_point_id: '', meter_reading_day: '',
     monitoring_system: '', monitoring_id: '', monitoring_user: '', monitoring_pw: '',
     has_4g: false, key_number: '', local_association: '', old_owner: '',
     sales_company: input.sales_company || '', referrer: input.referrer || '',
+    customer_referrer: input.referrer || '', project_referrer: '',
     power_change_date: '', handover_date: '',
     sales_price: input.equipment || '',
     reference_price: '', land_cost: input.land_cost || '',
     amuras_member_no: '', notes: '',
   })
+
+  // 「契約レコードがない」状態を作らない設計（Phase 2）。
+  // 見込み追加モーダルでは契約日系の入力がないため、空の契約レコードのみ作成。
+  // 見込み詳細で sale_contract_date / land_contract_date を編集した時は
+  // syncProspectToCustomerProject 側で contracts に同期する想定。
+  await createContract(project.id, {})
 
   const payload = {
     customer_name: input.customer_name,
@@ -994,11 +1022,12 @@ export async function convertProspectToCustomer(prospect: Prospect): Promise<num
     latitude: '', longitude: '', google_coordinates: '',
     panel_kw: prospect.panel_kw?.toString() ?? '', panel_count: '',
     panel_maker: '', panel_model: '', pcs_kw: '', pcs_count: '', pcs_maker: '', pcs_model: '',
-    grid_id: '', grid_certified_at: '', fit_period: '', power_supply_start_date: '',
+    grid_id: '', grid_certified_at: '', fit_period: '', fit_term_years: '', power_supply_start_date: '',
     customer_number: '', generation_point_id: '', meter_reading_day: '',
     monitoring_system: '', monitoring_id: '', monitoring_user: '', monitoring_pw: '',
     has_4g: false, key_number: '', local_association: '', old_owner: '',
     sales_company: prospect.sales_company || '', referrer: prospect.referrer || '',
+    customer_referrer: prospect.referrer || '', project_referrer: '',
     power_change_date: '', handover_date: prospect.handover_date || '',
     sales_price: prospect.equipment?.toString() ?? '',
     reference_price: '', land_cost: prospect.land_cost?.toString() ?? '',
@@ -1024,6 +1053,12 @@ export async function convertProspectToCustomer(prospect: Prospect): Promise<num
     billing_count: null,
     plan_inspection: null, plan_weeding: null, plan_emergency: null,
     notes: `ローン会社: ${prospect.loan_company ?? '未設定'} / 融資額: ${prospect.loan_amount?.toLocaleString('ja-JP') ?? '未設定'}円`,
+    ownership_transfer_date: null,
+    maintenance_contractor: null,
+    equipment_contract_notes: null,
+    land_contract_notes: null,
+    maintenance_content_notes: null,
+    subcontract_notes: null,
   }
   if (!hasSupabaseEnv) {
     contractStore.create(contractPayload)

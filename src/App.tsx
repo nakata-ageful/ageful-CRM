@@ -6,11 +6,12 @@ import {
   getDashboard, getCustomers, getProjects, getProjectDetail,
   getCustomerDetail, getMaintenanceResponses, getMaintenanceResponseById,
   getBillingRows, getBillingDetail, getProspects, getProspectById,
-  getProjectIdByCustomerId,
+  getProjectIdByCustomerId, getPeriodicMaintenance,
 } from './lib/data'
 import type {
   DashboardStats, Customer, ProjectRow, ProjectDetail,
   CustomerDetailData, MaintenanceResponse, BillingRow, BillingDetail, Prospect,
+  PeriodicMaintenance,
 } from './types'
 
 import { Dashboard } from './views/Dashboard'
@@ -91,6 +92,7 @@ export default function App() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [projectRows, setProjectRows] = useState<ProjectRow[]>([])
   const [maintenanceList, setMaintenanceList] = useState<MaintenanceResponse[]>([])
+  const [periodicMaintenanceList, setPeriodicMaintenanceList] = useState<PeriodicMaintenance[]>([])
   const [billingRows, setBillingRows] = useState<BillingRow[]>([])
 
   // List data — prospects
@@ -129,13 +131,14 @@ export default function App() {
     if (!silent) setLoading(true)
     setError('')
     try {
-      const [s, c, p, m, b, pr] = await Promise.all([
+      const [s, c, p, m, b, pr, pm] = await Promise.all([
         getDashboard(),
         getCustomers(),
         getProjects(),
         getMaintenanceResponses(),
         getBillingRows(),
         getProspects(),
+        getPeriodicMaintenance(),
       ])
       setStats(s)
       setCustomers(c)
@@ -143,6 +146,7 @@ export default function App() {
       setMaintenanceList(m)
       setBillingRows(b)
       setProspects(pr)
+      setPeriodicMaintenanceList(pm)
     } catch (e) {
       setError('データの取得に失敗しました。')
       console.error(e)
@@ -166,11 +170,16 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading])
 
-  async function navToProjectDetail(projectId: number) {
+  async function navToProjectDetail(projectId: number, tab?: string) {
     const detail = await getProjectDetail(projectId)
     if (detail) {
       setProjectDetail(detail)
       setView('project-detail', projectId)
+      if (tab) {
+        // setView 後に ?tab=... を URL ハッシュへ反映。ProjectDetail 側が readTabFromHash で拾う
+        const base = `#project-detail/${projectId}`
+        window.history.replaceState(null, '', `${base}?tab=${encodeURIComponent(tab)}`)
+      }
     }
   }
 
@@ -325,7 +334,16 @@ export default function App() {
             {view === 'project-detail' && projectDetail && (
               <ProjectDetailView
                 detail={projectDetail}
-                onBack={() => { setView('projects'); loadAll(true) }}
+                onBack={() => {
+                  // ブラウザ履歴を1つ戻す。popstate ハンドラで view が直前の画面に復元される。
+                  // 履歴が無い場合（直接URL等）は発電所一覧へのフォールバック。
+                  if (window.history.length > 1) {
+                    window.history.back()
+                  } else {
+                    setView('projects')
+                    loadAll(true)
+                  }
+                }}
                 onReload={reloadProjectDetail}
                 onViewCustomer={navToCustomerDetail}
                 onViewMaintenance={navToMaintenanceDetail}
@@ -349,8 +367,10 @@ export default function App() {
             {view === 'maintenance-responses' && (
               <MaintenanceResponses
                 responses={maintenanceList}
+                periodic={periodicMaintenanceList}
                 onReload={loadAll}
                 onViewDetail={navToMaintenanceDetail}
+                onViewProject={(id) => navToProjectDetail(id, '保守対応')}
               />
             )}
             {view === 'maintenance-response-detail' && maintenanceDetail && (

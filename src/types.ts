@@ -176,6 +176,10 @@ export type PeriodicMaintenance = {
   work_type: string | null // 点検 / 除草 / 巡回 / その他
   content: string | null
   created_at: string
+  // 一覧表示用（JOIN で取得）
+  project_name?: string
+  plant_name?: string | null
+  customer_name?: string
 }
 
 export type Attachment = {

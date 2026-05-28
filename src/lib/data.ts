@@ -7,7 +7,7 @@ import {
 import type {
   Customer, DashboardStats, ProjectRow, ProjectDetail,
   CustomerDetailData, MaintenanceResponse, BillingRow, BillingDetail,
-  Prospect,
+  Prospect, PeriodicMaintenance,
 } from '../types'
 
 function db() {
@@ -284,6 +284,41 @@ export async function getMaintenanceResponseById(id: number): Promise<Maintenanc
     plant_name: (proj?.plant_name as string) ?? null,
     customer_name: (cust?.company_name as string) ?? (cust?.name as string) ?? '不明',
   }
+}
+
+// ── Periodic Maintenance ──────────────────────────────────
+
+export async function getPeriodicMaintenance(): Promise<PeriodicMaintenance[]> {
+  if (!hasSupabaseEnv) {
+    return periodicMaintenanceStore.getAll().map(m => {
+      const proj = projectStore.getById(m.project_id)
+      const cust = proj ? customerStore.getById(proj.customer_id) : null
+      return {
+        ...m,
+        project_name: proj?.project_name ?? '不明',
+        plant_name: proj?.plant_name ?? null,
+        customer_name: cust?.company_name ?? cust?.name ?? '不明',
+      }
+    })
+  }
+  const client = db()
+  const { data, error } = await client
+    .from('periodic_maintenance')
+    .select('*, projects(project_name, plant_name, customers(name, company_name))')
+    .order('record_date', { ascending: false, nullsFirst: false })
+    // TODO: 大規模データセットに対しては適切なページネーションを実装すべき
+    .limit(1000)
+  if (error) throw error
+  return (data ?? []).map((row: Record<string, unknown>) => {
+    const proj = row.projects as Record<string, unknown> | null
+    const cust = proj?.customers as Record<string, unknown> | null
+    return {
+      ...(row as PeriodicMaintenance),
+      project_name: (proj?.project_name as string) ?? '不明',
+      plant_name: (proj?.plant_name as string) ?? null,
+      customer_name: (cust?.company_name as string) ?? (cust?.name as string) ?? '不明',
+    }
+  })
 }
 
 // ── Billing ───────────────────────────────────────────────

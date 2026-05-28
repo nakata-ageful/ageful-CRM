@@ -560,7 +560,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
 
   return (
     <>
-      <button className="back-btn" onClick={onBack}>← 案件一覧に戻る</button>
+      <button className="back-btn" onClick={onBack}>← 戻る</button>
 
       <div style={{ marginBottom: 16 }}>
         <span style={{ fontSize: 13, color: '#64748b' }}>顧客：</span>
@@ -1790,9 +1790,6 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                     <option value="">未設定</option>
                     <option value="なし">なし</option>
                     <option value="年1回">年1回</option>
-                    <option value="年2回">年2回</option>
-                    <option value="年3回">年3回</option>
-                    <option value="無制限">無制限</option>
                   </select>
                 </label>
                 <label className="form-label">
@@ -1801,8 +1798,6 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                     <option value="">未設定</option>
                     <option value="なし">なし</option>
                     <option value="年1回">年1回</option>
-                    <option value="年2回">年2回</option>
-                    <option value="年3回">年3回</option>
                     <option value="無制限">無制限</option>
                   </select>
                 </label>

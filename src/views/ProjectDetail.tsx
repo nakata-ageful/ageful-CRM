@@ -556,8 +556,13 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           maintenance_contractor: contractForm.maintenance_contractor || null,
           equipment_contract_notes: contractForm.equipment_contract_notes || null,
           land_contract_notes: contractForm.land_contract_notes || null,
+          maintenance_contract_notes: contractForm.maintenance_contract_notes || null,
           maintenance_content_notes: contractForm.maintenance_content_notes || null,
           subcontract_notes: contractForm.subcontract_notes || null,
+          has_meti_setup_report: contractForm.has_meti_setup_report,
+          has_meti_periodic_report: contractForm.has_meti_periodic_report,
+          meti_setup_report_date: contractForm.meti_setup_report_date || null,
+          meti_setup_report_status: contractForm.meti_setup_report_status || null,
         })
       }
       setEditSection(null)

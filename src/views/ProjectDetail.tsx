@@ -220,6 +220,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
     maintenance_contractor: contract?.maintenance_contractor ?? '',
     equipment_contract_notes: contract?.equipment_contract_notes ?? '',
     land_contract_notes: contract?.land_contract_notes ?? '',
+    maintenance_contract_notes: contract?.maintenance_contract_notes ?? '',
     maintenance_content_notes: contract?.maintenance_content_notes ?? '',
     subcontract_notes: contract?.subcontract_notes ?? '',
   })
@@ -383,6 +384,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
         maintenance_contractor: contractForm.maintenance_contractor || null,
         equipment_contract_notes: contractForm.equipment_contract_notes || null,
         land_contract_notes: contractForm.land_contract_notes || null,
+        maintenance_contract_notes: contractForm.maintenance_contract_notes || null,
         maintenance_content_notes: contractForm.maintenance_content_notes || null,
         subcontract_notes: contractForm.subcontract_notes || null,
       }
@@ -481,6 +483,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
         maintenance_contractor: contract.maintenance_contractor ?? '',
         equipment_contract_notes: contract.equipment_contract_notes ?? '',
         land_contract_notes: contract.land_contract_notes ?? '',
+        maintenance_contract_notes: contract.maintenance_contract_notes ?? '',
         maintenance_content_notes: contract.maintenance_content_notes ?? '',
         subcontract_notes: contract.subcontract_notes ?? '',
       })
@@ -738,6 +741,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               <div className="info-field"><span>年次保守料（税込）</span><b>{fmtYen(contract?.annual_maintenance_inc)}</b></div>
               <div className="info-field"><span>保守契約日</span><b>{contract?.maintenance_contract_date ?? '-'}</b></div>
               <div className="info-field"><span>保守開始日</span><b>{contract?.maintenance_start_date ?? '-'}</b></div>
+              <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap' }}>{contract?.maintenance_contract_notes || '-'}</b></div>
             </div>
           </div>
 
@@ -1740,11 +1744,35 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                 </label>
                 <label className="form-label">
                   年次保守料（税別）
-                  <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.annual_maintenance_ex)} onChange={e => setContractForm(f => ({ ...f, annual_maintenance_ex: e.target.value.replace(/,/g, '') }))} />
+                  <input
+                    className="form-input"
+                    inputMode="numeric"
+                    value={fmtFormNum(contractForm.annual_maintenance_ex)}
+                    onChange={e => setContractForm(f => ({ ...f, annual_maintenance_ex: e.target.value.replace(/,/g, '') }))}
+                    onBlur={e => {
+                      const v = e.target.value.replace(/,/g, '')
+                      if (!v) return
+                      const n = Number(v)
+                      if (!isFinite(n)) return
+                      setContractForm(f => ({ ...f, annual_maintenance_inc: String(Math.floor(n * 1.1)) }))
+                    }}
+                  />
                 </label>
                 <label className="form-label">
                   年次保守料（税込）
-                  <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.annual_maintenance_inc)} onChange={e => setContractForm(f => ({ ...f, annual_maintenance_inc: e.target.value.replace(/,/g, '') }))} />
+                  <input
+                    className="form-input"
+                    inputMode="numeric"
+                    value={fmtFormNum(contractForm.annual_maintenance_inc)}
+                    onChange={e => setContractForm(f => ({ ...f, annual_maintenance_inc: e.target.value.replace(/,/g, '') }))}
+                    onBlur={e => {
+                      const v = e.target.value.replace(/,/g, '')
+                      if (!v) return
+                      const n = Number(v)
+                      if (!isFinite(n)) return
+                      setContractForm(f => ({ ...f, annual_maintenance_ex: String(Math.floor(n / 1.1)) }))
+                    }}
+                  />
                 </label>
                 <label className="form-label">
                   保守契約日
@@ -1753,6 +1781,10 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                 <label className="form-label">
                   保守開始日
                   <input className="form-input" type="date" value={contractForm.maintenance_start_date} onChange={e => setContractForm(f => ({ ...f, maintenance_start_date: e.target.value }))} />
+                </label>
+                <label className="form-label" style={{ gridColumn: '1/-1' }}>
+                  備考
+                  <textarea className="form-input" rows={4} value={contractForm.maintenance_contract_notes} onChange={e => setContractForm(f => ({ ...f, maintenance_contract_notes: e.target.value }))} style={{ resize: 'vertical' }} />
                 </label>
               </>
             )}
@@ -1820,11 +1852,35 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                 </label>
                 <label className="form-label">
                   委託料（税別）
-                  <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.subcontract_fee_ex)} onChange={e => setContractForm(f => ({ ...f, subcontract_fee_ex: e.target.value.replace(/,/g, '') }))} />
+                  <input
+                    className="form-input"
+                    inputMode="numeric"
+                    value={fmtFormNum(contractForm.subcontract_fee_ex)}
+                    onChange={e => setContractForm(f => ({ ...f, subcontract_fee_ex: e.target.value.replace(/,/g, '') }))}
+                    onBlur={e => {
+                      const v = e.target.value.replace(/,/g, '')
+                      if (!v) return
+                      const n = Number(v)
+                      if (!isFinite(n)) return
+                      setContractForm(f => ({ ...f, subcontract_fee_inc: String(Math.floor(n * 1.1)) }))
+                    }}
+                  />
                 </label>
                 <label className="form-label">
                   委託料（税込）
-                  <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.subcontract_fee_inc)} onChange={e => setContractForm(f => ({ ...f, subcontract_fee_inc: e.target.value.replace(/,/g, '') }))} />
+                  <input
+                    className="form-input"
+                    inputMode="numeric"
+                    value={fmtFormNum(contractForm.subcontract_fee_inc)}
+                    onChange={e => setContractForm(f => ({ ...f, subcontract_fee_inc: e.target.value.replace(/,/g, '') }))}
+                    onBlur={e => {
+                      const v = e.target.value.replace(/,/g, '')
+                      if (!v) return
+                      const n = Number(v)
+                      if (!isFinite(n)) return
+                      setContractForm(f => ({ ...f, subcontract_fee_ex: String(Math.floor(n / 1.1)) }))
+                    }}
+                  />
                 </label>
                 <label className="form-label">
                   委託開始日

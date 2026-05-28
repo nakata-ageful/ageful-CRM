@@ -117,6 +117,7 @@ export type Contract = {
   // セクション別備考（請求情報の備考は既存 notes を使用）
   equipment_contract_notes: string | null  // 設備契約備考
   land_contract_notes: string | null       // 土地契約備考
+  maintenance_contract_notes: string | null // 保守契約備考
   maintenance_content_notes: string | null // 保守内容備考
   subcontract_notes: string | null         // 委託契約備考
   created_at: string

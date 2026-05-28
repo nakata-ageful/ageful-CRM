@@ -626,6 +626,7 @@ export async function bulkImportProjects(
           ownership_transfer_date: null,
           equipment_contract_notes: null,
           land_contract_notes: null,
+          maintenance_contract_notes: null,
           maintenance_content_notes: null,
           subcontract_notes: null,
         }
@@ -766,6 +767,7 @@ export async function bulkImportBilling(
         maintenance_contractor: null,
         equipment_contract_notes: null,
         land_contract_notes: null,
+        maintenance_contract_notes: null,
         maintenance_content_notes: null,
         subcontract_notes: null,
       }
@@ -1085,6 +1087,7 @@ export async function convertProspectToCustomer(prospect: Prospect): Promise<num
     maintenance_contractor: null,
     equipment_contract_notes: null,
     land_contract_notes: null,
+    maintenance_contract_notes: null,
     maintenance_content_notes: null,
     subcontract_notes: null,
   }

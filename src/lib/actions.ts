@@ -593,7 +593,7 @@ export async function bulkImportProjects(
       if (row.billing_method || row.billing_amount_inc || row.annual_maintenance_inc || row.maintenance_start_date
           || row.land_cost_monthly || row.insurance_fee || row.other_fee
           || row.sale_contract_date || row.equipment_contract_date || row.land_contract_date || row.maintenance_contract_date
-          || row.sales_to_neosys || row.neosys_to_referrer || row.contractor_name || row.transfer_fee) {
+          || row.sales_to_neosys || row.neosys_to_referrer || row.maintenance_contractor || row.transfer_fee) {
         const contractPayload = {
           project_id: projectId,
           billing_method: row.billing_method || null,
@@ -613,7 +613,7 @@ export async function bulkImportProjects(
           maintenance_contract_date: toDate(row.maintenance_contract_date ?? ''),
           sales_to_neosys: row.sales_to_neosys || null,
           neosys_to_referrer: row.neosys_to_referrer || null,
-          contractor_name: row.contractor_name || null,
+          maintenance_contractor: row.maintenance_contractor || null,
           subcontractor: row.subcontractor || null,
           subcontract_fee_ex: toInt(row.subcontract_fee_ex ?? ''),
           subcontract_fee_inc: toInt(row.subcontract_fee_inc ?? ''),
@@ -624,7 +624,6 @@ export async function bulkImportProjects(
           plan_inspection: null, plan_weeding: null, plan_emergency: null,
           notes: row.contract_notes || null,
           ownership_transfer_date: null,
-          maintenance_contractor: null,
           equipment_contract_notes: null,
           land_contract_notes: null,
           maintenance_content_notes: null,
@@ -754,7 +753,6 @@ export async function bulkImportBilling(
         maintenance_contract_date: null,
         sales_to_neosys: null,
         neosys_to_referrer: null,
-        contractor_name: null,
         subcontractor: row.subcontractor || null,
         subcontract_fee_ex: toInt(row.subcontract_fee_ex),
         subcontract_fee_inc: toInt(row.subcontract_fee_inc),
@@ -1076,7 +1074,7 @@ export async function convertProspectToCustomer(prospect: Prospect): Promise<num
     equipment_contract_date: null,
     land_contract_date: prospect.land_contract_date ?? null,
     maintenance_contract_date: null,
-    sales_to_neosys: null, neosys_to_referrer: null, contractor_name: null,
+    sales_to_neosys: null, neosys_to_referrer: null,
     subcontractor: null, subcontract_fee_ex: null, subcontract_fee_inc: null,
     subcontract_billing_day: null, subcontract_start_date: null,
     maintenance_start_date: null,

@@ -178,7 +178,7 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject }: P
   // 保守情報編集
   const [editingContract, setEditingContract] = useState(false)
   const [contractEdit, setContractEdit] = useState({
-    contractor_name: contract.contractor_name ?? '',
+    maintenance_contractor: contract.maintenance_contractor ?? '',
     billing_method: contract.billing_method ?? '',
     billing_due_day: contract.billing_due_day ?? '',
     billing_amount_ex: contract.billing_amount_ex?.toString() ?? '',
@@ -202,7 +202,7 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject }: P
     setSaving(true)
     const toInt = (v: string) => v ? parseInt(v.replace(/,/g, '')) || null : null
     await updateContract(contract.id, {
-      contractor_name: contractEdit.contractor_name || null,
+      maintenance_contractor: contractEdit.maintenance_contractor || null,
       billing_method: contractEdit.billing_method || null,
       billing_due_day: contractEdit.billing_due_day || null,
       billing_amount_ex: toInt(contractEdit.billing_amount_ex),
@@ -534,7 +534,7 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject }: P
                 {/* ── 請求情報 ── */}
                 <SectionLabel>請求</SectionLabel>
                 {([
-                  { label: '保守契約者', value: contract.contractor_name ?? contract.subcontractor },
+                  { label: '保守契約者', value: contract.maintenance_contractor ?? contract.subcontractor },
                   { label: '請求方法', value: contract.billing_method },
                   { label: '請求基準日', value: contract.billing_due_day },
                   { label: '請求金額（税込）', value: contract.billing_amount_inc != null ? fmtYen(contract.billing_amount_inc) : null },
@@ -590,7 +590,7 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject }: P
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <p style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', margin: '0 0 2px' }}>請求</p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  <ContractField key="contractor_name" label="保守契約者" type="text" value={contractEdit.contractor_name} onChange={v => setContractEdit(prev => ({ ...prev, contractor_name: v }))} />
+                  <ContractField key="maintenance_contractor" label="保守契約者" type="text" value={contractEdit.maintenance_contractor} onChange={v => setContractEdit(prev => ({ ...prev, maintenance_contractor: v }))} />
                   <label style={{ fontSize: 11, color: '#64748b', display: 'flex', flexDirection: 'column', gap: 3 }}>
                     請求方法
                     <select

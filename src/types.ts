@@ -98,7 +98,7 @@ export type Contract = {
   // 販売経路
   sales_to_neosys: string | null    // 販売店→ネオシス
   neosys_to_referrer: string | null // ネオシス→紹介者
-  contractor_name: string | null    // 契約者名
+  contractor_name?: string | null   // 契約者名（廃止予定。データは maintenance_contractor に移行済み）
   // 請求回数
   billing_count: number | null   // 年間請求回数（1=年1回, 2=年2回...）
   // 保守委託
@@ -425,7 +425,7 @@ export type CsvImportRow = {
   maintenance_contract_date?: string // 保守契約日（col48）
   sales_to_neosys?: string     // 販売店→ネオシス（col50）
   neosys_to_referrer?: string  // ネオシス→紹介者（col51）
-  contractor_name?: string     // 契約者名（col52）
+  maintenance_contractor?: string  // 受託会社（col52）
   maintenance_start_date?: string
   subcontractor?: string
   subcontract_fee_ex?: string

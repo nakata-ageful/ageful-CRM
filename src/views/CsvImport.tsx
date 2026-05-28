@@ -337,7 +337,7 @@ function parseZentaiCsv(text: string): { rows: CsvImportRow[]; errors: string[] 
       // 販売経路
       sales_to_neosys: cols[50]?.trim() ?? '',
       neosys_to_referrer: cols[51]?.trim() ?? '',
-      contractor_name: cols[52]?.trim() ?? '',
+      maintenance_contractor: cols[52]?.trim() ?? '',
       // 請求フィールド
       billing_method: cols[53]?.trim() ?? '',
       billing_due_day: cols[54]?.trim() ?? '',

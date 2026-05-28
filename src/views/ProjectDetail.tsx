@@ -205,7 +205,6 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
     maintenance_contract_date: contract?.maintenance_contract_date ?? '',
     sales_to_neosys: contract?.sales_to_neosys ?? '',
     neosys_to_referrer: contract?.neosys_to_referrer ?? '',
-    contractor_name: contract?.contractor_name ?? '',
     subcontractor: contract?.subcontractor ?? '',
     subcontract_fee_ex: contract?.subcontract_fee_ex != null ? String(contract.subcontract_fee_ex) : '',
     subcontract_fee_inc: contract?.subcontract_fee_inc != null ? String(contract.subcontract_fee_inc) : '',
@@ -370,7 +369,6 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
         maintenance_contract_date: contractForm.maintenance_contract_date || null,
         sales_to_neosys: contractForm.sales_to_neosys || null,
         neosys_to_referrer: contractForm.neosys_to_referrer || null,
-        contractor_name: contractForm.contractor_name || null,
         subcontractor: contractForm.subcontractor || null,
         subcontract_fee_ex: toNum(contractForm.subcontract_fee_ex),
         subcontract_fee_inc: toNum(contractForm.subcontract_fee_inc),
@@ -469,7 +467,6 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
         maintenance_contract_date: contract.maintenance_contract_date ?? '',
         sales_to_neosys: contract.sales_to_neosys ?? '',
         neosys_to_referrer: contract.neosys_to_referrer ?? '',
-        contractor_name: contract.contractor_name ?? '',
         subcontractor: contract.subcontractor ?? '',
         subcontract_fee_ex: contract.subcontract_fee_ex != null ? String(contract.subcontract_fee_ex) : '',
         subcontract_fee_inc: contract.subcontract_fee_inc != null ? String(contract.subcontract_fee_inc) : '',
@@ -529,7 +526,6 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           maintenance_contract_date: contractForm.maintenance_contract_date || null,
           sales_to_neosys: contractForm.sales_to_neosys || null,
           neosys_to_referrer: contractForm.neosys_to_referrer || null,
-          contractor_name: contractForm.contractor_name || null,
           subcontractor: contractForm.subcontractor || null,
           subcontract_fee_ex: toNum(contractForm.subcontract_fee_ex),
           subcontract_fee_inc: toNum(contractForm.subcontract_fee_inc),
@@ -697,7 +693,6 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               {contract && <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('equipment-contract')}>編集</button>}
             </div>
             <div className="info-grid">
-              <div className="info-field"><span>契約者名</span><b>{contract?.contractor_name ?? '-'}</b></div>
               <div className="info-field"><span>販売会社</span><b>{project.sales_company ?? '-'}</b></div>
               <div className="info-field"><span>設備代</span><b>{fmtYen(project.sales_price)}</b></div>
               <div className="info-field"><span>設備売買契約日</span><b>{contract?.equipment_contract_date ?? contract?.sale_contract_date ?? '-'}</b></div>
@@ -1253,10 +1248,6 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               ネオシス→紹介者
               <input className="form-input" value={contractForm.neosys_to_referrer} onChange={e => setContractForm(f => ({ ...f, neosys_to_referrer: e.target.value }))} />
             </label>
-            <label className="form-label">
-              契約者名
-              <input className="form-input" value={contractForm.contractor_name} onChange={e => setContractForm(f => ({ ...f, contractor_name: e.target.value }))} />
-            </label>
             <p style={{ gridColumn: '1/-1', margin: '8px 0 4px', fontWeight: 600, fontSize: 13, color: '#475569' }}>── 保守委託情報</p>
             <label className="form-label">
               保守開始日
@@ -1671,10 +1662,6 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             {/* 設備契約 */}
             {editSection === 'equipment-contract' && (
               <>
-                <label className="form-label">
-                  契約者名
-                  <input className="form-input" value={contractForm.contractor_name} onChange={e => setContractForm(f => ({ ...f, contractor_name: e.target.value }))} />
-                </label>
                 <label className="form-label">
                   販売会社
                   <input className="form-input" value={projForm.sales_company} onChange={e => setProjForm(f => ({ ...f, sales_company: e.target.value }))} />

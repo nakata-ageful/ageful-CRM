@@ -49,7 +49,8 @@ type Props = {
   onViewMaintenance: (id: number) => void
 }
 
-const WORK_TYPES = ['点検', '除草', '巡回', 'その他']
+const WORK_TYPES = ['点検', '除草', '巡回', '経産省定期報告', 'その他']
+const METI_STATUSES = ['未', '申請中', '受理', '不備']
 
 
 const TABS: Tab[] = ['基本情報', '設備情報', '契約情報', '保守情報', '請求情報', '保守対応', '年次請求記録', 'その他']
@@ -92,7 +93,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
   const [pmModal, setPmModal] = useState(false)
   const [pmEditId, setPmEditId] = useState<number | null>(null)
   const [pmForm, setPmForm] = useState<Omit<PeriodicMaintenanceInput, 'project_id'>>({
-    record_date: '', work_type: '点検', content: '',
+    record_date: '', work_type: '点検', content: '', status: null,
   })
 
   // 年次記録フォーム
@@ -222,6 +223,10 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
     land_contract_notes: contract?.land_contract_notes ?? '',
     maintenance_contract_notes: contract?.maintenance_contract_notes ?? '',
     maintenance_content_notes: contract?.maintenance_content_notes ?? '',
+    has_meti_setup_report: contract?.has_meti_setup_report ?? false,
+    has_meti_periodic_report: contract?.has_meti_periodic_report ?? false,
+    meti_setup_report_date: contract?.meti_setup_report_date ?? '',
+    meti_setup_report_status: contract?.meti_setup_report_status ?? '',
     subcontract_notes: contract?.subcontract_notes ?? '',
   })
 
@@ -286,15 +291,15 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
     } catch (e: unknown) { setErr(e instanceof Error ? e.message : JSON.stringify(e)) } finally { setSaving(false) }
   }
 
-  function openPmEdit(m: { id: number; record_date: string; work_type: string | null; content: string | null }) {
-    setPmForm({ record_date: m.record_date, work_type: m.work_type ?? '', content: m.content ?? '' })
+  function openPmEdit(m: { id: number; record_date: string; work_type: string | null; content: string | null; status?: string | null }) {
+    setPmForm({ record_date: m.record_date, work_type: m.work_type ?? '', content: m.content ?? '', status: m.status ?? null })
     setPmEditId(m.id)
     setErr('')
     setPmModal(true)
   }
 
   function openPmCreate(workType: string) {
-    setPmForm({ record_date: '', work_type: workType, content: '' })
+    setPmForm({ record_date: '', work_type: workType, content: '', status: workType === '経産省定期報告' ? '未' : null })
     setPmEditId(null)
     setErr('')
     setPmModal(true)
@@ -387,6 +392,10 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
         maintenance_contract_notes: contractForm.maintenance_contract_notes || null,
         maintenance_content_notes: contractForm.maintenance_content_notes || null,
         subcontract_notes: contractForm.subcontract_notes || null,
+        has_meti_setup_report: contractForm.has_meti_setup_report,
+        has_meti_periodic_report: contractForm.has_meti_periodic_report,
+        meti_setup_report_date: contractForm.meti_setup_report_date || null,
+        meti_setup_report_status: contractForm.meti_setup_report_status || null,
       }
       if (contract) {
         await updateContract(contract.id, payload)
@@ -485,6 +494,10 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
         land_contract_notes: contract.land_contract_notes ?? '',
         maintenance_contract_notes: contract.maintenance_contract_notes ?? '',
         maintenance_content_notes: contract.maintenance_content_notes ?? '',
+        has_meti_setup_report: contract.has_meti_setup_report ?? false,
+        has_meti_periodic_report: contract.has_meti_periodic_report ?? false,
+        meti_setup_report_date: contract.meti_setup_report_date ?? '',
+        meti_setup_report_status: contract.meti_setup_report_status ?? '',
         subcontract_notes: contract.subcontract_notes ?? '',
       })
     }
@@ -759,6 +772,14 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               <div className="info-field"><span>自治会</span><b>{project.local_association ?? '-'}</b></div>
               <div className="info-field"><span>保険料</span><b>{fmtYen(contract?.insurance_fee)}</b></div>
               <div className="info-field"><span>その他費用</span><b>{fmtYen(contract?.other_fee)}</b></div>
+              <div className="info-field"><span>経産省 設置報告</span><b>{contract?.has_meti_setup_report ? 'あり' : 'なし'}</b></div>
+              <div className="info-field"><span>経産省 定期報告</span><b>{contract?.has_meti_periodic_report ? 'あり' : 'なし'}</b></div>
+              {contract?.has_meti_setup_report && (
+                <>
+                  <div className="info-field"><span>設置報告 申請日</span><b>{contract?.meti_setup_report_date ?? '-'}</b></div>
+                  <div className="info-field"><span>設置報告 ステータス</span><b>{contract?.meti_setup_report_status ?? '-'}</b></div>
+                </>
+              )}
               <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap' }}>{contract?.maintenance_content_notes || '-'}</b></div>
             </div>
           </div>
@@ -820,26 +841,31 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           {/* 定期保守セクション（旧「定期保守」タブの内容を統合） */}
           {(() => {
         const currentYear = new Date().getFullYear()
-        const categories: { key: string; label: string; planField: 'plan_inspection' | 'plan_weeding' | 'plan_emergency' }[] = [
+        type CatDef = { key: string; label: string; planField?: 'plan_inspection' | 'plan_weeding' | 'plan_emergency'; isMeti?: boolean }
+        const categories: CatDef[] = [
           { key: '点検', label: '点検', planField: 'plan_inspection' },
           { key: '除草', label: '除草', planField: 'plan_weeding' },
           { key: '巡回', label: '巡回（駆けつけ）', planField: 'plan_emergency' },
+          { key: '経産省定期報告', label: '経産省 定期報告', isMeti: true },
         ]
-        const otherRecords = periodicMaintenance.filter(m => !['点検', '除草', '巡回'].includes(m.work_type ?? ''))
+        const KNOWN_KEYS = ['点検', '除草', '巡回', '経産省定期報告']
+        const otherRecords = periodicMaintenance.filter(m => !KNOWN_KEYS.includes(m.work_type ?? ''))
+        const isCatVisible = (cat: CatDef) => {
+          const records = periodicMaintenance.filter(m => m.work_type === cat.key)
+          if (cat.isMeti) return records.length > 0 || !!contract?.has_meti_periodic_report
+          const plan = cat.planField ? contract?.[cat.planField] : null
+          return records.length > 0 || (plan && plan !== 'なし')
+        }
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* カテゴリ別記録（縦カラム）。進捗表示は撤去し、見出しは「ラベル + 契約回数」のみ */}
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${categories.filter(cat => {
-              const plan = contract?.[cat.planField]
-              const records = periodicMaintenance.filter(m => m.work_type === cat.key)
-              return records.length > 0 || (plan && plan !== 'なし')
-            }).length + (otherRecords.length > 0 ? 1 : 0)}, 1fr)`, gap: 12, alignItems: 'start' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${categories.filter(isCatVisible).length + (otherRecords.length > 0 ? 1 : 0)}, 1fr)`, gap: 12, alignItems: 'start' }}>
               {categories.map(cat => {
                 const records = periodicMaintenance
                   .filter(m => m.work_type === cat.key)
                   .sort((a, b) => b.record_date.localeCompare(a.record_date))
-                const plan = contract?.[cat.planField]
-                if (records.length === 0 && (!plan || plan === 'なし')) return null
+                if (!isCatVisible(cat)) return null
+                const plan = cat.planField ? contract?.[cat.planField] : null
                 return (
                   <div className="card" key={cat.key} style={{ margin: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -847,6 +873,9 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                         <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>{cat.label}</div>
                         {plan && plan !== 'なし' && (
                           <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>契約: {plan}</div>
+                        )}
+                        {cat.isMeti && (
+                          <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>毎年申請</div>
                         )}
                       </div>
                       <button className="btn btn-main btn-sm" onClick={() => openPmCreate(cat.key)}>
@@ -870,6 +899,11 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                                 {m.record_date.startsWith(String(currentYear)) && (
                                   <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: '#0ea5e9', background: '#f0f9ff', borderRadius: 4, padding: '1px 5px' }}>
                                     #{records.filter(r => r.record_date.startsWith(String(currentYear)) && r.record_date <= m.record_date).length}
+                                  </span>
+                                )}
+                                {cat.isMeti && m.status && (
+                                  <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: m.status === '受理' ? '#16a34a' : m.status === '不備' ? '#dc2626' : '#0ea5e9', background: m.status === '受理' ? '#dcfce7' : m.status === '不備' ? '#fee2e2' : '#f0f9ff', borderRadius: 4, padding: '1px 5px' }}>
+                                    {m.status}
                                   </span>
                                 )}
                               </span>
@@ -1067,10 +1101,18 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             </label>
             <label className="form-label">
               作業種別
-              <select className="form-select" value={pmForm.work_type} onChange={e => setPmForm(f => ({ ...f, work_type: e.target.value }))}>
+              <select className="form-select" value={pmForm.work_type} onChange={e => setPmForm(f => ({ ...f, work_type: e.target.value, status: e.target.value === '経産省定期報告' ? (f.status ?? '未') : null }))}>
                 {WORK_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </label>
+            {pmForm.work_type === '経産省定期報告' && (
+              <label className="form-label">
+                ステータス
+                <select className="form-select" value={pmForm.status ?? ''} onChange={e => setPmForm(f => ({ ...f, status: e.target.value || null }))}>
+                  {METI_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </label>
+            )}
             <label className="form-label" style={{ gridColumn: '1/-1' }}>
               内容
               <textarea className="form-input" rows={4} value={pmForm.content} onChange={e => setPmForm(f => ({ ...f, content: e.target.value }))} style={{ resize: 'vertical' }} />
@@ -1836,6 +1878,39 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                   その他費用（円）
                   <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.other_fee)} onChange={e => setContractForm(f => ({ ...f, other_fee: e.target.value.replace(/,/g, '') }))} />
                 </label>
+                <p style={{ gridColumn: '1/-1', margin: '8px 0 4px', fontWeight: 600, fontSize: 13, color: '#475569' }}>── 経産省報告</p>
+                <label className="form-label">
+                  経産省 設置報告
+                  <select className="form-select" value={contractForm.has_meti_setup_report ? 'あり' : 'なし'} onChange={e => setContractForm(f => ({ ...f, has_meti_setup_report: e.target.value === 'あり' }))}>
+                    <option value="なし">なし</option>
+                    <option value="あり">あり</option>
+                  </select>
+                </label>
+                <label className="form-label">
+                  経産省 定期報告
+                  <select className="form-select" value={contractForm.has_meti_periodic_report ? 'あり' : 'なし'} onChange={e => setContractForm(f => ({ ...f, has_meti_periodic_report: e.target.value === 'あり' }))}>
+                    <option value="なし">なし</option>
+                    <option value="あり">あり</option>
+                  </select>
+                </label>
+                {contractForm.has_meti_setup_report && (
+                  <>
+                    <label className="form-label">
+                      設置報告 申請日
+                      <input className="form-input" type="date" value={contractForm.meti_setup_report_date} onChange={e => setContractForm(f => ({ ...f, meti_setup_report_date: e.target.value }))} />
+                    </label>
+                    <label className="form-label">
+                      設置報告 ステータス
+                      <select className="form-select" value={contractForm.meti_setup_report_status} onChange={e => setContractForm(f => ({ ...f, meti_setup_report_status: e.target.value }))}>
+                        <option value="">未設定</option>
+                        <option value="未">未</option>
+                        <option value="申請中">申請中</option>
+                        <option value="受理">受理</option>
+                        <option value="不備">不備</option>
+                      </select>
+                    </label>
+                  </>
+                )}
                 <label className="form-label" style={{ gridColumn: '1/-1' }}>
                   備考
                   <textarea className="form-input" rows={4} value={contractForm.maintenance_content_notes} onChange={e => setContractForm(f => ({ ...f, maintenance_content_notes: e.target.value }))} style={{ resize: 'vertical' }} />

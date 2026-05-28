@@ -120,6 +120,11 @@ export type Contract = {
   maintenance_contract_notes: string | null // 保守契約備考
   maintenance_content_notes: string | null // 保守内容備考
   subcontract_notes: string | null         // 委託契約備考
+  // 経産省報告
+  has_meti_setup_report?: boolean | null    // 設置報告の有無
+  has_meti_periodic_report?: boolean | null // 定期報告の有無
+  meti_setup_report_date?: string | null    // 設置報告 申請日
+  meti_setup_report_status?: string | null  // 設置報告 ステータス（未/申請中/受理/不備）
   created_at: string
 }
 
@@ -174,8 +179,9 @@ export type PeriodicMaintenance = {
   id: number
   project_id: number
   record_date: string
-  work_type: string | null // 点検 / 除草 / 巡回 / その他
+  work_type: string | null // 点検 / 除草 / 駆付 / 経産省定期報告 / その他
   content: string | null
+  status?: string | null // 経産省定期報告で使用（未/申請中/受理/不備）。他カテゴリは null
   created_at: string
   // 一覧表示用（JOIN で取得）
   project_name?: string
@@ -287,6 +293,7 @@ export type PeriodicMaintenanceInput = {
   record_date: string
   work_type: string
   content: string
+  status?: string | null
 }
 
 export type AnnualRecordInput = {

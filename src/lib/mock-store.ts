@@ -153,7 +153,7 @@ const initContracts: Contract[] = [
     plan_inspection: '年1回', plan_weeding: '年1回', plan_emergency: '無制限',
     billing_count: 1,
     notes: '清水電気448,800・新電660,000円',
-    equipment_contract_notes: null, land_contract_notes: null, maintenance_contract_notes: null, maintenance_content_notes: null, subcontract_notes: null,
+    equipment_contract_notes: null, land_contract_notes: null, maintenance_contract_notes: null, maintenance_content_notes: null, subcontract_notes: null, has_meti_setup_report: false, has_meti_periodic_report: false, meti_setup_report_date: null, meti_setup_report_status: null,
     created_at: '2020-01-01',
   },
   {
@@ -169,7 +169,7 @@ const initContracts: Contract[] = [
     plan_inspection: '年1回', plan_weeding: '年1回', plan_emergency: '年1回',
     billing_count: 1,
     notes: null,
-    equipment_contract_notes: null, land_contract_notes: null, maintenance_contract_notes: null, maintenance_content_notes: null, subcontract_notes: null,
+    equipment_contract_notes: null, land_contract_notes: null, maintenance_contract_notes: null, maintenance_content_notes: null, subcontract_notes: null, has_meti_setup_report: false, has_meti_periodic_report: false, meti_setup_report_date: null, meti_setup_report_status: null,
     created_at: '2022-06-25',
   },
   {
@@ -185,7 +185,7 @@ const initContracts: Contract[] = [
     plan_inspection: '年1回', plan_weeding: '年1回', plan_emergency: 'なし',
     billing_count: 1,
     notes: null,
-    equipment_contract_notes: null, land_contract_notes: null, maintenance_contract_notes: null, maintenance_content_notes: null, subcontract_notes: null,
+    equipment_contract_notes: null, land_contract_notes: null, maintenance_contract_notes: null, maintenance_content_notes: null, subcontract_notes: null, has_meti_setup_report: false, has_meti_periodic_report: false, meti_setup_report_date: null, meti_setup_report_status: null,
     created_at: '2021-10-27',
   },
   {
@@ -201,7 +201,7 @@ const initContracts: Contract[] = [
     plan_inspection: '年1回', plan_weeding: '年1回', plan_emergency: '年1回',
     billing_count: 1,
     notes: null,
-    equipment_contract_notes: null, land_contract_notes: null, maintenance_contract_notes: null, maintenance_content_notes: null, subcontract_notes: null,
+    equipment_contract_notes: null, land_contract_notes: null, maintenance_contract_notes: null, maintenance_content_notes: null, subcontract_notes: null, has_meti_setup_report: false, has_meti_periodic_report: false, meti_setup_report_date: null, meti_setup_report_status: null,
     created_at: '2021-07-22',
   },
   {
@@ -217,7 +217,7 @@ const initContracts: Contract[] = [
     plan_inspection: '年1回', plan_weeding: '年1回', plan_emergency: '年1回',
     billing_count: 1,
     notes: null,
-    equipment_contract_notes: null, land_contract_notes: null, maintenance_contract_notes: null, maintenance_content_notes: null, subcontract_notes: null,
+    equipment_contract_notes: null, land_contract_notes: null, maintenance_contract_notes: null, maintenance_content_notes: null, subcontract_notes: null, has_meti_setup_report: false, has_meti_periodic_report: false, meti_setup_report_date: null, meti_setup_report_status: null,
     created_at: '2022-06-25',
   },
   {
@@ -233,7 +233,7 @@ const initContracts: Contract[] = [
     plan_inspection: '年1回', plan_weeding: '年1回', plan_emergency: '年1回',
     billing_count: 1,
     notes: null,
-    equipment_contract_notes: null, land_contract_notes: null, maintenance_contract_notes: null, maintenance_content_notes: null, subcontract_notes: null,
+    equipment_contract_notes: null, land_contract_notes: null, maintenance_contract_notes: null, maintenance_content_notes: null, subcontract_notes: null, has_meti_setup_report: false, has_meti_periodic_report: false, meti_setup_report_date: null, meti_setup_report_status: null,
     created_at: '2022-06-25',
   },
   {
@@ -249,7 +249,7 @@ const initContracts: Contract[] = [
     plan_inspection: '年1回', plan_weeding: '無制限', plan_emergency: '年1回',
     billing_count: 1,
     notes: null,
-    equipment_contract_notes: null, land_contract_notes: null, maintenance_contract_notes: null, maintenance_content_notes: null, subcontract_notes: null,
+    equipment_contract_notes: null, land_contract_notes: null, maintenance_contract_notes: null, maintenance_content_notes: null, subcontract_notes: null, has_meti_setup_report: false, has_meti_periodic_report: false, meti_setup_report_date: null, meti_setup_report_status: null,
     created_at: '2022-01-14',
   },
   {
@@ -265,7 +265,7 @@ const initContracts: Contract[] = [
     plan_inspection: 'なし', plan_weeding: '年1回', plan_emergency: 'なし',
     billing_count: 1,
     notes: '年間110,000円',
-    equipment_contract_notes: null, land_contract_notes: null, maintenance_contract_notes: null, maintenance_content_notes: null, subcontract_notes: null,
+    equipment_contract_notes: null, land_contract_notes: null, maintenance_contract_notes: null, maintenance_content_notes: null, subcontract_notes: null, has_meti_setup_report: false, has_meti_periodic_report: false, meti_setup_report_date: null, meti_setup_report_status: null,
     created_at: '2021-02-26',
   },
 ]

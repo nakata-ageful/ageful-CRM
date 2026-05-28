@@ -321,6 +321,7 @@ export async function createPeriodicMaintenance(input: PeriodicMaintenanceInput)
     record_date: input.record_date,
     work_type: input.work_type || null,
     content: input.content || null,
+    status: input.status ?? null,
   }
   if (!hasSupabaseEnv) return periodicMaintenanceStore.create(payload)
   const { data, error } = await db().from('periodic_maintenance').insert(payload).select().single()
@@ -333,6 +334,7 @@ export async function updatePeriodicMaintenance(id: number, input: PeriodicMaint
     record_date: input.record_date,
     work_type: input.work_type || null,
     content: input.content || null,
+    status: input.status ?? null,
   }
   if (!hasSupabaseEnv) {
     const updated = periodicMaintenanceStore.update(id, payload)

@@ -141,6 +141,7 @@ export type ProjectInput = {
   generation_point_id: string
   meter_reading_day: string
   monitoring_system: string
+  monitoring_model: string
   monitoring_id: string
   monitoring_user: string
   monitoring_pw: string
@@ -189,6 +190,7 @@ function projectPayload(input: Omit<ProjectInput, 'customer_id'>): Omit<Project,
     generation_point_id: input.generation_point_id || null,
     meter_reading_day: input.meter_reading_day || null,
     monitoring_system: input.monitoring_system || null,
+    monitoring_model: input.monitoring_model || null,
     monitoring_id: input.monitoring_id || null,
     monitoring_user: input.monitoring_user || null,
     monitoring_pw: input.monitoring_pw || null,
@@ -889,7 +891,7 @@ export async function createProspect(input: ProspectInput): Promise<Prospect> {
     panel_maker: '', panel_model: '', pcs_kw: '', pcs_count: '', pcs_maker: '', pcs_model: '',
     grid_id: '', grid_certified_at: '', fit_period: '', fit_term_years: '', power_supply_start_date: '',
     customer_number: '', generation_point_id: '', meter_reading_day: '',
-    monitoring_system: '', monitoring_id: '', monitoring_user: '', monitoring_pw: '',
+    monitoring_system: '', monitoring_model: '', monitoring_id: '', monitoring_user: '', monitoring_pw: '',
     has_4g: false, key_number: '', local_association: '', old_owner: '',
     sales_company: input.sales_company || '', referrer: input.referrer || '',
     customer_referrer: input.referrer || '', project_referrer: '',
@@ -1056,7 +1058,7 @@ export async function convertProspectToCustomer(prospect: Prospect): Promise<num
     panel_maker: '', panel_model: '', pcs_kw: '', pcs_count: '', pcs_maker: '', pcs_model: '',
     grid_id: '', grid_certified_at: '', fit_period: '', fit_term_years: '', power_supply_start_date: '',
     customer_number: '', generation_point_id: '', meter_reading_day: '',
-    monitoring_system: '', monitoring_id: '', monitoring_user: '', monitoring_pw: '',
+    monitoring_system: '', monitoring_model: '', monitoring_id: '', monitoring_user: '', monitoring_pw: '',
     has_4g: false, key_number: '', local_association: '', old_owner: '',
     sales_company: prospect.sales_company || '', referrer: prospect.referrer || '',
     customer_referrer: prospect.referrer || '', project_referrer: '',

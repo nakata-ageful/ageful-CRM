@@ -51,6 +51,7 @@ export type Project = {
   meter_reading_day: string | null
   // 監視情報
   monitoring_system: string | null
+  monitoring_model?: string | null
   monitoring_id: string | null
   monitoring_user: string | null
   monitoring_pw: string | null

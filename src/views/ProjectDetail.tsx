@@ -166,6 +166,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
     generation_point_id: project.generation_point_id ?? '',
     meter_reading_day: project.meter_reading_day ?? '',
     monitoring_system: project.monitoring_system ?? '',
+    monitoring_model: project.monitoring_model ?? '',
     monitoring_id: project.monitoring_id ?? '',
     monitoring_user: project.monitoring_user ?? '',
     monitoring_pw: project.monitoring_pw ?? '',
@@ -439,6 +440,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       generation_point_id: project.generation_point_id ?? '',
       meter_reading_day: project.meter_reading_day ?? '',
       monitoring_system: project.monitoring_system ?? '',
+      monitoring_model: project.monitoring_model ?? '',
       monitoring_id: project.monitoring_id ?? '',
       monitoring_user: project.monitoring_user ?? '',
       monitoring_pw: project.monitoring_pw ?? '',
@@ -696,6 +698,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             </div>
             <div className="info-grid">
               <div className="info-field"><span>メーカー</span><b>{project.monitoring_system ?? '-'}</b></div>
+              <div className="info-field"><span>型式</span><b>{project.monitoring_model ?? '-'}</b></div>
               <div className="info-field"><span>ID</span><b>{project.monitoring_id ?? '-'}</b></div>
               <div className="info-field"><span>パスワード</span><b>{project.monitoring_pw ?? '-'}</b></div>
               <div className="info-field"><span>4G対応</span><b>{project.has_4g == null ? '-' : project.has_4g ? 'あり' : 'なし'}</b></div>
@@ -1690,6 +1693,10 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                 <label className="form-label">
                   メーカー
                   <input className="form-input" value={projForm.monitoring_system} onChange={e => setProjForm(f => ({ ...f, monitoring_system: e.target.value }))} />
+                </label>
+                <label className="form-label">
+                  型式
+                  <input className="form-input" value={projForm.monitoring_model} onChange={e => setProjForm(f => ({ ...f, monitoring_model: e.target.value }))} />
                 </label>
                 <label className="form-label">
                   ID

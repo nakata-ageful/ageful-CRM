@@ -53,6 +53,7 @@ const emptyProjectForm: Omit<ProjectInput, 'customer_id'> = {
   generation_point_id: '',
   meter_reading_day: '',
   monitoring_system: '',
+  monitoring_model: '',
   monitoring_id: '',
   monitoring_user: '',
   monitoring_pw: '',

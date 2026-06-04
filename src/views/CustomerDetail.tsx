@@ -26,7 +26,7 @@ const emptyProject: Omit<ProjectInput, 'customer_id'> = {
   site_address: '', latitude: '', longitude: '', google_coordinates: '',
   panel_kw: '', panel_count: '', panel_maker: '', panel_model: '',
   pcs_kw: '', pcs_count: '', pcs_maker: '', pcs_model: '',
-  grid_id: '', grid_certified_at: '', fit_period: '', fit_term_years: '', power_supply_start_date: '',
+  grid_id: '', grid_certified_at: '', fit_period: '', fit_term_years: '', fit_end_date: '', power_supply_start_date: '',
   customer_number: '', generation_point_id: '', meter_reading_day: '',
   monitoring_system: '', monitoring_model: '', monitoring_id: '', monitoring_user: '', monitoring_pw: '',
   has_4g: false, key_number: '', local_association: '', old_owner: '',

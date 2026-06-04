@@ -48,6 +48,7 @@ const emptyProjectForm: Omit<ProjectInput, 'customer_id'> = {
   grid_certified_at: '',
   fit_period: '',
   fit_term_years: '',
+  fit_end_date: '',
   power_supply_start_date: '',
   customer_number: '',
   generation_point_id: '',

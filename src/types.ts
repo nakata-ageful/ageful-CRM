@@ -44,7 +44,8 @@ export type Project = {
   grid_id: string | null
   grid_certified_at: string | null
   fit_period: number | null
-  fit_term_years: number | null         // FIT期間（年）
+  fit_term_years: number | null         // FIT期間（年）旧データ、UIから廃止
+  fit_end_date?: string | null          // FIT満了年月（YYYY-MM-01 形式で保存、表示は YYYY年MM月）
   power_supply_start_date: string | null
   customer_number: string | null
   generation_point_id: string | null

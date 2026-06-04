@@ -161,6 +161,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
     grid_certified_at: project.grid_certified_at ?? '',
     fit_period: project.fit_period != null ? String(project.fit_period) : '',
     fit_term_years: project.fit_term_years != null ? String(project.fit_term_years) : '',
+    fit_end_date: project.fit_end_date ?? '',
     power_supply_start_date: project.power_supply_start_date ?? '',
     customer_number: project.customer_number ?? '',
     generation_point_id: project.generation_point_id ?? '',
@@ -435,6 +436,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       grid_certified_at: project.grid_certified_at ?? '',
       fit_period: project.fit_period != null ? String(project.fit_period) : '',
       fit_term_years: project.fit_term_years != null ? String(project.fit_term_years) : '',
+      fit_end_date: project.fit_end_date ?? '',
       power_supply_start_date: project.power_supply_start_date ?? '',
       customer_number: project.customer_number ?? '',
       generation_point_id: project.generation_point_id ?? '',
@@ -649,7 +651,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               <div className="info-field"><span>お客様番号</span><b>{project.customer_number ?? '-'}</b></div>
               <div className="info-field"><span>受給開始日</span><b>{project.power_supply_start_date ?? '-'}</b></div>
               <div className="info-field"><span>FIT</span><b>{project.fit_period != null ? `${project.fit_period}円` : '-'}</b></div>
-              <div className="info-field"><span>FIT期間</span><b>{project.fit_term_years != null ? `${project.fit_term_years}年` : '-'}</b></div>
+              <div className="info-field"><span>FIT期間</span><b>{project.fit_end_date ? `${project.fit_end_date.slice(0, 4)}年${project.fit_end_date.slice(5, 7)}月` : '-'}</b></div>
               <div className="info-field"><span>電力変更日</span><b>{project.power_change_date ?? '-'}</b></div>
               <div className="info-field"><span>検針日</span><b>{project.meter_reading_day ?? '-'}</b></div>
             </div>
@@ -1612,8 +1614,24 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                   <input className="form-input" inputMode="numeric" value={fmtFormNum(projForm.fit_period)} onChange={e => setProjForm(f => ({ ...f, fit_period: e.target.value.replace(/,/g, '') }))} />
                 </label>
                 <label className="form-label">
-                  FIT期間（年）
-                  <input className="form-input" inputMode="numeric" value={fmtFormNum(projForm.fit_term_years)} onChange={e => setProjForm(f => ({ ...f, fit_term_years: e.target.value.replace(/,/g, '') }))} />
+                  FIT期間（満了）
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <input className="form-input" inputMode="numeric" placeholder="年" style={{ flex: 1 }} maxLength={4} value={projForm.fit_end_date ? projForm.fit_end_date.slice(0, 4) : ''} onChange={e => {
+                      const y = e.target.value.replace(/\D/g, '').slice(0, 4)
+                      const m = projForm.fit_end_date ? projForm.fit_end_date.slice(5, 7) : ''
+                      setProjForm(f => ({ ...f, fit_end_date: y ? `${y}-${m || '01'}-01` : '' }))
+                    }} />
+                    <span style={{ fontSize: 13 }}>年</span>
+                    <select className="form-select" style={{ flex: 1 }} value={projForm.fit_end_date ? projForm.fit_end_date.slice(5, 7) : ''} onChange={e => {
+                      const m = e.target.value
+                      const y = projForm.fit_end_date ? projForm.fit_end_date.slice(0, 4) : ''
+                      if (!y) return
+                      setProjForm(f => ({ ...f, fit_end_date: `${y}-${m || '01'}-01` }))
+                    }}>
+                      <option value="">月</option>
+                      {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map(m => <option key={m} value={m}>{m}月</option>)}
+                    </select>
+                  </div>
                 </label>
                 <label className="form-label">
                   電力変更日

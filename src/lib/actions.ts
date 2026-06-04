@@ -136,6 +136,7 @@ export type ProjectInput = {
   grid_certified_at: string
   fit_period: string
   fit_term_years: string
+  fit_end_date: string
   power_supply_start_date: string
   customer_number: string
   generation_point_id: string
@@ -185,6 +186,7 @@ function projectPayload(input: Omit<ProjectInput, 'customer_id'>): Omit<Project,
     grid_certified_at: toDate(input.grid_certified_at),
     fit_period: toInt(input.fit_period),
     fit_term_years: toInt(input.fit_term_years),
+    fit_end_date: input.fit_end_date || null,
     power_supply_start_date: toDate(input.power_supply_start_date),
     customer_number: input.customer_number || null,
     generation_point_id: input.generation_point_id || null,
@@ -889,7 +891,7 @@ export async function createProspect(input: ProspectInput): Promise<Prospect> {
     latitude: '', longitude: '', google_coordinates: '',
     panel_kw: input.panel_kw || '', panel_count: '',
     panel_maker: '', panel_model: '', pcs_kw: '', pcs_count: '', pcs_maker: '', pcs_model: '',
-    grid_id: '', grid_certified_at: '', fit_period: '', fit_term_years: '', power_supply_start_date: '',
+    grid_id: '', grid_certified_at: '', fit_period: '', fit_term_years: '', fit_end_date: '', power_supply_start_date: '',
     customer_number: '', generation_point_id: '', meter_reading_day: '',
     monitoring_system: '', monitoring_model: '', monitoring_id: '', monitoring_user: '', monitoring_pw: '',
     has_4g: false, key_number: '', local_association: '', old_owner: '',
@@ -1056,7 +1058,7 @@ export async function convertProspectToCustomer(prospect: Prospect): Promise<num
     latitude: '', longitude: '', google_coordinates: '',
     panel_kw: prospect.panel_kw?.toString() ?? '', panel_count: '',
     panel_maker: '', panel_model: '', pcs_kw: '', pcs_count: '', pcs_maker: '', pcs_model: '',
-    grid_id: '', grid_certified_at: '', fit_period: '', fit_term_years: '', power_supply_start_date: '',
+    grid_id: '', grid_certified_at: '', fit_period: '', fit_term_years: '', fit_end_date: '', power_supply_start_date: '',
     customer_number: '', generation_point_id: '', meter_reading_day: '',
     monitoring_system: '', monitoring_model: '', monitoring_id: '', monitoring_user: '', monitoring_pw: '',
     has_4g: false, key_number: '', local_association: '', old_owner: '',

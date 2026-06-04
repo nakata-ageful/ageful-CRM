@@ -1826,7 +1826,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                       if (!v) return
                       const n = Number(v)
                       if (!isFinite(n)) return
-                      setContractForm(f => ({ ...f, annual_maintenance_inc: String(Math.floor(n * 1.1)) }))
+                      setContractForm(f => ({ ...f, annual_maintenance_inc: String(Math.floor((n * 11) / 10)) }))
                     }}
                   />
                 </label>
@@ -1842,7 +1842,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                       if (!v) return
                       const n = Number(v)
                       if (!isFinite(n)) return
-                      setContractForm(f => ({ ...f, annual_maintenance_ex: String(Math.floor(n / 1.1)) }))
+                      setContractForm(f => ({ ...f, annual_maintenance_ex: String(Math.floor((n * 10) / 11)) }))
                     }}
                   />
                 </label>
@@ -1967,7 +1967,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                       if (!v) return
                       const n = Number(v)
                       if (!isFinite(n)) return
-                      setContractForm(f => ({ ...f, subcontract_fee_inc: String(Math.floor(n * 1.1)) }))
+                      setContractForm(f => ({ ...f, subcontract_fee_inc: String(Math.floor((n * 11) / 10)) }))
                     }}
                   />
                 </label>
@@ -1983,7 +1983,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                       if (!v) return
                       const n = Number(v)
                       if (!isFinite(n)) return
-                      setContractForm(f => ({ ...f, subcontract_fee_ex: String(Math.floor(n / 1.1)) }))
+                      setContractForm(f => ({ ...f, subcontract_fee_ex: String(Math.floor((n * 10) / 11)) }))
                     }}
                   />
                 </label>

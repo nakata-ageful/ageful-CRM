@@ -5,7 +5,7 @@ import { Modal } from '../components/Modal'
 import {
   createMaintenanceResponse, deleteMaintenanceResponse,
   createPeriodicMaintenance, updatePeriodicMaintenance, deletePeriodicMaintenance,
-  upsertAnnualRecord, updateAnnualRecordStatus, deleteAnnualRecord, createContract, updateContract, updateProject,
+  saveAnnualRecord, updateAnnualRecordStatus, deleteAnnualRecord, createContract, updateContract, updateProject,
 } from '../lib/actions'
 import { fmtYen } from '../lib/utils'
 
@@ -99,7 +99,8 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
   // 年次記録フォーム
   const currentYear = new Date().getFullYear()
   const [arModal, setArModal] = useState(false)
-  const [arForm, setArForm] = useState<Omit<AnnualRecordInput, 'contract_id'>>({
+  const [arForm, setArForm] = useState<Omit<AnnualRecordInput, 'contract_id'> & { id: number | null }>({
+    id: null,
     year: currentYear,
     billing_date: '',
     received_date: '',
@@ -316,15 +317,20 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
 
   // ── 年次記録 ─────────────────────────────────────────────
 
-  function openArModal(year?: number) {
-    const existing = annualRecords.find(r => r.year === (year ?? currentYear))
+  /**
+   * 年次記録モーダルを開く。
+   * - 引数なし: 新規追加（今年の年度を初期値）
+   * - 引数 record: 既存レコードを編集
+   */
+  function openArModal(record?: { id: number; year: number; billing_date: string | null; received_date: string | null; maintenance_record: string | null; escort_record: string | null; status: '' | '請求済' | '入金済' }) {
     setArForm({
-      year: year ?? currentYear,
-      billing_date: existing?.billing_date ?? '',
-      received_date: existing?.received_date ?? '',
-      maintenance_record: existing?.maintenance_record ?? '',
-      escort_record: existing?.escort_record ?? '',
-      status: existing?.status ?? '',
+      id: record?.id ?? null,
+      year: record?.year ?? currentYear,
+      billing_date: record?.billing_date ?? '',
+      received_date: record?.received_date ?? '',
+      maintenance_record: record?.maintenance_record ?? '',
+      escort_record: record?.escort_record ?? '',
+      status: record?.status ?? '',
     })
     setArModal(true)
     setErr('')
@@ -334,10 +340,10 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
     if (!contract) return
     setSaving(true); setErr('')
     try {
-      await upsertAnnualRecord({ ...arForm, contract_id: contract.id })
+      await saveAnnualRecord({ ...arForm, contract_id: contract.id })
       setArModal(false)
       onReload()
-      toast('年次記録を保存しました')
+      toast(arForm.id != null ? '年次記録を更新しました' : '年次記録を追加しました')
     } catch (e: unknown) { setErr(e instanceof Error ? e.message : JSON.stringify(e)) } finally { setSaving(false) }
   }
 
@@ -1009,7 +1015,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             <div className="card-header-row">
               <h3 className="section-title" style={{ margin: 0 }}>年次記録</h3>
               <button className="btn btn-main btn-sm" onClick={() => { openArModal(); }}>
-                ＋ 追加 / 編集
+                ＋ 追加
               </button>
             </div>
             <table>
@@ -1022,7 +1028,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                 )}
                 {annualRecords.sort((a, b) => b.year - a.year).map(r => (
                   <tr key={r.id}>
-                    <td><button className="link-btn" onClick={() => openArModal(r.year)}>{r.year}年</button></td>
+                    <td><button className="link-btn" onClick={() => openArModal(r)}>{r.year}年</button></td>
                     <td>{r.billing_date ?? '-'}</td>
                     <td>{r.received_date ?? '-'}</td>
                     <td><StatusBadge status={r.status} /></td>
@@ -1152,7 +1158,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
 
       {/* 年次記録モーダル */}
       {arModal && (
-        <Modal title={`${arForm.year}年度 年次記録`} onClose={() => setArModal(false)}>
+        <Modal title={`${arForm.year}年度 年次記録${arForm.id != null ? '（編集）' : '（追加）'}`} onClose={() => setArModal(false)}>
           {err && <div className="form-error">{err}</div>}
           <div className="form-grid">
             <label className="form-label">

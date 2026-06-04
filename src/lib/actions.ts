@@ -430,6 +430,51 @@ export async function deleteAnnualRecord(id: number): Promise<void> {
   if (error) throw error
 }
 
+/**
+ * 年次記録を保存（id がある場合は更新、ない場合は新規作成）。
+ * 同一 contract_id + year で複数レコードを許容する用途。
+ */
+export async function saveAnnualRecord(
+  input: AnnualRecordInput & { id?: number | null }
+): Promise<AnnualRecord> {
+  const status = (input.billing_date
+    ? (input.received_date ? '入金済' : '請求済')
+    : '') as AnnualRecordStatus
+  const payload = {
+    contract_id: input.contract_id,
+    year: input.year,
+    billing_date: input.billing_date || null,
+    received_date: input.received_date || null,
+    maintenance_record: input.maintenance_record || null,
+    escort_record: input.escort_record || null,
+    status,
+  }
+  if (input.id != null) {
+    if (!hasSupabaseEnv) {
+      const updated = annualRecordStore.update(input.id, payload)
+      if (!updated) throw new Error('Not found')
+      return updated
+    }
+    const { data, error } = await db().from('annual_records').update(payload).eq('id', input.id).select().single()
+    if (error) throw error
+    return data as AnnualRecord
+  }
+  // 新規作成
+  if (!hasSupabaseEnv) {
+    return annualRecordStore.create({
+      ...payload,
+      billing_scheduled_date: null,
+      payment_due_date: null,
+      line_items: null,
+      transfer_failed: null,
+      payments: null,
+    } as Omit<AnnualRecord, 'id'>)
+  }
+  const { data, error } = await db().from('annual_records').insert(payload).select().single()
+  if (error) throw error
+  return data as AnnualRecord
+}
+
 // ── Contract CRUD ─────────────────────────────────────────
 
 export async function createContract(projectId: number, input: Partial<Omit<Contract, 'id' | 'created_at' | 'project_id'>>): Promise<Contract> {

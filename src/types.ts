@@ -167,6 +167,7 @@ export type MaintenanceResponse = {
   inquiry_date: string | null    // 問合日
   occurrence_date: string | null // 発生日
   target_area: string | null     // 対象箇所
+  serial_number?: string | null  // 製造番号（対象箇所がパネル/パワコン/遠隔監視 など）
   situation: string | null       // 状況
   response_content: string | null // 対応
   report: string | null          // 報告
@@ -175,6 +176,13 @@ export type MaintenanceResponse = {
   project_name?: string
   plant_name?: string | null
   customer_name?: string
+  // joined（対象箇所に応じた設備情報、保守対応詳細で表示）
+  panel_maker?: string | null
+  panel_model?: string | null
+  pcs_maker?: string | null
+  pcs_model?: string | null
+  monitoring_system?: string | null
+  monitoring_model?: string | null
 }
 
 export type PeriodicMaintenance = {
@@ -285,6 +293,7 @@ export type MaintenanceResponseInput = {
   inquiry_date: string
   occurrence_date: string
   target_area: string
+  serial_number?: string
   situation: string
   response_content: string
   report: string

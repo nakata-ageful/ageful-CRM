@@ -19,6 +19,7 @@ export function MaintenanceResponseDetail({ response, onBack, onReload, onViewPr
     inquiry_date: response.inquiry_date ?? '',
     occurrence_date: response.occurrence_date ?? '',
     target_area: response.target_area ?? '',
+    serial_number: response.serial_number ?? '',
     situation: response.situation ?? '',
     response_content: response.response_content ?? '',
     report: response.report ?? '',
@@ -71,6 +72,7 @@ export function MaintenanceResponseDetail({ response, onBack, onReload, onViewPr
               inquiry_date: response.inquiry_date ?? '',
               occurrence_date: response.occurrence_date ?? '',
               target_area: response.target_area ?? '',
+              serial_number: response.serial_number ?? '',
               situation: response.situation ?? '',
               response_content: response.response_content ?? '',
               report: response.report ?? '',
@@ -90,6 +92,22 @@ export function MaintenanceResponseDetail({ response, onBack, onReload, onViewPr
           <div className="info-field"><span>問合日</span><b>{response.inquiry_date ?? '-'}</b></div>
           <div className="info-field"><span>発生日</span><b>{response.occurrence_date ?? '-'}</b></div>
           <div className="info-field"><span>対象箇所</span><b>{response.target_area ?? '-'}</b></div>
+          {(() => {
+            const t = response.target_area
+            let maker: string | null | undefined = null
+            let model: string | null | undefined = null
+            if (t === 'パネル') { maker = response.panel_maker; model = response.panel_model }
+            else if (t === 'パワコン') { maker = response.pcs_maker; model = response.pcs_model }
+            else if (t === '遠隔監視') { maker = response.monitoring_system; model = response.monitoring_model }
+            if (t !== 'パネル' && t !== 'パワコン' && t !== '遠隔監視') return null
+            return (
+              <>
+                <div className="info-field"><span>メーカー</span><b>{maker ?? '-'}</b></div>
+                <div className="info-field"><span>型式</span><b>{model ?? '-'}</b></div>
+              </>
+            )
+          })()}
+          <div className="info-field"><span>製造番号</span><b>{response.serial_number ?? '-'}</b></div>
         </div>
 
         <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -131,9 +149,19 @@ export function MaintenanceResponseDetail({ response, onBack, onReload, onViewPr
               発生日
               <input className="form-input" type="date" value={form.occurrence_date} onChange={e => setForm(f => ({ ...f, occurrence_date: e.target.value }))} />
             </label>
-            <label className="form-label" style={{ gridColumn: '1/-1' }}>
+            <label className="form-label">
               対象箇所
-              <select className="form-select" value={form.target_area} onChange={e => setForm(f => ({ ...f, target_area: e.target.value }))}>
+              <select className="form-select" value={form.target_area} onChange={e => {
+                const next = e.target.value
+                setForm(f => {
+                  let nextSituation = f.situation
+                  if (!f.situation) {
+                    if (next === '停電') nextSituation = '電力会社から再連系の連絡あり'
+                    else if (next === '出力制御') nextSituation = '電力会社から出力制御の指示あり'
+                  }
+                  return { ...f, target_area: next, situation: nextSituation }
+                })
+              }}>
                 <option value="">選択してください</option>
                 {['パネル', 'パワコン', '遠隔監視', '停電', '出力制御', 'その他'].map(t => (
                   <option key={t} value={t}>{t}</option>
@@ -143,6 +171,10 @@ export function MaintenanceResponseDetail({ response, onBack, onReload, onViewPr
                   <option value={form.target_area}>{form.target_area}</option>
                 )}
               </select>
+            </label>
+            <label className="form-label">
+              製造番号
+              <input className="form-input" value={form.serial_number} onChange={e => setForm(f => ({ ...f, serial_number: e.target.value }))} placeholder="例: S029111" />
             </label>
             <label className="form-label" style={{ gridColumn: '1/-1' }}>
               状況

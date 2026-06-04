@@ -271,7 +271,7 @@ export async function getMaintenanceResponseById(id: number): Promise<Maintenanc
   const client = db()
   const { data } = await client
     .from('maintenance_responses')
-    .select('*, projects(project_name, plant_name, customers(name, company_name))')
+    .select('*, projects(project_name, plant_name, panel_maker, panel_model, pcs_maker, pcs_model, monitoring_system, monitoring_model, customers(name, company_name))')
     .eq('id', id)
     .single()
   if (!data) return null
@@ -283,7 +283,13 @@ export async function getMaintenanceResponseById(id: number): Promise<Maintenanc
     project_name: (proj?.project_name as string) ?? '不明',
     plant_name: (proj?.plant_name as string) ?? null,
     customer_name: (cust?.company_name as string) ?? (cust?.name as string) ?? '不明',
-  }
+    panel_maker: (proj?.panel_maker as string) ?? null,
+    panel_model: (proj?.panel_model as string) ?? null,
+    pcs_maker: (proj?.pcs_maker as string) ?? null,
+    pcs_model: (proj?.pcs_model as string) ?? null,
+    monitoring_system: (proj?.monitoring_system as string) ?? null,
+    monitoring_model: (proj?.monitoring_model as string) ?? null,
+  } as MaintenanceResponse
 }
 
 // ── Periodic Maintenance ──────────────────────────────────

@@ -86,7 +86,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
   const [mrModal, setMrModal] = useState(false)
   const [mrForm, setMrForm] = useState<Omit<MaintenanceResponseInput, 'project_id'>>({
     inquiry_date: '', occurrence_date: '',
-    target_area: '', situation: '', response_content: '', report: '',
+    target_area: '', serial_number: '', situation: '', response_content: '', report: '',
   })
 
   // 定期保守フォーム
@@ -971,7 +971,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           <div className="card">
             <div className="card-header-row">
               <h3 className="section-title" style={{ margin: 0 }}>保守対応記録</h3>
-              <button className="btn btn-main btn-sm" onClick={() => { setMrForm({ inquiry_date: '', occurrence_date: '', target_area: '', situation: '', response_content: '', report: '' }); setErr(''); setMrModal(true) }}>
+              <button className="btn btn-main btn-sm" onClick={() => { setMrForm({ inquiry_date: '', occurrence_date: '', target_area: '', serial_number: '', situation: '', response_content: '', report: '' }); setErr(''); setMrModal(true) }}>
                 ＋ 追加
               </button>
             </div>
@@ -1070,7 +1070,18 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             </label>
             <label className="form-label">
               対象箇所
-              <select className="form-select" value={mrForm.target_area} onChange={e => setMrForm(f => ({ ...f, target_area: e.target.value }))}>
+              <select className="form-select" value={mrForm.target_area} onChange={e => {
+                const next = e.target.value
+                setMrForm(f => {
+                  // 状況が空のときだけ、対象箇所に応じたデフォルトを入れる
+                  let nextSituation = f.situation
+                  if (!f.situation) {
+                    if (next === '停電') nextSituation = '電力会社から再連系の連絡あり'
+                    else if (next === '出力制御') nextSituation = '電力会社から出力制御の指示あり'
+                  }
+                  return { ...f, target_area: next, situation: nextSituation }
+                })
+              }}>
                 <option value="">選択してください</option>
                 {['パネル', 'パワコン', '遠隔監視', '停電', '出力制御', 'その他'].map(t => (
                   <option key={t} value={t}>{t}</option>
@@ -1079,6 +1090,10 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                   <option value={mrForm.target_area}>{mrForm.target_area}</option>
                 )}
               </select>
+            </label>
+            <label className="form-label">
+              製造番号
+              <input className="form-input" value={mrForm.serial_number ?? ''} onChange={e => setMrForm(f => ({ ...f, serial_number: e.target.value }))} placeholder="例: S029111" />
             </label>
             <label className="form-label" style={{ gridColumn: '1/-1' }}>
               状況

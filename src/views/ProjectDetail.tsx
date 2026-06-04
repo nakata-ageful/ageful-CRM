@@ -202,6 +202,8 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
     land_cost_monthly: contract?.land_cost_monthly != null ? String(contract.land_cost_monthly) : '',
     insurance_fee: contract?.insurance_fee != null ? String(contract.insurance_fee) : '',
     other_fee: contract?.other_fee != null ? String(contract.other_fee) : '',
+    communication_fee: contract?.communication_fee != null ? String(contract.communication_fee) : '',
+    local_association_fee: contract?.local_association_fee != null ? String(contract.local_association_fee) : '',
     transfer_fee: contract?.transfer_fee != null ? String(contract.transfer_fee) : '',
     sale_contract_date: contract?.sale_contract_date ?? '',
     equipment_contract_date: contract?.equipment_contract_date ?? '',
@@ -376,6 +378,8 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
         land_cost_monthly: toNum(contractForm.land_cost_monthly),
         insurance_fee: toNum(contractForm.insurance_fee),
         other_fee: toNum(contractForm.other_fee),
+        communication_fee: toNum(contractForm.communication_fee),
+        local_association_fee: toNum(contractForm.local_association_fee),
         transfer_fee: toNum(contractForm.transfer_fee),
         sale_contract_date: contractForm.sale_contract_date || null,
         equipment_contract_date: contractForm.equipment_contract_date || null,
@@ -481,6 +485,8 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
         land_cost_monthly: contract.land_cost_monthly != null ? String(contract.land_cost_monthly) : '',
         insurance_fee: contract.insurance_fee != null ? String(contract.insurance_fee) : '',
         other_fee: contract.other_fee != null ? String(contract.other_fee) : '',
+        communication_fee: contract.communication_fee != null ? String(contract.communication_fee) : '',
+        local_association_fee: contract.local_association_fee != null ? String(contract.local_association_fee) : '',
         transfer_fee: contract.transfer_fee != null ? String(contract.transfer_fee) : '',
         sale_contract_date: contract.sale_contract_date ?? '',
         equipment_contract_date: contract.equipment_contract_date ?? '',
@@ -545,6 +551,8 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           land_cost_monthly: toNum(contractForm.land_cost_monthly),
           insurance_fee: toNum(contractForm.insurance_fee),
           other_fee: toNum(contractForm.other_fee),
+          communication_fee: toNum(contractForm.communication_fee),
+          local_association_fee: toNum(contractForm.local_association_fee),
           transfer_fee: toNum(contractForm.transfer_fee),
           sale_contract_date: contractForm.sale_contract_date || null,
           equipment_contract_date: contractForm.equipment_contract_date || null,
@@ -785,8 +793,11 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               <div className="info-field"><span>点検</span><b>{contract?.plan_inspection ?? '-'}</b></div>
               <div className="info-field"><span>駆付</span><b>{contract?.plan_emergency ?? '-'}</b></div>
               <div className="info-field"><span>鍵番号</span><b>{project.key_number ?? '-'}</b></div>
+              <div className="info-field"><span>土地賃料（月額）</span><b>{fmtYen(contract?.land_cost_monthly)}</b></div>
               <div className="info-field"><span>自治会</span><b>{project.local_association ?? '-'}</b></div>
-              <div className="info-field"><span>保険料</span><b>{fmtYen(contract?.insurance_fee)}</b></div>
+              <div className="info-field"><span>自治会費</span><b>{fmtYen(contract?.local_association_fee)}</b></div>
+              <div className="info-field"><span>通信費</span><b>{fmtYen(contract?.communication_fee)}</b></div>
+              <div className="info-field"><span>火災保険料</span><b>{fmtYen(contract?.insurance_fee)}</b></div>
               <div className="info-field"><span>その他費用</span><b>{fmtYen(contract?.other_fee)}</b></div>
               <div className="info-field"><span>経産省 設置報告</span><b>{contract?.has_meti_setup_report ? 'あり' : 'なし'}</b></div>
               <div className="info-field"><span>経産省 定期報告</span><b>{contract?.has_meti_periodic_report ? 'あり' : 'なし'}</b></div>
@@ -1918,11 +1929,23 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                   <input className="form-input" value={projForm.key_number} onChange={e => setProjForm(f => ({ ...f, key_number: e.target.value }))} />
                 </label>
                 <label className="form-label">
+                  土地賃料（月額・円）
+                  <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.land_cost_monthly)} onChange={e => setContractForm(f => ({ ...f, land_cost_monthly: e.target.value.replace(/,/g, '') }))} />
+                </label>
+                <label className="form-label">
                   自治会
                   <input className="form-input" value={projForm.local_association} onChange={e => setProjForm(f => ({ ...f, local_association: e.target.value }))} />
                 </label>
                 <label className="form-label">
-                  保険料（円）
+                  自治会費（円）
+                  <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.local_association_fee)} onChange={e => setContractForm(f => ({ ...f, local_association_fee: e.target.value.replace(/,/g, '') }))} />
+                </label>
+                <label className="form-label">
+                  通信費（円）
+                  <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.communication_fee)} onChange={e => setContractForm(f => ({ ...f, communication_fee: e.target.value.replace(/,/g, '') }))} />
+                </label>
+                <label className="form-label">
+                  火災保険料（円）
                   <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.insurance_fee)} onChange={e => setContractForm(f => ({ ...f, insurance_fee: e.target.value.replace(/,/g, '') }))} />
                 </label>
                 <label className="form-label">

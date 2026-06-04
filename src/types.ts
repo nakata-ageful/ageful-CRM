@@ -87,8 +87,10 @@ export type Contract = {
   annual_maintenance_ex: number | null
   annual_maintenance_inc: number | null
   land_cost_monthly: number | null
-  insurance_fee: number | null
+  insurance_fee: number | null         // 火災保険料（DBカラム名は insurance_fee のまま）
   other_fee: number | null
+  communication_fee?: number | null    // 通信費
+  local_association_fee?: number | null // 自治会費（金額）
   transfer_fee: number | null    // 振替手数料
   transfer_account: number | null
   // 契約日

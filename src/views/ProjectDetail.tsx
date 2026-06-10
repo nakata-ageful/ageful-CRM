@@ -281,7 +281,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
   // ── 定期保守 ─────────────────────────────────────────────
 
   async function handleSavePM() {
-    if (!pmForm.record_date) { setErr('記録日は必須です'); return }
+    if (!pmForm.record_date) { setErr('実施日は必須です'); return }
     setSaving(true); setErr('')
     try {
       if (pmEditId != null) {
@@ -1150,7 +1150,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           {err && <div className="form-error">{err}</div>}
           <div className="form-grid">
             <label className="form-label required">
-              記録日
+              実施日
               <input className="form-input" type="date" value={pmForm.record_date} onChange={e => setPmForm(f => ({ ...f, record_date: e.target.value }))} />
             </label>
             <label className="form-label">

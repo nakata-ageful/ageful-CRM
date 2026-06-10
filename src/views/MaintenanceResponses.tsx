@@ -153,7 +153,7 @@ export function MaintenanceResponses({ responses, periodic, onReload: _onReload,
           <table>
             <thead>
               <tr>
-                <th>記録日</th><th>発電所</th><th>顧客</th><th>作業種別</th><th>内容</th>
+                <th>実施日</th><th>発電所</th><th>顧客</th><th>作業種別</th><th>内容</th>
               </tr>
             </thead>
             <tbody>

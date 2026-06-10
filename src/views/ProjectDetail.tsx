@@ -49,7 +49,7 @@ type Props = {
   onViewMaintenance: (id: number) => void
 }
 
-const WORK_TYPES = ['点検', '除草', '巡回', '経産省定期報告', 'その他']
+const WORK_TYPES = ['点検', '除草', '経産省定期報告']
 const METI_STATUSES = ['未', '申請中', '受理', '不備']
 
 
@@ -792,7 +792,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             <div className="info-grid">
               <div className="info-field"><span>除草（回）</span><b>{contract?.plan_weeding ?? '-'}</b></div>
               <div className="info-field"><span>点検</span><b>{contract?.plan_inspection ?? '-'}</b></div>
-              <div className="info-field"><span>駆付</span><b>{contract?.plan_emergency ?? '-'}</b></div>
+              <div className="info-field"><span>駆けつけ</span><b>{contract?.plan_emergency ?? '-'}</b></div>
               <div className="info-field"><span>鍵番号</span><b>{project.key_number ?? '-'}</b></div>
               <div className="info-field"><span>土地賃料（月額）</span><b>{fmtYen(contract?.land_cost_monthly)}</b></div>
               <div className="info-field"><span>自治会</span><b>{project.local_association ?? '-'}</b></div>
@@ -874,11 +874,12 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
         const categories: CatDef[] = [
           { key: '点検', label: '点検', planField: 'plan_inspection' },
           { key: '除草', label: '除草', planField: 'plan_weeding' },
-          { key: '巡回', label: '巡回（駆けつけ）', planField: 'plan_emergency' },
           { key: '経産省定期報告', label: '経産省 定期報告', isMeti: true },
         ]
-        const KNOWN_KEYS = ['点検', '除草', '巡回', '経産省定期報告']
-        const otherRecords = periodicMaintenance.filter(m => !KNOWN_KEYS.includes(m.work_type ?? ''))
+        // 巡回・その他は定期保守から廃止。残存があってもこのセクションには表示しない。
+        const KNOWN_KEYS = ['点検', '除草', '経産省定期報告']
+        const otherRecords: typeof periodicMaintenance = []
+        void KNOWN_KEYS
         const isCatVisible = (cat: CatDef) => {
           const records = periodicMaintenance.filter(m => m.work_type === cat.key)
           if (cat.isMeti) return records.length > 0 || !!contract?.has_meti_periodic_report
@@ -991,7 +992,12 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           {/* 下半分: 保守対応記録（ヘッダ固定・テーブル内側スクロール） */}
           <div className="card" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, padding: 0 }}>
             <div className="card-header-row" style={{ padding: '12px 16px 8px', borderBottom: '1px solid #e2e8f0' }}>
-              <h3 className="section-title" style={{ margin: 0 }}>保守対応記録</h3>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                <h3 className="section-title" style={{ margin: 0 }}>保守対応記録</h3>
+                {contract?.plan_emergency && contract.plan_emergency !== 'なし' && (
+                  <span style={{ fontSize: 12, color: '#64748b' }}>駆けつけ 契約: {contract.plan_emergency}</span>
+                )}
+              </div>
               <button className="btn btn-main btn-sm" onClick={() => { setMrForm({ inquiry_date: '', occurrence_date: '', target_area: '', serial_number: '', situation: '', response_content: '', report: '' }); setErr(''); setMrModal(true) }}>
                 ＋ 追加
               </button>
@@ -1203,7 +1209,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               <textarea className="form-input" rows={3} value={arForm.maintenance_record} onChange={e => setArForm(f => ({ ...f, maintenance_record: e.target.value }))} style={{ resize: 'vertical' }} />
             </label>
             <label className="form-label" style={{ gridColumn: '1/-1' }}>
-              駆付記録
+              駆けつけ記録
               <textarea className="form-input" rows={3} value={arForm.escort_record} onChange={e => setArForm(f => ({ ...f, escort_record: e.target.value }))} style={{ resize: 'vertical' }} />
             </label>
           </div>
@@ -1922,7 +1928,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                   </select>
                 </label>
                 <label className="form-label">
-                  駆付
+                  駆けつけ
                   <select className="form-select" value={contractForm.plan_emergency} onChange={e => setContractForm(f => ({ ...f, plan_emergency: e.target.value }))}>
                     <option value="">未設定</option>
                     <option value="なし">なし</option>

@@ -177,6 +177,7 @@ export type MaintenanceResponse = {
   // joined
   project_name?: string
   plant_name?: string | null
+  customer_id?: number | null
   customer_name?: string
   // joined（対象箇所に応じた設備情報、保守対応詳細で表示）
   panel_maker?: string | null

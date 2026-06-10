@@ -388,6 +388,7 @@ export default function App() {
                 }}
                 onReload={reloadMaintenanceDetail}
                 onViewProject={navToProjectDetail}
+                onViewCustomer={navToCustomerDetail}
               />
             )}
             {view === 'billing' && (

@@ -271,7 +271,7 @@ export async function getMaintenanceResponseById(id: number): Promise<Maintenanc
   const client = db()
   const { data } = await client
     .from('maintenance_responses')
-    .select('*, projects(project_name, plant_name, panel_maker, panel_model, pcs_maker, pcs_model, monitoring_system, monitoring_model, customers(name, company_name))')
+    .select('*, projects(project_name, plant_name, customer_id, panel_maker, panel_model, pcs_maker, pcs_model, monitoring_system, monitoring_model, customers(name, company_name))')
     .eq('id', id)
     .single()
   if (!data) return null
@@ -282,6 +282,7 @@ export async function getMaintenanceResponseById(id: number): Promise<Maintenanc
     ...(row as MaintenanceResponse),
     project_name: (proj?.project_name as string) ?? '不明',
     plant_name: (proj?.plant_name as string) ?? null,
+    customer_id: (proj?.customer_id as number) ?? null,
     customer_name: (cust?.company_name as string) ?? (cust?.name as string) ?? '不明',
     panel_maker: (proj?.panel_maker as string) ?? null,
     panel_model: (proj?.panel_model as string) ?? null,

@@ -10,9 +10,10 @@ type Props = {
   onBack: () => void
   onReload: () => void
   onViewProject: (projectId: number) => void
+  onViewCustomer: (customerId: number) => void
 }
 
-export function MaintenanceResponseDetail({ response, onBack, onReload, onViewProject }: Props) {
+export function MaintenanceResponseDetail({ response, onBack, onReload, onViewProject, onViewCustomer }: Props) {
   const toast = useToast()
   const [editModal, setEditModal] = useState(false)
   const [form, setForm] = useState({
@@ -56,7 +57,14 @@ export function MaintenanceResponseDetail({ response, onBack, onReload, onViewPr
         <button className="link-btn" onClick={() => onViewProject(response.project_id)}>
           {response.plant_name || response.project_name || '-'}
         </button>
-        <span style={{ fontSize: 13, color: '#64748b' }}>顧客：{response.customer_name ?? '-'}</span>
+        <span style={{ fontSize: 13, color: '#64748b' }}>顧客：</span>
+        {response.customer_id ? (
+          <button className="link-btn" onClick={() => onViewCustomer(response.customer_id!)}>
+            {response.customer_name ?? '-'}
+          </button>
+        ) : (
+          <span style={{ fontSize: 13 }}>{response.customer_name ?? '-'}</span>
+        )}
         <StatusBadge status={response.status} />
       </div>
 

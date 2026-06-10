@@ -863,10 +863,11 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
         </div>
       )}
 
-      {/* ── 保守対応（定期保守 + 保守対応記録を統合。保守対応は記録が増えていくため下に配置） ── */}
+      {/* ── 保守対応（上半分=定期保守、下半分=保守対応記録 を独立スクロール） ── */}
       {tab === '保守対応' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* 定期保守セクション（旧「定期保守」タブの内容を統合） */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, height: 'calc(100vh - 260px)', minHeight: 480 }}>
+          {/* 上半分: 定期保守セクション（内側スクロール） */}
+          <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, paddingRight: 4 }}>
           {(() => {
         const currentYear = new Date().getFullYear()
         type CatDef = { key: string; label: string; planField?: 'plan_inspection' | 'plan_weeding' | 'plan_emergency'; isMeti?: boolean }
@@ -986,35 +987,39 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           </div>
         )
       })()}
-          <div className="card">
-            <div className="card-header-row">
+          </div>
+          {/* 下半分: 保守対応記録（ヘッダ固定・テーブル内側スクロール） */}
+          <div className="card" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, padding: 0 }}>
+            <div className="card-header-row" style={{ padding: '12px 16px 8px', borderBottom: '1px solid #e2e8f0' }}>
               <h3 className="section-title" style={{ margin: 0 }}>保守対応記録</h3>
               <button className="btn btn-main btn-sm" onClick={() => { setMrForm({ inquiry_date: '', occurrence_date: '', target_area: '', serial_number: '', situation: '', response_content: '', report: '' }); setErr(''); setMrModal(true) }}>
                 ＋ 追加
               </button>
             </div>
-            <table>
-              <thead>
-                <tr><th>管理番号</th><th>問合日</th><th>発生日</th><th>対象箇所</th><th>状態</th><th>操作</th></tr>
-              </thead>
-              <tbody>
-                {maintenanceResponses.length === 0 && (
-                  <tr><td colSpan={6} className="empty-cell">保守対応記録がありません</td></tr>
-                )}
-                {maintenanceResponses.map(m => (
-                  <tr key={m.id} className="clickable-row" onClick={() => onViewMaintenance(m.id)}>
-                    <td>{m.response_no ?? '-'}</td>
-                    <td>{m.inquiry_date ?? '-'}</td>
-                    <td>{m.occurrence_date ?? '-'}</td>
-                    <td>{m.target_area ?? '-'}</td>
-                    <td><StatusBadge status={m.status} /></td>
-                    <td onClick={e => e.stopPropagation()}>
-                      <button className="btn-icon" title="削除" onClick={() => handleDeleteMR(m.id)}>🗑</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+              <table>
+                <thead>
+                  <tr><th>管理番号</th><th>問合日</th><th>発生日</th><th>対象箇所</th><th>状態</th><th>操作</th></tr>
+                </thead>
+                <tbody>
+                  {maintenanceResponses.length === 0 && (
+                    <tr><td colSpan={6} className="empty-cell">保守対応記録がありません</td></tr>
+                  )}
+                  {maintenanceResponses.map(m => (
+                    <tr key={m.id} className="clickable-row" onClick={() => onViewMaintenance(m.id)}>
+                      <td>{m.response_no ?? '-'}</td>
+                      <td>{m.inquiry_date ?? '-'}</td>
+                      <td>{m.occurrence_date ?? '-'}</td>
+                      <td>{m.target_area ?? '-'}</td>
+                      <td><StatusBadge status={m.status} /></td>
+                      <td onClick={e => e.stopPropagation()}>
+                        <button className="btn-icon" title="削除" onClick={() => handleDeleteMR(m.id)}>🗑</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

@@ -595,9 +595,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
 
   return (
     <>
-      <button className="back-btn" onClick={onBack}>← 戻る</button>
-
-      <div style={{ marginBottom: 16 }}>
+      <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 13, color: '#64748b' }}>顧客：</span>
         <button
           className="link-btn"
@@ -605,6 +603,9 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
         >
           {customer.company_name ?? customer.name}
         </button>
+        <span style={{ fontSize: 13, color: '#64748b' }}>発電所：</span>
+        <b style={{ fontSize: 'inherit' }}>{project.plant_name || project.project_name}</b>
+        <button className="back-btn" onClick={onBack} style={{ marginLeft: 'auto' }}>← 戻る</button>
       </div>
 
       {/* タブ */}

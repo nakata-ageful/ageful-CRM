@@ -51,6 +51,18 @@ type Props = {
 
 const WORK_TYPES = ['点検', '除草', '経産省定期報告']
 const METI_STATUSES = ['未', '申請中', '受理', '不備']
+const BILLING_METHODS = ['請求書', '口座振替'] as const
+
+/** 保守内容セクションの年間金額合計（税込ベース） */
+function annualTotalIncFromContract(c: { annual_maintenance_inc?: number | null; land_cost_monthly?: number | null; insurance_fee?: number | null; local_association_fee?: number | null; communication_fee?: number | null; other_fee?: number | null } | null | undefined): number {
+  if (!c) return 0
+  return (c.annual_maintenance_inc ?? 0)
+    + (c.land_cost_monthly ?? 0)
+    + (c.insurance_fee ?? 0)
+    + (c.local_association_fee ?? 0)
+    + (c.communication_fee ?? 0)
+    + (c.other_fee ?? 0)
+}
 
 
 const TABS: Tab[] = ['基本情報', '設備情報', '契約情報', '保守情報', '請求情報', '保守対応', '年次請求記録', 'その他']
@@ -204,6 +216,14 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
     other_fee: contract?.other_fee != null ? String(contract.other_fee) : '',
     communication_fee: contract?.communication_fee != null ? String(contract.communication_fee) : '',
     local_association_fee: contract?.local_association_fee != null ? String(contract.local_association_fee) : '',
+    has_issuance_fee: contract?.has_issuance_fee ?? false,
+    issuance_fee_ex: contract?.issuance_fee_ex != null ? String(contract.issuance_fee_ex) : '',
+    issuance_fee_inc: contract?.issuance_fee_inc != null ? String(contract.issuance_fee_inc) : '',
+    has_transfer_fee: contract?.has_transfer_fee ?? false,
+    transfer_fee_ex: contract?.transfer_fee_ex != null ? String(contract.transfer_fee_ex) : '',
+    transfer_fee_inc: contract?.transfer_fee_inc != null ? String(contract.transfer_fee_inc) : '',
+    billing_schedule_days: (contract?.billing_schedule_days ?? []) as string[],
+    billing_amount_overrides: (contract?.billing_amount_overrides ?? {}) as Record<string, number>,
     transfer_fee: contract?.transfer_fee != null ? String(contract.transfer_fee) : '',
     sale_contract_date: contract?.sale_contract_date ?? '',
     equipment_contract_date: contract?.equipment_contract_date ?? '',
@@ -380,6 +400,14 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
         other_fee: toNum(contractForm.other_fee),
         communication_fee: toNum(contractForm.communication_fee),
         local_association_fee: toNum(contractForm.local_association_fee),
+        has_issuance_fee: contractForm.has_issuance_fee,
+        issuance_fee_ex: toNum(contractForm.issuance_fee_ex),
+        issuance_fee_inc: toNum(contractForm.issuance_fee_inc),
+        has_transfer_fee: contractForm.has_transfer_fee,
+        transfer_fee_ex: toNum(contractForm.transfer_fee_ex),
+        transfer_fee_inc: toNum(contractForm.transfer_fee_inc),
+        billing_schedule_days: contractForm.billing_schedule_days.length > 0 ? contractForm.billing_schedule_days : null,
+        billing_amount_overrides: Object.keys(contractForm.billing_amount_overrides).length > 0 ? contractForm.billing_amount_overrides : null,
         transfer_fee: toNum(contractForm.transfer_fee),
         sale_contract_date: contractForm.sale_contract_date || null,
         equipment_contract_date: contractForm.equipment_contract_date || null,
@@ -487,6 +515,14 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
         other_fee: contract.other_fee != null ? String(contract.other_fee) : '',
         communication_fee: contract.communication_fee != null ? String(contract.communication_fee) : '',
         local_association_fee: contract.local_association_fee != null ? String(contract.local_association_fee) : '',
+        has_issuance_fee: contract.has_issuance_fee ?? false,
+        issuance_fee_ex: contract.issuance_fee_ex != null ? String(contract.issuance_fee_ex) : '',
+        issuance_fee_inc: contract.issuance_fee_inc != null ? String(contract.issuance_fee_inc) : '',
+        has_transfer_fee: contract.has_transfer_fee ?? false,
+        transfer_fee_ex: contract.transfer_fee_ex != null ? String(contract.transfer_fee_ex) : '',
+        transfer_fee_inc: contract.transfer_fee_inc != null ? String(contract.transfer_fee_inc) : '',
+        billing_schedule_days: (contract.billing_schedule_days ?? []) as string[],
+        billing_amount_overrides: (contract.billing_amount_overrides ?? {}) as Record<string, number>,
         transfer_fee: contract.transfer_fee != null ? String(contract.transfer_fee) : '',
         sale_contract_date: contract.sale_contract_date ?? '',
         equipment_contract_date: contract.equipment_contract_date ?? '',
@@ -794,12 +830,12 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               <div className="info-field"><span>点検</span><b>{contract?.plan_inspection ?? '-'}</b></div>
               <div className="info-field"><span>駆けつけ</span><b>{contract?.plan_emergency ?? '-'}</b></div>
               <div className="info-field"><span>鍵番号</span><b>{project.key_number ?? '-'}</b></div>
-              <div className="info-field"><span>土地賃料（月額）</span><b>{fmtYen(contract?.land_cost_monthly)}</b></div>
+              <div className="info-field"><span>土地賃料（年間）</span><b>{fmtYen(contract?.land_cost_monthly)}</b></div>
               <div className="info-field"><span>自治会</span><b>{project.local_association ?? '-'}</b></div>
-              <div className="info-field"><span>自治会費</span><b>{fmtYen(contract?.local_association_fee)}</b></div>
-              <div className="info-field"><span>通信費</span><b>{fmtYen(contract?.communication_fee)}</b></div>
-              <div className="info-field"><span>火災保険料</span><b>{fmtYen(contract?.insurance_fee)}</b></div>
-              <div className="info-field"><span>その他費用</span><b>{fmtYen(contract?.other_fee)}</b></div>
+              <div className="info-field"><span>自治会費（年間）</span><b>{fmtYen(contract?.local_association_fee)}</b></div>
+              <div className="info-field"><span>通信費（年間）</span><b>{fmtYen(contract?.communication_fee)}</b></div>
+              <div className="info-field"><span>火災保険料（年間）</span><b>{fmtYen(contract?.insurance_fee)}</b></div>
+              <div className="info-field"><span>その他費用（年間）</span><b>{fmtYen(contract?.other_fee)}</b></div>
               <div className="info-field"><span>経産省 設置報告</span><b>{contract?.has_meti_setup_report ? 'あり' : 'なし'}</b></div>
               <div className="info-field"><span>経産省 定期報告</span><b>{contract?.has_meti_periodic_report ? 'あり' : 'なし'}</b></div>
               {contract?.has_meti_setup_report && (
@@ -838,14 +874,51 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               <h3 className="section-title" style={{ margin: 0 }}>請求情報</h3>
               {contract && <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('billing')}>編集</button>}
             </div>
-            <div className="info-grid">
-              <div className="info-field"><span>請求方法</span><b>{contract?.billing_method ?? '-'}</b></div>
-              <div className="info-field"><span>請求回数</span><b>{contract?.billing_count != null ? `年${contract.billing_count}回` : '-'}</b></div>
-              <div className="info-field"><span>請求予定日</span><b>{contract?.billing_due_day ?? '-'}</b></div>
-              <div className="info-field"><span>請求額（税別）</span><b>{fmtYen(contract?.billing_amount_ex)}</b></div>
-              <div className="info-field"><span>請求額（税込）</span><b>{fmtYen(contract?.billing_amount_inc)}</b></div>
-              <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap' }}>{contract?.notes || '-'}</b></div>
-            </div>
+            {(() => {
+              const annualInc = annualTotalIncFromContract(contract)
+              const method = contract?.billing_method
+              const days = contract?.billing_schedule_days ?? []
+              const overrides = contract?.billing_amount_overrides ?? {}
+              const isInvoice = method === '請求書'
+              const isWithdraw = method === '口座振替'
+              const count = isInvoice ? (contract?.billing_count ?? days.length ?? 0) : (isWithdraw ? 12 : 0)
+              const baseAmount = count > 0 ? Math.floor(annualInc / count) : 0
+              return (
+                <>
+                  <div className="info-grid">
+                    <div className="info-field"><span>請求方法</span><b>{method ?? '-'}</b></div>
+                    {isInvoice && (
+                      <>
+                        <div className="info-field"><span>請求回数</span><b>{contract?.billing_count != null ? `年${contract.billing_count}回` : '-'}</b></div>
+                        <div className="info-field"><span>請求予定日</span><b>{days.length > 0 ? days.join(', ') : '-'}</b></div>
+                        <div className="info-field"><span>発行手数料</span><b>{contract?.has_issuance_fee ? `あり（税込 ${fmtYen(contract.issuance_fee_inc)}）` : 'なし'}</b></div>
+                      </>
+                    )}
+                    {isWithdraw && (
+                      <>
+                        <div className="info-field"><span>引落日</span><b>{days[0] ?? '-'}</b></div>
+                        <div className="info-field"><span>振替手数料</span><b>{contract?.has_transfer_fee ? `あり（税込 ${fmtYen(contract.transfer_fee_inc)}）` : 'なし'}</b></div>
+                      </>
+                    )}
+                    <div className="info-field"><span>年間総額（税込）</span><b>{fmtYen(annualInc)}</b></div>
+                    {count > 0 && (
+                      <div className="info-field"><span>{isInvoice ? '1回あたり（均等割）' : '月額（均等割）'}</span><b>{fmtYen(baseAmount)}</b></div>
+                    )}
+                    <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap' }}>{contract?.notes || '-'}</b></div>
+                  </div>
+                  {Object.keys(overrides).length > 0 && (
+                    <div style={{ marginTop: 12, padding: '8px 12px', background: '#fffbeb', borderRadius: 6, fontSize: 12 }}>
+                      <div style={{ fontWeight: 600, color: '#92400e', marginBottom: 4 }}>個別金額の上書きあり</div>
+                      {Object.entries(overrides).sort((a, b) => Number(a[0]) - Number(b[0])).map(([k, v]) => (
+                        <div key={k} style={{ color: '#78350f' }}>
+                          {isInvoice ? `${k}回目` : `${k}月`}: {fmtYen(v)}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )
+            })()}
           </div>
         </div>
       )}
@@ -1941,7 +2014,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                   <input className="form-input" value={projForm.key_number} onChange={e => setProjForm(f => ({ ...f, key_number: e.target.value }))} />
                 </label>
                 <label className="form-label">
-                  土地賃料（月額・円）
+                  土地賃料（年間・円）
                   <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.land_cost_monthly)} onChange={e => setContractForm(f => ({ ...f, land_cost_monthly: e.target.value.replace(/,/g, '') }))} />
                 </label>
                 <label className="form-label">
@@ -1949,19 +2022,19 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                   <input className="form-input" value={projForm.local_association} onChange={e => setProjForm(f => ({ ...f, local_association: e.target.value }))} />
                 </label>
                 <label className="form-label">
-                  自治会費（円）
+                  自治会費（年間・円）
                   <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.local_association_fee)} onChange={e => setContractForm(f => ({ ...f, local_association_fee: e.target.value.replace(/,/g, '') }))} />
                 </label>
                 <label className="form-label">
-                  通信費（円）
+                  通信費（年間・円）
                   <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.communication_fee)} onChange={e => setContractForm(f => ({ ...f, communication_fee: e.target.value.replace(/,/g, '') }))} />
                 </label>
                 <label className="form-label">
-                  火災保険料（円）
+                  火災保険料（年間・円）
                   <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.insurance_fee)} onChange={e => setContractForm(f => ({ ...f, insurance_fee: e.target.value.replace(/,/g, '') }))} />
                 </label>
                 <label className="form-label">
-                  その他費用（円）
+                  その他費用（年間・円）
                   <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.other_fee)} onChange={e => setContractForm(f => ({ ...f, other_fee: e.target.value.replace(/,/g, '') }))} />
                 </label>
                 <p style={{ gridColumn: '1/-1', margin: '8px 0 4px', fontWeight: 600, fontSize: 13, color: '#475569' }}>── 経産省報告</p>
@@ -2074,53 +2147,223 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             )}
 
             {/* 請求情報 */}
-            {editSection === 'billing' && (
+            {editSection === 'billing' && (() => {
+              const annualInc = annualTotalIncFromContract({
+                annual_maintenance_inc: Number(contractForm.annual_maintenance_inc) || 0,
+                land_cost_monthly: Number(contractForm.land_cost_monthly) || 0,
+                insurance_fee: Number(contractForm.insurance_fee) || 0,
+                local_association_fee: Number(contractForm.local_association_fee) || 0,
+                communication_fee: Number(contractForm.communication_fee) || 0,
+                other_fee: Number(contractForm.other_fee) || 0,
+              })
+              const isInvoice = contractForm.billing_method === '請求書'
+              const isWithdraw = contractForm.billing_method === '口座振替'
+              const count = isInvoice ? (Number(contractForm.billing_count) || 0) : (isWithdraw ? 12 : 0)
+              const baseAmount = count > 0 ? Math.floor(annualInc / count) : 0
+              return (
               <>
                 <label className="form-label">
                   請求方法
                   <select className="form-select" value={contractForm.billing_method} onChange={e => setContractForm(f => ({ ...f, billing_method: e.target.value }))}>
                     <option value="">未設定</option>
-                    <option value="請求書">請求書</option>
-                    <option value="口座振替">口座振替</option>
+                    {BILLING_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
                   </select>
                 </label>
-                <label className="form-label">
-                  請求回数（年）
-                  <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.billing_count)} onChange={e => setContractForm(f => ({ ...f, billing_count: e.target.value.replace(/,/g, '') }))} />
-                </label>
-                <label className="form-label">
-                  請求予定日（毎年）
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <select className="form-select" value={contractForm.billing_due_day.match(/(\d{1,2})月/)?.[1] ?? ''} onChange={e => {
-                      const day = contractForm.billing_due_day.match(/(\d{1,2})日/)?.[1] ?? '1'
-                      setContractForm(f => ({ ...f, billing_due_day: e.target.value ? `${e.target.value}月${day}日` : '' }))
-                    }}>
-                      <option value="">月</option>
-                      {Array.from({ length: 12 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}月</option>)}
-                    </select>
-                    <select className="form-select" value={contractForm.billing_due_day.match(/(\d{1,2})日/)?.[1] ?? ''} onChange={e => {
-                      const month = contractForm.billing_due_day.match(/(\d{1,2})月/)?.[1] ?? '1'
-                      setContractForm(f => ({ ...f, billing_due_day: e.target.value ? `${month}月${e.target.value}日` : '' }))
-                    }}>
-                      <option value="">日</option>
-                      {Array.from({ length: 31 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}日</option>)}
-                    </select>
+                <div className="info-field" style={{ alignSelf: 'end', padding: '4px 8px', background: '#f1f5f9', borderRadius: 4 }}>
+                  <span>年間総額（税込・保守内容より自動）</span>
+                  <b>{fmtYen(annualInc)}</b>
+                </div>
+
+                {isInvoice && (
+                  <>
+                    <p style={{ gridColumn: '1/-1', margin: '8px 0 4px', fontWeight: 600, fontSize: 13, color: '#475569' }}>── 請求書の設定</p>
+                    <label className="form-label">
+                      請求回数（年）
+                      <select className="form-select" value={contractForm.billing_count} onChange={e => {
+                        const newCount = e.target.value
+                        setContractForm(f => {
+                          const n = Number(newCount) || 0
+                          // 予定日リストの長さを n に合わせる（不足は空文字埋め、超過分は削除）
+                          const days = [...f.billing_schedule_days]
+                          while (days.length < n) days.push('')
+                          days.length = n
+                          return { ...f, billing_count: newCount, billing_schedule_days: days }
+                        })
+                      }}>
+                        <option value="">未設定</option>
+                        {[1,2,3,4,6,12].map(n => <option key={n} value={n}>年{n}回</option>)}
+                      </select>
+                    </label>
+                    {Number(contractForm.billing_count) > 0 && (
+                      <div style={{ gridColumn: '1/-1' }}>
+                        <p style={{ margin: '0 0 4px', fontSize: 12, color: '#64748b' }}>各回の予定日（毎年）</p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {Array.from({ length: Number(contractForm.billing_count) }, (_, i) => {
+                            const day = contractForm.billing_schedule_days[i] ?? ''
+                            const m = day.match(/(\d{1,2})月/)?.[1] ?? ''
+                            const d = day.match(/(\d{1,2})日/)?.[1] ?? ''
+                            const setDay = (newDay: string) => {
+                              setContractForm(f => {
+                                const days = [...f.billing_schedule_days]
+                                days[i] = newDay
+                                return { ...f, billing_schedule_days: days }
+                              })
+                            }
+                            return (
+                              <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
+                                <span style={{ minWidth: 50 }}>{i + 1}回目:</span>
+                                <select className="form-select" style={{ flex: 1 }} value={m} onChange={e => setDay(e.target.value ? `${e.target.value}月${d || '1'}日` : '')}>
+                                  <option value="">月</option>
+                                  {Array.from({ length: 12 }, (_, k) => <option key={k + 1} value={k + 1}>{k + 1}月</option>)}
+                                </select>
+                                <select className="form-select" style={{ flex: 1 }} value={d} onChange={e => setDay(e.target.value ? `${m || '1'}月${e.target.value}日` : '')}>
+                                  <option value="">日</option>
+                                  {Array.from({ length: 31 }, (_, k) => <option key={k + 1} value={k + 1}>{k + 1}日</option>)}
+                                </select>
+                                <span style={{ minWidth: 80, fontSize: 11, color: '#64748b' }}>
+                                  金額: {fmtYen(contractForm.billing_amount_overrides[String(i + 1)] ?? baseAmount)}
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    <label className="form-label">
+                      発行手数料
+                      <select className="form-select" value={contractForm.has_issuance_fee ? 'あり' : 'なし'} onChange={e => setContractForm(f => ({ ...f, has_issuance_fee: e.target.value === 'あり' }))}>
+                        <option value="なし">なし</option>
+                        <option value="あり">あり</option>
+                      </select>
+                    </label>
+                    {contractForm.has_issuance_fee && (
+                      <>
+                        <label className="form-label">
+                          発行手数料（税別）
+                          <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.issuance_fee_ex)}
+                            onChange={e => setContractForm(f => ({ ...f, issuance_fee_ex: e.target.value.replace(/,/g, '') }))}
+                            onBlur={e => {
+                              const v = e.target.value.replace(/,/g, '')
+                              if (!v) return
+                              const n = Number(v)
+                              if (!isFinite(n)) return
+                              setContractForm(f => ({ ...f, issuance_fee_inc: String(Math.floor((n * 11) / 10)) }))
+                            }} />
+                        </label>
+                        <label className="form-label">
+                          発行手数料（税込）
+                          <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.issuance_fee_inc)}
+                            onChange={e => setContractForm(f => ({ ...f, issuance_fee_inc: e.target.value.replace(/,/g, '') }))}
+                            onBlur={e => {
+                              const v = e.target.value.replace(/,/g, '')
+                              if (!v) return
+                              const n = Number(v)
+                              if (!isFinite(n)) return
+                              setContractForm(f => ({ ...f, issuance_fee_ex: String(Math.floor((n * 10) / 11)) }))
+                            }} />
+                        </label>
+                      </>
+                    )}
+                  </>
+                )}
+
+                {isWithdraw && (
+                  <>
+                    <p style={{ gridColumn: '1/-1', margin: '8px 0 4px', fontWeight: 600, fontSize: 13, color: '#475569' }}>── 口座振替の設定</p>
+                    <label className="form-label">
+                      毎月の引落日
+                      <select className="form-select" value={(contractForm.billing_schedule_days[0] ?? '').match(/(\d{1,2})日/)?.[1] ?? ''} onChange={e => {
+                        const day = e.target.value
+                        setContractForm(f => ({ ...f, billing_schedule_days: day ? [`${day}日`] : [] }))
+                      }}>
+                        <option value="">日</option>
+                        {Array.from({ length: 31 }, (_, k) => <option key={k + 1} value={k + 1}>{k + 1}日</option>)}
+                      </select>
+                    </label>
+                    <label className="form-label">
+                      振替手数料
+                      <select className="form-select" value={contractForm.has_transfer_fee ? 'あり' : 'なし'} onChange={e => setContractForm(f => ({ ...f, has_transfer_fee: e.target.value === 'あり' }))}>
+                        <option value="なし">なし</option>
+                        <option value="あり">あり</option>
+                      </select>
+                    </label>
+                    {contractForm.has_transfer_fee && (
+                      <>
+                        <label className="form-label">
+                          振替手数料（税別）
+                          <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.transfer_fee_ex)}
+                            onChange={e => setContractForm(f => ({ ...f, transfer_fee_ex: e.target.value.replace(/,/g, '') }))}
+                            onBlur={e => {
+                              const v = e.target.value.replace(/,/g, '')
+                              if (!v) return
+                              const n = Number(v)
+                              if (!isFinite(n)) return
+                              setContractForm(f => ({ ...f, transfer_fee_inc: String(Math.floor((n * 11) / 10)) }))
+                            }} />
+                        </label>
+                        <label className="form-label">
+                          振替手数料（税込）
+                          <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.transfer_fee_inc)}
+                            onChange={e => setContractForm(f => ({ ...f, transfer_fee_inc: e.target.value.replace(/,/g, '') }))}
+                            onBlur={e => {
+                              const v = e.target.value.replace(/,/g, '')
+                              if (!v) return
+                              const n = Number(v)
+                              if (!isFinite(n)) return
+                              setContractForm(f => ({ ...f, transfer_fee_ex: String(Math.floor((n * 10) / 11)) }))
+                            }} />
+                        </label>
+                      </>
+                    )}
+                    <div style={{ gridColumn: '1/-1', fontSize: 13, color: '#64748b', padding: '4px 0' }}>
+                      月額（均等割）: <b style={{ color: '#0f172a' }}>{fmtYen(baseAmount)}</b>
+                    </div>
+                  </>
+                )}
+
+                {count > 0 && (
+                  <div style={{ gridColumn: '1/-1', padding: '8px 12px', background: '#fef3c7', borderRadius: 6, marginTop: 4 }}>
+                    <details>
+                      <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>個別に金額を上書きする（イレギュラー対応）</summary>
+                      <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 6 }}>
+                        {Array.from({ length: count }, (_, i) => {
+                          const k = String(i + 1)
+                          const override = contractForm.billing_amount_overrides[k]
+                          return (
+                            <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <span style={{ fontSize: 11, minWidth: 40 }}>{isInvoice ? `${k}回目` : `${k}月`}</span>
+                              <input
+                                className="form-input"
+                                style={{ flex: 1, fontSize: 12, padding: '2px 6px' }}
+                                inputMode="numeric"
+                                placeholder={String(baseAmount)}
+                                value={override != null ? fmtFormNum(String(override)) : ''}
+                                onChange={e => {
+                                  const v = e.target.value.replace(/,/g, '')
+                                  setContractForm(f => {
+                                    const ov = { ...f.billing_amount_overrides }
+                                    if (v === '') delete ov[k]
+                                    else ov[k] = Number(v) || 0
+                                    return { ...f, billing_amount_overrides: ov }
+                                  })
+                                }}
+                              />
+                            </div>
+                          )
+                        })}
+                      </div>
+                      <p style={{ fontSize: 11, color: '#92400e', margin: '8px 0 0' }}>※ 空欄なら均等割（{fmtYen(baseAmount)}）が適用されます</p>
+                    </details>
                   </div>
-                </label>
-                <label className="form-label">
-                  請求額（税別）
-                  <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.billing_amount_ex)} onChange={e => setContractForm(f => ({ ...f, billing_amount_ex: e.target.value.replace(/,/g, '') }))} />
-                </label>
-                <label className="form-label">
-                  請求額（税込）
-                  <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.billing_amount_inc)} onChange={e => setContractForm(f => ({ ...f, billing_amount_inc: e.target.value.replace(/,/g, '') }))} />
-                </label>
-                <label className="form-label" style={{ gridColumn: '1/-1' }}>
+                )}
+
+                <label className="form-label" style={{ gridColumn: '1/-1', marginTop: 8 }}>
                   備考
                   <textarea className="form-input" rows={4} value={contractForm.notes} onChange={e => setContractForm(f => ({ ...f, notes: e.target.value }))} style={{ resize: 'vertical' }} />
                 </label>
               </>
-            )}
+              )
+            })()}
 
             {/* その他 (備考) */}
             {editSection === 'other-notes' && (

@@ -129,6 +129,18 @@ export type Contract = {
   has_meti_periodic_report?: boolean | null // 定期報告の有無
   meti_setup_report_date?: string | null    // 設置報告 申請日
   meti_setup_report_status?: string | null  // 設置報告 ステータス（未/申請中/受理/不備）
+  // 発行手数料（請求書のとき有効）
+  has_issuance_fee?: boolean | null
+  issuance_fee_ex?: number | null
+  issuance_fee_inc?: number | null
+  // 振替手数料（口座振替のとき有効）
+  has_transfer_fee?: boolean | null
+  transfer_fee_ex?: number | null
+  transfer_fee_inc?: number | null
+  // 請求予定日リスト（請求書: ["1月15日","7月15日"] / 口座振替: ["15日"] の運用）
+  billing_schedule_days?: string[] | null
+  // 各回/月の金額上書き JSON（請求書: { "1": 50000 } はround1=50000円 / 口座振替: { "11": 50000 } は11月）
+  billing_amount_overrides?: Record<string, number> | null
   created_at: string
 }
 

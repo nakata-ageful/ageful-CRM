@@ -866,8 +866,8 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       {/* ── 保守対応（上半分=定期保守、下半分=保守対応記録 を独立スクロール） ── */}
       {tab === '保守対応' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, height: 'calc(100vh - 260px)', minHeight: 480 }}>
-          {/* 上半分: 定期保守セクション（内側スクロール） */}
-          <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, paddingRight: 4 }}>
+          {/* 上半分: 定期保守セクション（ログ2件分の高さに固定、内側スクロール） */}
+          <div style={{ height: 260, overflowY: 'auto', flexShrink: 0, paddingRight: 4 }}>
           {(() => {
         const currentYear = new Date().getFullYear()
         type CatDef = { key: string; label: string; planField?: 'plan_inspection' | 'plan_weeding' | 'plan_emergency'; isMeti?: boolean }

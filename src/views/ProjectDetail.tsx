@@ -1173,11 +1173,17 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           <div className="form-grid">
             <label className="form-label">
               問合日
-              <input className="form-input" type="date" value={mrForm.inquiry_date} onChange={e => setMrForm(f => ({ ...f, inquiry_date: e.target.value }))} />
+              <input className="form-input" type="date"
+                min={`${new Date().getFullYear() - 4}-01-01`}
+                max={`${new Date().getFullYear() + 1}-12-31`}
+                value={mrForm.inquiry_date} onChange={e => setMrForm(f => ({ ...f, inquiry_date: e.target.value }))} />
             </label>
             <label className="form-label">
               発生日
-              <input className="form-input" type="date" value={mrForm.occurrence_date} onChange={e => setMrForm(f => ({ ...f, occurrence_date: e.target.value }))} />
+              <input className="form-input" type="date"
+                min={`${new Date().getFullYear() - 4}-01-01`}
+                max={`${new Date().getFullYear() + 1}-12-31`}
+                value={mrForm.occurrence_date} onChange={e => setMrForm(f => ({ ...f, occurrence_date: e.target.value }))} />
             </label>
             <label className="form-label">
               対象箇所

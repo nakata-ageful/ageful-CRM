@@ -151,11 +151,17 @@ export function MaintenanceResponseDetail({ response, onBack, onReload, onViewPr
             </label>
             <label className="form-label">
               問合日
-              <input className="form-input" type="date" value={form.inquiry_date} onChange={e => setForm(f => ({ ...f, inquiry_date: e.target.value }))} />
+              <input className="form-input" type="date"
+                min={`${new Date().getFullYear() - 4}-01-01`}
+                max={`${new Date().getFullYear() + 1}-12-31`}
+                value={form.inquiry_date} onChange={e => setForm(f => ({ ...f, inquiry_date: e.target.value }))} />
             </label>
             <label className="form-label">
               発生日
-              <input className="form-input" type="date" value={form.occurrence_date} onChange={e => setForm(f => ({ ...f, occurrence_date: e.target.value }))} />
+              <input className="form-input" type="date"
+                min={`${new Date().getFullYear() - 4}-01-01`}
+                max={`${new Date().getFullYear() + 1}-12-31`}
+                value={form.occurrence_date} onChange={e => setForm(f => ({ ...f, occurrence_date: e.target.value }))} />
             </label>
             <label className="form-label">
               対象箇所

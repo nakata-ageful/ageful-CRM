@@ -368,9 +368,11 @@ export default function App() {
               <MaintenanceResponses
                 responses={maintenanceList}
                 periodic={periodicMaintenanceList}
+                billingRows={billingRows}
                 onReload={loadAll}
                 onViewDetail={navToMaintenanceDetail}
                 onViewProject={(id) => navToProjectDetail(id, '保守対応')}
+                onViewProjectMaintenance={(id) => navToProjectDetail(id, '保守情報')}
               />
             )}
             {view === 'maintenance-response-detail' && maintenanceDetail && (

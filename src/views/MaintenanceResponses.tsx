@@ -1,19 +1,22 @@
 import { useState } from 'react'
-import type { MaintenanceResponse, PeriodicMaintenance } from '../types'
+import type { MaintenanceResponse, PeriodicMaintenance, BillingRow } from '../types'
 import { StatusBadge } from '../components/StatusBadge'
+import { fmtYen } from '../lib/utils'
 
 type Props = {
   responses: MaintenanceResponse[]
   periodic: PeriodicMaintenance[]
+  billingRows: BillingRow[]
   onReload: () => void
   onViewDetail: (id: number) => void
   onViewProject: (projectId: number) => void
+  onViewProjectMaintenance: (projectId: number) => void
 }
 
-type TopTab = '保守対応' | '定期保守'
+type TopTab = '保守対応' | '定期保守' | '受託情報' | '委託情報'
 type Filter = 'all' | '対応中' | '完了'
 
-const TOP_TABS: TopTab[] = ['保守対応', '定期保守']
+const TOP_TABS: TopTab[] = ['保守対応', '定期保守', '受託情報', '委託情報']
 
 function readTopTabFromHash(): TopTab {
   const h = window.location.hash
@@ -31,7 +34,7 @@ function writeTopTabToHash(t: TopTab) {
   }
 }
 
-export function MaintenanceResponses({ responses, periodic, onReload: _onReload, onViewDetail, onViewProject }: Props) {
+export function MaintenanceResponses({ responses, periodic, billingRows, onReload: _onReload, onViewDetail, onViewProject, onViewProjectMaintenance }: Props) {
   const [topTab, setTopTabState] = useState<TopTab>(() => readTopTabFromHash())
   const setTopTab = (t: TopTab) => {
     setTopTabState(t)
@@ -66,12 +69,31 @@ export function MaintenanceResponses({ responses, periodic, onReload: _onReload,
     )
   })
 
+  const filteredContractRows = billingRows.filter(r => {
+    if (!search) return true
+    const q = search.toLowerCase()
+    const c = r.contract
+    return (
+      (r.project_name ?? '').toLowerCase().includes(q) ||
+      (r.customer_name ?? '').toLowerCase().includes(q) ||
+      (c?.maintenance_contractor ?? '').toLowerCase().includes(q) ||
+      (c?.subcontractor ?? '').toLowerCase().includes(q)
+    )
+  })
+
   const activeCount = responses.filter(r => r.status === '対応中').length
   const doneCount = responses.filter(r => r.status === '完了').length
 
+  const placeholderByTab: Record<TopTab, string> = {
+    '保守対応': '発電所名・顧客名・対象箇所・状況で検索...',
+    '定期保守': '発電所名・顧客名・作業種別・内容で検索...',
+    '受託情報': '発電所名・顧客名・受託会社で検索...',
+    '委託情報': '発電所名・顧客名・保守委託先で検索...',
+  }
+
   return (
     <>
-      {/* 大タブ: 保守対応 / 定期保守 */}
+      {/* 大タブ */}
       <div className="tab-bar">
         <button
           className={`tab-btn ${topTab === '保守対応' ? 'active' : ''}`}
@@ -86,15 +108,25 @@ export function MaintenanceResponses({ responses, periodic, onReload: _onReload,
         >
           定期保守
         </button>
+        <button
+          className={`tab-btn ${topTab === '受託情報' ? 'active' : ''}`}
+          onClick={() => setTopTab('受託情報')}
+        >
+          受託情報
+        </button>
+        <button
+          className={`tab-btn ${topTab === '委託情報' ? 'active' : ''}`}
+          onClick={() => setTopTab('委託情報')}
+        >
+          委託情報
+        </button>
       </div>
 
       <div className="toolbar">
         <input
           className="search-input"
           type="search"
-          placeholder={topTab === '保守対応'
-            ? '発電所名・顧客名・対象箇所・状況で検索...'
-            : '発電所名・顧客名・作業種別・内容で検索...'}
+          placeholder={placeholderByTab[topTab]}
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
@@ -169,6 +201,72 @@ export function MaintenanceResponses({ responses, periodic, onReload: _onReload,
                   <td>{p.content ?? '-'}</td>
                 </tr>
               ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {topTab === '受託情報' && (
+        <div className="card">
+          <div className="table-meta">{filteredContractRows.length} 件</div>
+          <table>
+            <thead>
+              <tr>
+                <th>受託会社</th><th>発電所</th><th>顧客</th>
+                <th>年次保守料金（税込）</th><th>保守開始日</th>
+                <th>除草</th><th>点検</th><th>駆付</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredContractRows.length === 0 && (
+                <tr><td colSpan={8} className="empty-cell">該当する発電所がありません</td></tr>
+              )}
+              {filteredContractRows.map(r => {
+                const c = r.contract
+                return (
+                  <tr key={r.project_id} className="clickable-row" onClick={() => onViewProjectMaintenance(r.project_id)}>
+                    <td>{c?.maintenance_contractor ?? '-'}</td>
+                    <td><strong>{r.project_name || '-'}</strong></td>
+                    <td>{r.customer_name ?? '-'}</td>
+                    <td>{c?.annual_maintenance_inc != null ? fmtYen(c.annual_maintenance_inc) : '-'}</td>
+                    <td>{c?.maintenance_start_date ?? '-'}</td>
+                    <td>{c?.plan_weeding ?? '-'}</td>
+                    <td>{c?.plan_inspection ?? '-'}</td>
+                    <td>{c?.plan_emergency ?? '-'}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {topTab === '委託情報' && (
+        <div className="card">
+          <div className="table-meta">{filteredContractRows.length} 件</div>
+          <table>
+            <thead>
+              <tr>
+                <th>保守委託先</th><th>発電所</th><th>顧客</th>
+                <th>委託料（税込）</th><th>委託開始日</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredContractRows.length === 0 && (
+                <tr><td colSpan={5} className="empty-cell">該当する発電所がありません</td></tr>
+              )}
+              {filteredContractRows.map(r => {
+                const c = r.contract
+                return (
+                  <tr key={r.project_id} className="clickable-row" onClick={() => onViewProjectMaintenance(r.project_id)}>
+                    <td>{c?.subcontractor ?? '-'}</td>
+                    <td><strong>{r.project_name || '-'}</strong></td>
+                    <td>{r.customer_name ?? '-'}</td>
+                    <td>{c?.subcontract_fee_inc != null ? fmtYen(c.subcontract_fee_inc) : '-'}</td>
+                    <td>{c?.subcontract_start_date ?? '-'}</td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

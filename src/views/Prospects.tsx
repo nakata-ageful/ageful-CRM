@@ -328,15 +328,34 @@ export function Prospects({
 }) {
   const toast = useToast()
   // 複数選択フィルター: 空配列 = 全件、非空 = OR 条件で絞り込み
-  const [applyFilters, setApplyFilters] = useState<ProspectApplyStatus[]>([])
-  const [contractFilters, setContractFilters] = useState<ProspectContractStatus[]>([])
+  // sessionStorage で詳細画面遷移→戻る時にフィルタを復元
+  const [applyFilters, setApplyFilters] = useState<ProspectApplyStatus[]>(() => {
+    try {
+      const saved = sessionStorage.getItem('prospects_apply_filters')
+      return saved ? JSON.parse(saved) : []
+    } catch { return [] }
+  })
+  const [contractFilters, setContractFilters] = useState<ProspectContractStatus[]>(() => {
+    try {
+      const saved = sessionStorage.getItem('prospects_contract_filters')
+      return saved ? JSON.parse(saved) : []
+    } catch { return [] }
+  })
   const [showAdd, setShowAdd] = useState(false)
 
   function toggleApply(s: ProspectApplyStatus) {
-    setApplyFilters(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])
+    setApplyFilters(prev => {
+      const next = prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]
+      sessionStorage.setItem('prospects_apply_filters', JSON.stringify(next))
+      return next
+    })
   }
   function toggleContract(s: ProspectContractStatus) {
-    setContractFilters(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])
+    setContractFilters(prev => {
+      const next = prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]
+      sessionStorage.setItem('prospects_contract_filters', JSON.stringify(next))
+      return next
+    })
   }
 
   const filtered = prospects.filter(p =>
@@ -419,7 +438,7 @@ export function Prospects({
           <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '.05em' }}>申込</span>
           <button
             className={`filter-tab ${applyFilters.length === 0 ? 'active' : ''}`}
-            onClick={() => setApplyFilters([])}
+            onClick={() => { setApplyFilters([]); sessionStorage.setItem('prospects_apply_filters', '[]') }}
           >
             すべて
           </button>
@@ -437,7 +456,7 @@ export function Prospects({
           <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '.05em' }}>契約</span>
           <button
             className={`filter-tab ${contractFilters.length === 0 ? 'active' : ''}`}
-            onClick={() => setContractFilters([])}
+            onClick={() => { setContractFilters([]); sessionStorage.setItem('prospects_contract_filters', '[]') }}
           >
             すべて
           </button>

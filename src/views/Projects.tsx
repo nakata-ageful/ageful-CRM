@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { ProjectRow, Customer, CustomerInput } from '../types'
 import type { ProjectInput } from '../lib/actions'
+import { dateInputRange } from '../lib/utils'
 import { Modal } from '../components/Modal'
 import { createCustomer, createProject, deleteProject } from '../lib/actions'
 import { useToast } from '../components/Toast'
@@ -286,7 +287,7 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
             </label>
             <label className="form-label">
               系統認定日
-              <input className="form-input" type="date" value={projectForm.grid_certified_at} onChange={pf('grid_certified_at')} />
+              <input className="form-input" type="date" {...dateInputRange()} value={projectForm.grid_certified_at} onChange={pf('grid_certified_at')} />
             </label>
             <label className="form-label">
               FIT（円）
@@ -294,7 +295,7 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
             </label>
             <label className="form-label">
               給電開始日
-              <input className="form-input" type="date" value={projectForm.power_supply_start_date} onChange={pf('power_supply_start_date')} />
+              <input className="form-input" type="date" {...dateInputRange()} value={projectForm.power_supply_start_date} onChange={pf('power_supply_start_date')} />
             </label>
             <label className="form-label">
               お客さま番号
@@ -311,7 +312,7 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
           <div className="form-grid">
             <label className="form-label">
               引渡日
-              <input className="form-input" type="date" value={projectForm.handover_date} onChange={pf('handover_date')} />
+              <input className="form-input" type="date" {...dateInputRange()} value={projectForm.handover_date} onChange={pf('handover_date')} />
             </label>
             <label className="form-label">
               販売会社

@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import type { Prospect, ProspectApplyStatus, ProspectContractStatus, ProspectInput, Customer } from '../types'
 import { createProspect, deleteProspect } from '../lib/actions'
-import { fmtNum } from '../lib/utils'
+import { fmtNum, dateInputRange } from '../lib/utils'
 import { useToast } from '../components/Toast'
 
 const APPLY_STATUSES: ProspectApplyStatus[] = ['未', '提出済', '通過', '不通', '不可']
@@ -296,7 +296,7 @@ function AddModal({ onSave, onClose, existingCustomers }: {
             </label>
             <label className="form-label">
               商談開始日
-              <input className="form-input" type="date" value={form.lead_date} onChange={e => set('lead_date', e.target.value)} />
+              <input className="form-input" type="date" {...dateInputRange()} value={form.lead_date} onChange={e => set('lead_date', e.target.value)} />
             </label>
           </div>
           <div className="modal-footer">

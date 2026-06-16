@@ -17,3 +17,16 @@ export function fmtDate(v: string | null | undefined): string {
   if (isNaN(d.getTime())) return v
   return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
 }
+
+/**
+ * 日付入力 (input type="date") の選択範囲。過去4年〜来年。
+ * 年が進むと自動でスライド。
+ * 使い方: <input type="date" {...dateInputRange()} ... />
+ */
+export function dateInputRange(): { min: string; max: string } {
+  const yr = new Date().getFullYear()
+  return {
+    min: `${yr - 4}-01-01`,
+    max: `${yr + 1}-12-31`,
+  }
+}

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { Prospect, ProspectApplyStatus, ProspectContractStatus } from '../types'
 import { updateProspect } from '../lib/actions'
-import { fmtNum } from '../lib/utils'
+import { fmtNum, dateInputRange } from '../lib/utils'
 import { buildTaskMap, buildSubTaskMap, tasksForCompany } from '../lib/prospect-tasks'
 
 const APPLY_STATUSES: ProspectApplyStatus[] = ['未', '提出済', '通過', '不通', '不可']
@@ -429,7 +429,7 @@ export function ProspectDetailView({
           <div className="info-field">
             <span>商談開始日</span>
             <input
-              type="date" className="form-input" style={{ marginTop: 4 }}
+              type="date" {...dateInputRange()} className="form-input" style={{ marginTop: 4 }}
               value={p.lead_date ?? ''}
               onChange={e => save({ lead_date: e.target.value || null })}
             />
@@ -437,7 +437,7 @@ export function ProspectDetailView({
           <div className="info-field">
             <span>申込提出日</span>
             <input
-              type="date" className="form-input" style={{ marginTop: 4 }}
+              type="date" {...dateInputRange()} className="form-input" style={{ marginTop: 4 }}
               value={p.apply_submit_date ?? ''}
               onChange={e => save({ apply_submit_date: e.target.value || null })}
             />
@@ -445,7 +445,7 @@ export function ProspectDetailView({
           <div className="info-field">
             <span>審査結果日</span>
             <input
-              type="date" className="form-input" style={{ marginTop: 4 }}
+              type="date" {...dateInputRange()} className="form-input" style={{ marginTop: 4 }}
               value={p.apply_result_date ?? ''}
               onChange={e => save({ apply_result_date: e.target.value || null })}
             />
@@ -453,7 +453,7 @@ export function ProspectDetailView({
           <div className="info-field">
             <span>ローン申込日</span>
             <input
-              type="date" className="form-input" style={{ marginTop: 4 }}
+              type="date" {...dateInputRange()} className="form-input" style={{ marginTop: 4 }}
               value={p.loan_apply_date ?? ''}
               onChange={e => save({ loan_apply_date: e.target.value || null })}
             />
@@ -461,7 +461,7 @@ export function ProspectDetailView({
           <div className="info-field">
             <span>設備売買契約日</span>
             <input
-              type="date" className="form-input" style={{ marginTop: 4 }}
+              type="date" {...dateInputRange()} className="form-input" style={{ marginTop: 4 }}
               value={p.sale_contract_date ?? ''}
               onChange={e => save({ sale_contract_date: e.target.value || null })}
             />
@@ -469,7 +469,7 @@ export function ProspectDetailView({
           <div className="info-field">
             <span>土地契約日</span>
             <input
-              type="date" className="form-input" style={{ marginTop: 4 }}
+              type="date" {...dateInputRange()} className="form-input" style={{ marginTop: 4 }}
               value={p.land_contract_date ?? ''}
               onChange={e => save({ land_contract_date: e.target.value || null })}
             />

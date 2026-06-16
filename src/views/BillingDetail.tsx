@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { BillingDetail, BillingLineItem, PaymentEntry, MaintenanceResponse, PeriodicMaintenance } from '../types'
 import { updateAnnualRecord, createAnnualRecord, deleteAnnualRecord, updateContract } from '../lib/actions'
-import { fmtYen, fmtDate } from '../lib/utils'
+import { fmtYen, fmtDate, dateInputRange } from '../lib/utils'
 import { useToast } from '../components/Toast'
 
 type LineItemForm = { name: string; amount: string }
@@ -286,7 +286,7 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject }: P
                     </div>
                     <label className="form-label">
                       <span style={{ color: '#64748b', fontSize: 11 }}>入金日（振替確認日）</span>
-                      <input type="date" className="form-input" value={receivedDate} onChange={e => setReceivedDate(e.target.value)} />
+                      <input type="date" {...dateInputRange()} className="form-input" value={receivedDate} onChange={e => setReceivedDate(e.target.value)} />
                     </label>
                   </div>
                 )}
@@ -334,18 +334,18 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject }: P
                         <span style={{ fontSize: 10, fontWeight: 700, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>請求書対応</span>
                         <label className="form-label">
                           <span style={{ color: billingDate ? '#374151' : '#ef4444', fontSize: 11 }}>請求日</span>
-                          <input type="date" className="form-input" value={billingDate} onChange={e => setBillingDate(e.target.value)} />
+                          <input type="date" {...dateInputRange()} className="form-input" value={billingDate} onChange={e => setBillingDate(e.target.value)} />
                         </label>
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, background: '#f8fafc', borderRadius: 8, padding: '10px 14px', borderLeft: '3px solid #10b981' }}>
                         <span style={{ fontSize: 10, fontWeight: 700, color: '#10b981', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>入金</span>
                         <label className="form-label" style={{ marginBottom: 6 }}>
                           <span style={{ color: '#64748b', fontSize: 11 }}>入金予定日</span>
-                          <input type="date" className="form-input" value={paymentDueDate} onChange={e => setPaymentDueDate(e.target.value)} />
+                          <input type="date" {...dateInputRange()} className="form-input" value={paymentDueDate} onChange={e => setPaymentDueDate(e.target.value)} />
                         </label>
                         <label className="form-label">
                           <span style={{ color: '#64748b', fontSize: 11 }}>入金日</span>
-                          <input type="date" className="form-input" value={receivedDate} onChange={e => setReceivedDate(e.target.value)} />
+                          <input type="date" {...dateInputRange()} className="form-input" value={receivedDate} onChange={e => setReceivedDate(e.target.value)} />
                         </label>
                       </div>
                     </div>
@@ -370,11 +370,11 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject }: P
                       <span style={{ fontSize: 10, fontWeight: 700, color: '#0ea5e9', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>請求</span>
                       <label className="form-label" style={{ marginBottom: 6 }}>
                         <span style={{ color: '#64748b', fontSize: 11 }}>請求予定日</span>
-                        <input type="date" className="form-input" value={scheduledDate} onChange={e => setScheduledDate(e.target.value)} />
+                        <input type="date" {...dateInputRange()} className="form-input" value={scheduledDate} onChange={e => setScheduledDate(e.target.value)} />
                       </label>
                       <label className="form-label">
                         <span style={{ color: billingDate ? '#374151' : '#ef4444', fontSize: 11 }}>請求日</span>
-                        <input type="date" className="form-input" value={billingDate} onChange={e => setBillingDate(e.target.value)} />
+                        <input type="date" {...dateInputRange()} className="form-input" value={billingDate} onChange={e => setBillingDate(e.target.value)} />
                       </label>
                     </div>
                     {/* 入金グループ */}
@@ -382,11 +382,11 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject }: P
                       <span style={{ fontSize: 10, fontWeight: 700, color: '#10b981', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>入金</span>
                       <label className="form-label" style={{ marginBottom: 6 }}>
                         <span style={{ color: '#64748b', fontSize: 11 }}>入金予定日</span>
-                        <input type="date" className="form-input" value={paymentDueDate} onChange={e => setPaymentDueDate(e.target.value)} />
+                        <input type="date" {...dateInputRange()} className="form-input" value={paymentDueDate} onChange={e => setPaymentDueDate(e.target.value)} />
                       </label>
                       <label className="form-label">
                         <span style={{ color: '#64748b', fontSize: 11 }}>入金日</span>
-                        <input type="date" className="form-input" value={receivedDate} onChange={e => setReceivedDate(e.target.value)} />
+                        <input type="date" {...dateInputRange()} className="form-input" value={receivedDate} onChange={e => setReceivedDate(e.target.value)} />
                       </label>
                     </div>
                   </div>
@@ -406,21 +406,21 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject }: P
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
                           <label className="form-label">
                             <span style={{ color: '#64748b', fontSize: 10 }}>請求予定日</span>
-                            <input type="date" className="form-input" style={{ padding: '4px 6px', fontSize: 11 }}
+                            <input type="date" {...dateInputRange()} className="form-input" style={{ padding: '4px 6px', fontSize: 11 }}
                               value={p.scheduled_date ?? ''}
                               onChange={e => setPayments(prev => prev.map((pp, j) => j === i ? { ...pp, scheduled_date: e.target.value || null } : pp))}
                             />
                           </label>
                           <label className="form-label">
                             <span style={{ color: '#64748b', fontSize: 10 }}>請求日</span>
-                            <input type="date" className="form-input" style={{ padding: '4px 6px', fontSize: 11 }}
+                            <input type="date" {...dateInputRange()} className="form-input" style={{ padding: '4px 6px', fontSize: 11 }}
                               value={p.billing_date ?? ''}
                               onChange={e => setPayments(prev => prev.map((pp, j) => j === i ? { ...pp, billing_date: e.target.value || null } : pp))}
                             />
                           </label>
                           <label className="form-label">
                             <span style={{ color: '#64748b', fontSize: 10 }}>入金日</span>
-                            <input type="date" className="form-input" style={{ padding: '4px 6px', fontSize: 11 }}
+                            <input type="date" {...dateInputRange()} className="form-input" style={{ padding: '4px 6px', fontSize: 11 }}
                               value={p.received_date ?? ''}
                               onChange={e => setPayments(prev => prev.map((pp, j) => j === i ? { ...pp, received_date: e.target.value || null } : pp))}
                             />
@@ -763,7 +763,7 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject }: P
                           <label style={{ fontSize: 11, color: '#64748b', display: 'flex', flexDirection: 'column', gap: 3 }}>
                             請求日
                             <input
-                              type="date" className="form-input"
+                              type="date" {...dateInputRange()} className="form-input"
                               style={{ padding: '4px 8px', fontSize: 12 }}
                               value={historyEdit.billing_date}
                               onChange={e => setHistoryEdit(prev => ({ ...prev, billing_date: e.target.value }))}
@@ -772,7 +772,7 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject }: P
                           <label style={{ fontSize: 11, color: '#64748b', display: 'flex', flexDirection: 'column', gap: 3 }}>
                             入金日
                             <input
-                              type="date" className="form-input"
+                              type="date" {...dateInputRange()} className="form-input"
                               style={{ padding: '4px 8px', fontSize: 12 }}
                               value={historyEdit.received_date}
                               onChange={e => setHistoryEdit(prev => ({ ...prev, received_date: e.target.value }))}

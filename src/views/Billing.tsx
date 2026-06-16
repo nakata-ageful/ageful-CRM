@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { BillingRow } from '../types'
 import { updateAnnualRecord, saveAnnualRecord, deleteAnnualRecord } from '../lib/actions'
-import { fmtYen } from '../lib/utils'
+import { fmtYen, dateInputRange } from '../lib/utils'
 import { useToast } from '../components/Toast'
 
 type Props = {
@@ -214,7 +214,7 @@ export function Billing({ rows, onReload, onViewDetail }: Props) {
                           )}
                         </td>
                         <td style={tdStyle}>
-                          <input type="date" className="form-input" style={{ padding: '5px 8px', fontSize: 13 }}
+                          <input type="date" {...dateInputRange()} className="form-input" style={{ padding: '5px 8px', fontSize: 13 }}
                             value={receivedDates[rec.id] ?? ''}
                             onChange={e => setReceivedDates(prev => ({ ...prev, [rec.id]: e.target.value }))} />
                         </td>

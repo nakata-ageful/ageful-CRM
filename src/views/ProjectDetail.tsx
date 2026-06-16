@@ -7,7 +7,7 @@ import {
   createPeriodicMaintenance, updatePeriodicMaintenance, deletePeriodicMaintenance,
   saveAnnualRecord, updateAnnualRecordStatus, deleteAnnualRecord, createContract, updateContract, updateProject,
 } from '../lib/actions'
-import { fmtYen } from '../lib/utils'
+import { fmtYen, dateInputRange } from '../lib/utils'
 
 /** 郵便番号を自動フォーマット（全角→半角変換、数字のみ抽出 → 3桁+4桁にハイフン挿入） */
 function fmtPostalCode(v: string): string {
@@ -1173,17 +1173,11 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           <div className="form-grid">
             <label className="form-label">
               問合日
-              <input className="form-input" type="date"
-                min={`${new Date().getFullYear() - 4}-01-01`}
-                max={`${new Date().getFullYear() + 1}-12-31`}
-                value={mrForm.inquiry_date} onChange={e => setMrForm(f => ({ ...f, inquiry_date: e.target.value }))} />
+              <input className="form-input" type="date" {...dateInputRange()} value={mrForm.inquiry_date} onChange={e => setMrForm(f => ({ ...f, inquiry_date: e.target.value }))} />
             </label>
             <label className="form-label">
               発生日
-              <input className="form-input" type="date"
-                min={`${new Date().getFullYear() - 4}-01-01`}
-                max={`${new Date().getFullYear() + 1}-12-31`}
-                value={mrForm.occurrence_date} onChange={e => setMrForm(f => ({ ...f, occurrence_date: e.target.value }))} />
+              <input className="form-input" type="date" {...dateInputRange()} value={mrForm.occurrence_date} onChange={e => setMrForm(f => ({ ...f, occurrence_date: e.target.value }))} />
             </label>
             <label className="form-label">
               対象箇所
@@ -1239,7 +1233,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           <div className="form-grid">
             <label className="form-label required">
               実施日
-              <input className="form-input" type="date" value={pmForm.record_date} onChange={e => setPmForm(f => ({ ...f, record_date: e.target.value }))} />
+              <input className="form-input" type="date" {...dateInputRange()} value={pmForm.record_date} onChange={e => setPmForm(f => ({ ...f, record_date: e.target.value }))} />
             </label>
             <label className="form-label">
               作業種別
@@ -1286,11 +1280,11 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             </label>
             <label className="form-label">
               請求日
-              <input className="form-input" type="date" value={arForm.billing_date} onChange={e => setArForm(f => ({ ...f, billing_date: e.target.value }))} />
+              <input className="form-input" type="date" {...dateInputRange()} value={arForm.billing_date} onChange={e => setArForm(f => ({ ...f, billing_date: e.target.value }))} />
             </label>
             <label className="form-label">
               入金日
-              <input className="form-input" type="date" value={arForm.received_date} onChange={e => setArForm(f => ({ ...f, received_date: e.target.value }))} />
+              <input className="form-input" type="date" {...dateInputRange()} value={arForm.received_date} onChange={e => setArForm(f => ({ ...f, received_date: e.target.value }))} />
             </label>
             <label className="form-label" style={{ gridColumn: '1/-1' }}>
               保守記録メモ
@@ -1413,19 +1407,19 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             <p style={{ gridColumn: '1/-1', margin: '8px 0 4px', fontWeight: 600, fontSize: 13, color: '#475569' }}>── 契約日</p>
             <label className="form-label">
               売買契約日
-              <input className="form-input" type="date" value={contractForm.sale_contract_date} onChange={e => setContractForm(f => ({ ...f, sale_contract_date: e.target.value }))} />
+              <input className="form-input" type="date" {...dateInputRange()} value={contractForm.sale_contract_date} onChange={e => setContractForm(f => ({ ...f, sale_contract_date: e.target.value }))} />
             </label>
             <label className="form-label">
               設備契約日
-              <input className="form-input" type="date" value={contractForm.equipment_contract_date} onChange={e => setContractForm(f => ({ ...f, equipment_contract_date: e.target.value }))} />
+              <input className="form-input" type="date" {...dateInputRange()} value={contractForm.equipment_contract_date} onChange={e => setContractForm(f => ({ ...f, equipment_contract_date: e.target.value }))} />
             </label>
             <label className="form-label">
               土地契約日
-              <input className="form-input" type="date" value={contractForm.land_contract_date} onChange={e => setContractForm(f => ({ ...f, land_contract_date: e.target.value }))} />
+              <input className="form-input" type="date" {...dateInputRange()} value={contractForm.land_contract_date} onChange={e => setContractForm(f => ({ ...f, land_contract_date: e.target.value }))} />
             </label>
             <label className="form-label">
               保守契約日
-              <input className="form-input" type="date" value={contractForm.maintenance_contract_date} onChange={e => setContractForm(f => ({ ...f, maintenance_contract_date: e.target.value }))} />
+              <input className="form-input" type="date" {...dateInputRange()} value={contractForm.maintenance_contract_date} onChange={e => setContractForm(f => ({ ...f, maintenance_contract_date: e.target.value }))} />
             </label>
             <p style={{ gridColumn: '1/-1', margin: '8px 0 4px', fontWeight: 600, fontSize: 13, color: '#475569' }}>── 販売経路</p>
             <label className="form-label">
@@ -1439,7 +1433,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             <p style={{ gridColumn: '1/-1', margin: '8px 0 4px', fontWeight: 600, fontSize: 13, color: '#475569' }}>── 保守委託情報</p>
             <label className="form-label">
               保守開始日
-              <input className="form-input" type="date" value={contractForm.maintenance_start_date} onChange={e => setContractForm(f => ({ ...f, maintenance_start_date: e.target.value }))} />
+              <input className="form-input" type="date" {...dateInputRange()} value={contractForm.maintenance_start_date} onChange={e => setContractForm(f => ({ ...f, maintenance_start_date: e.target.value }))} />
             </label>
             <label className="form-label">
               保守委託先
@@ -1465,7 +1459,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             </label>
             <label className="form-label">
               委託開始日
-              <input className="form-input" type="date" value={contractForm.subcontract_start_date} onChange={e => setContractForm(f => ({ ...f, subcontract_start_date: e.target.value }))} />
+              <input className="form-input" type="date" {...dateInputRange()} value={contractForm.subcontract_start_date} onChange={e => setContractForm(f => ({ ...f, subcontract_start_date: e.target.value }))} />
             </label>
             <p style={{ gridColumn: '1/-1', margin: '8px 0 4px', fontWeight: 600, fontSize: 13, color: '#475569' }}>── 保守プラン</p>
             <label className="form-label">
@@ -1579,7 +1573,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             </label>
             <label className="form-label">
               経産認定日
-              <input className="form-input" type="date" value={projForm.grid_certified_at} onChange={e => setProjForm(f => ({ ...f, grid_certified_at: e.target.value }))} />
+              <input className="form-input" type="date" {...dateInputRange()} value={projForm.grid_certified_at} onChange={e => setProjForm(f => ({ ...f, grid_certified_at: e.target.value }))} />
             </label>
             <label className="form-label">
               FIT（円）
@@ -1587,7 +1581,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             </label>
             <label className="form-label">
               需給開始日
-              <input className="form-input" type="date" value={projForm.power_supply_start_date} onChange={e => setProjForm(f => ({ ...f, power_supply_start_date: e.target.value }))} />
+              <input className="form-input" type="date" {...dateInputRange()} value={projForm.power_supply_start_date} onChange={e => setProjForm(f => ({ ...f, power_supply_start_date: e.target.value }))} />
             </label>
             <label className="form-label">
               お客さま番号
@@ -1643,11 +1637,11 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             </label>
             <label className="form-label">
               電力変更日
-              <input className="form-input" type="date" value={projForm.power_change_date} onChange={e => setProjForm(f => ({ ...f, power_change_date: e.target.value }))} />
+              <input className="form-input" type="date" {...dateInputRange()} value={projForm.power_change_date} onChange={e => setProjForm(f => ({ ...f, power_change_date: e.target.value }))} />
             </label>
             <label className="form-label">
               引渡日
-              <input className="form-input" type="date" value={projForm.handover_date} onChange={e => setProjForm(f => ({ ...f, handover_date: e.target.value }))} />
+              <input className="form-input" type="date" {...dateInputRange()} value={projForm.handover_date} onChange={e => setProjForm(f => ({ ...f, handover_date: e.target.value }))} />
             </label>
             <label className="form-label">
               設備代
@@ -1722,7 +1716,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                 </label>
                 <label className="form-label">
                   認定日
-                  <input className="form-input" type="date" value={projForm.grid_certified_at} onChange={e => setProjForm(f => ({ ...f, grid_certified_at: e.target.value }))} />
+                  <input className="form-input" type="date" {...dateInputRange()} value={projForm.grid_certified_at} onChange={e => setProjForm(f => ({ ...f, grid_certified_at: e.target.value }))} />
                 </label>
               </>
             )}
@@ -1740,7 +1734,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                 </label>
                 <label className="form-label">
                   受給開始日
-                  <input className="form-input" type="date" value={projForm.power_supply_start_date} onChange={e => setProjForm(f => ({ ...f, power_supply_start_date: e.target.value }))} />
+                  <input className="form-input" type="date" {...dateInputRange()} value={projForm.power_supply_start_date} onChange={e => setProjForm(f => ({ ...f, power_supply_start_date: e.target.value }))} />
                 </label>
                 <label className="form-label">
                   FIT（円）
@@ -1768,7 +1762,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                 </label>
                 <label className="form-label">
                   電力変更日
-                  <input className="form-input" type="date" value={projForm.power_change_date} onChange={e => setProjForm(f => ({ ...f, power_change_date: e.target.value }))} />
+                  <input className="form-input" type="date" {...dateInputRange()} value={projForm.power_change_date} onChange={e => setProjForm(f => ({ ...f, power_change_date: e.target.value }))} />
                 </label>
                 <label className="form-label">
                   検針日（毎月）
@@ -1893,11 +1887,11 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                 </label>
                 <label className="form-label">
                   設備売買契約日
-                  <input className="form-input" type="date" value={contractForm.equipment_contract_date} onChange={e => setContractForm(f => ({ ...f, equipment_contract_date: e.target.value }))} />
+                  <input className="form-input" type="date" {...dateInputRange()} value={contractForm.equipment_contract_date} onChange={e => setContractForm(f => ({ ...f, equipment_contract_date: e.target.value }))} />
                 </label>
                 <label className="form-label">
                   引渡日
-                  <input className="form-input" type="date" value={projForm.handover_date} onChange={e => setProjForm(f => ({ ...f, handover_date: e.target.value }))} />
+                  <input className="form-input" type="date" {...dateInputRange()} value={projForm.handover_date} onChange={e => setProjForm(f => ({ ...f, handover_date: e.target.value }))} />
                 </label>
                 <label className="form-label">
                   顧客紹介者
@@ -1939,11 +1933,11 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                 </label>
                 <label className="form-label">
                   土地契約日
-                  <input className="form-input" type="date" value={contractForm.land_contract_date} onChange={e => setContractForm(f => ({ ...f, land_contract_date: e.target.value }))} />
+                  <input className="form-input" type="date" {...dateInputRange()} value={contractForm.land_contract_date} onChange={e => setContractForm(f => ({ ...f, land_contract_date: e.target.value }))} />
                 </label>
                 <label className="form-label">
                   所有権移転日
-                  <input className="form-input" type="date" value={contractForm.ownership_transfer_date} onChange={e => setContractForm(f => ({ ...f, ownership_transfer_date: e.target.value }))} />
+                  <input className="form-input" type="date" {...dateInputRange()} value={contractForm.ownership_transfer_date} onChange={e => setContractForm(f => ({ ...f, ownership_transfer_date: e.target.value }))} />
                 </label>
                 <label className="form-label" style={{ gridColumn: '1/-1' }}>
                   備考
@@ -1993,11 +1987,11 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                 </label>
                 <label className="form-label">
                   保守契約日
-                  <input className="form-input" type="date" value={contractForm.maintenance_contract_date} onChange={e => setContractForm(f => ({ ...f, maintenance_contract_date: e.target.value }))} />
+                  <input className="form-input" type="date" {...dateInputRange()} value={contractForm.maintenance_contract_date} onChange={e => setContractForm(f => ({ ...f, maintenance_contract_date: e.target.value }))} />
                 </label>
                 <label className="form-label">
                   保守開始日
-                  <input className="form-input" type="date" value={contractForm.maintenance_start_date} onChange={e => setContractForm(f => ({ ...f, maintenance_start_date: e.target.value }))} />
+                  <input className="form-input" type="date" {...dateInputRange()} value={contractForm.maintenance_start_date} onChange={e => setContractForm(f => ({ ...f, maintenance_start_date: e.target.value }))} />
                 </label>
                 <label className="form-label" style={{ gridColumn: '1/-1' }}>
                   備考
@@ -2085,7 +2079,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                   <>
                     <label className="form-label">
                       設置報告 申請日
-                      <input className="form-input" type="date" value={contractForm.meti_setup_report_date} onChange={e => setContractForm(f => ({ ...f, meti_setup_report_date: e.target.value }))} />
+                      <input className="form-input" type="date" {...dateInputRange()} value={contractForm.meti_setup_report_date} onChange={e => setContractForm(f => ({ ...f, meti_setup_report_date: e.target.value }))} />
                     </label>
                     <label className="form-label">
                       設置報告 ステータス
@@ -2147,7 +2141,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                 </label>
                 <label className="form-label">
                   委託開始日
-                  <input className="form-input" type="date" value={contractForm.subcontract_start_date} onChange={e => setContractForm(f => ({ ...f, subcontract_start_date: e.target.value }))} />
+                  <input className="form-input" type="date" {...dateInputRange()} value={contractForm.subcontract_start_date} onChange={e => setContractForm(f => ({ ...f, subcontract_start_date: e.target.value }))} />
                 </label>
                 <label className="form-label">
                   委託請求日（毎年）

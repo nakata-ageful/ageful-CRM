@@ -3,7 +3,7 @@ import type { CustomerDetailData, CustomerInput } from '../types'
 import type { ProjectInput } from '../lib/actions'
 import { Modal } from '../components/Modal'
 import { createProject, updateCustomer, uploadAttachment, deleteAttachment } from '../lib/actions'
-import { fmtDate } from '../lib/utils'
+import { fmtDate, dateInputRange } from '../lib/utils'
 import { useToast } from '../components/Toast'
 
 /** 郵便番号を「〒xxx-xxxx」形式で表示。値が空なら「-」を返す。 */
@@ -347,7 +347,7 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject }: 
             </label>
             <label className="form-label">
               引渡日
-              <input className="form-input" type="date" value={projectForm.handover_date} onChange={e => setProjectForm(f => ({ ...f, handover_date: e.target.value }))} />
+              <input className="form-input" type="date" {...dateInputRange()} value={projectForm.handover_date} onChange={e => setProjectForm(f => ({ ...f, handover_date: e.target.value }))} />
             </label>
           </div>
           <div className="modal-footer">

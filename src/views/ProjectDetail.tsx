@@ -720,7 +720,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('panel')}>編集</button>
             </div>
             <div className="info-grid">
-              <div className="info-field"><span>KW</span><b>{project.panel_kw != null ? `${project.panel_kw}kW` : '-'}</b></div>
+              <div className="info-field"><span>KW</span><b>{project.panel_kw != null ? `${project.panel_kw.toFixed(3)}kW` : '-'}</b></div>
               <div className="info-field"><span>メーカー</span><b>{project.panel_maker ?? '-'}</b></div>
               <div className="info-field"><span>型式</span><b>{project.panel_model ?? '-'}</b></div>
               <div className="info-field"><span>w/枚</span><b>{project.panel_kw != null && project.panel_count != null && project.panel_count > 0 ? `${Math.round(project.panel_kw * 1000 / project.panel_count)}W` : '-'}</b></div>
@@ -735,7 +735,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('pcs')}>編集</button>
             </div>
             <div className="info-grid">
-              <div className="info-field"><span>KW</span><b>{project.pcs_kw != null ? `${project.pcs_kw}kW` : '-'}</b></div>
+              <div className="info-field"><span>KW</span><b>{project.pcs_kw != null ? `${project.pcs_kw.toFixed(3)}kW` : '-'}</b></div>
               <div className="info-field"><span>メーカー</span><b>{project.pcs_maker ?? '-'}</b></div>
               <div className="info-field"><span>型式</span><b>{project.pcs_model ?? '-'}</b></div>
               <div className="info-field"><span>kw/台</span><b>{project.pcs_kw != null && project.pcs_count != null && project.pcs_count > 0 ? `${(project.pcs_kw / project.pcs_count).toFixed(1)}kW` : '-'}</b></div>

@@ -40,8 +40,19 @@ export function MaintenanceResponses({ responses, periodic, billingRows, onReloa
     setTopTabState(t)
     writeTopTabToHash(t)
   }
-  const [filter, setFilter] = useState<Filter>('対応中')
-  const [search, setSearch] = useState('')
+  const [filter, setFilterState] = useState<Filter>(() => {
+    const saved = sessionStorage.getItem('maintenance_responses_filter')
+    return (['all', '対応中', '完了'].includes(saved ?? '') ? saved : '対応中') as Filter
+  })
+  const setFilter = (f: Filter) => {
+    setFilterState(f)
+    sessionStorage.setItem('maintenance_responses_filter', f)
+  }
+  const [search, setSearchState] = useState(() => sessionStorage.getItem('maintenance_responses_search') ?? '')
+  const setSearch = (s: string) => {
+    setSearchState(s)
+    sessionStorage.setItem('maintenance_responses_search', s)
+  }
 
   const filteredResponses = responses.filter(r => {
     if (filter !== 'all' && r.status !== filter) return false

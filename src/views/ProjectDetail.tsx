@@ -623,6 +623,14 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           has_meti_periodic_report: contractForm.has_meti_periodic_report,
           meti_setup_report_date: contractForm.meti_setup_report_date || null,
           meti_setup_report_status: contractForm.meti_setup_report_status || null,
+          has_issuance_fee: contractForm.has_issuance_fee,
+          issuance_fee_ex: toNum(contractForm.issuance_fee_ex),
+          issuance_fee_inc: toNum(contractForm.issuance_fee_inc),
+          has_transfer_fee: contractForm.has_transfer_fee,
+          transfer_fee_ex: toNum(contractForm.transfer_fee_ex),
+          transfer_fee_inc: toNum(contractForm.transfer_fee_inc),
+          billing_schedule_days: contractForm.billing_schedule_days.length > 0 ? contractForm.billing_schedule_days : null,
+          billing_amount_overrides: Object.keys(contractForm.billing_amount_overrides).length > 0 ? contractForm.billing_amount_overrides : null,
         })
       }
       setEditSection(null)

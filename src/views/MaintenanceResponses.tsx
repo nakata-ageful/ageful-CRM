@@ -220,7 +220,8 @@ export function MaintenanceResponses({ responses, periodic, billingRows, onReloa
       {topTab === '受託情報' && (
         <div className="card">
           <div className="table-meta">{filteredContractRows.length} 件</div>
-          <table>
+          <div style={{ overflowX: 'auto' }}>
+          <table style={{ whiteSpace: 'nowrap' }}>
             <thead>
               <tr>
                 <th>受託会社</th><th>発電所</th><th>顧客</th>
@@ -249,13 +250,15 @@ export function MaintenanceResponses({ responses, periodic, billingRows, onReloa
               })}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
       {topTab === '委託情報' && (
         <div className="card">
           <div className="table-meta">{filteredContractRows.length} 件</div>
-          <table>
+          <div style={{ overflowX: 'auto' }}>
+          <table style={{ whiteSpace: 'nowrap' }}>
             <thead>
               <tr>
                 <th>保守委託先</th><th>発電所</th><th>顧客</th>
@@ -280,6 +283,7 @@ export function MaintenanceResponses({ responses, periodic, billingRows, onReloa
               })}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </>

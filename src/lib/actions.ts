@@ -128,10 +128,12 @@ export type ProjectInput = {
   panel_count: string
   panel_maker: string
   panel_model: string
+  panel_notes: string
   pcs_kw: string
   pcs_count: string
   pcs_maker: string
   pcs_model: string
+  pcs_notes: string
   grid_id: string
   grid_certified_at: string
   fit_period: string
@@ -146,6 +148,7 @@ export type ProjectInput = {
   monitoring_id: string
   monitoring_user: string
   monitoring_pw: string
+  monitoring_notes: string
   has_4g: boolean
   key_number: string
   local_association: string
@@ -178,10 +181,12 @@ function projectPayload(input: Omit<ProjectInput, 'customer_id'>): Omit<Project,
     panel_count: toInt(input.panel_count),
     panel_maker: input.panel_maker || null,
     panel_model: input.panel_model || null,
+    panel_notes: input.panel_notes || null,
     pcs_kw: toFloat(input.pcs_kw),
     pcs_count: toInt(input.pcs_count),
     pcs_maker: input.pcs_maker || null,
     pcs_model: input.pcs_model || null,
+    pcs_notes: input.pcs_notes || null,
     grid_id: input.grid_id || null,
     grid_certified_at: toDate(input.grid_certified_at),
     fit_period: toInt(input.fit_period),
@@ -196,6 +201,7 @@ function projectPayload(input: Omit<ProjectInput, 'customer_id'>): Omit<Project,
     monitoring_id: input.monitoring_id || null,
     monitoring_user: input.monitoring_user || null,
     monitoring_pw: input.monitoring_pw || null,
+    monitoring_notes: input.monitoring_notes || null,
     has_4g: input.has_4g ?? null,
     key_number: input.key_number || null,
     local_association: input.local_association || null,
@@ -937,10 +943,10 @@ export async function createProspect(input: ProspectInput): Promise<Prospect> {
     site_postal_code: '', site_prefecture: '', site_address: input.site_address || '',
     latitude: '', longitude: '', google_coordinates: '',
     panel_kw: input.panel_kw || '', panel_count: '',
-    panel_maker: '', panel_model: '', pcs_kw: '', pcs_count: '', pcs_maker: '', pcs_model: '',
+    panel_maker: '', panel_model: '', panel_notes: '', pcs_kw: '', pcs_count: '', pcs_maker: '', pcs_model: '', pcs_notes: '',
     grid_id: '', grid_certified_at: '', fit_period: '', fit_term_years: '', fit_end_date: '', power_supply_start_date: '',
     customer_number: '', generation_point_id: '', meter_reading_day: '',
-    monitoring_system: '', monitoring_model: '', monitoring_id: '', monitoring_user: '', monitoring_pw: '',
+    monitoring_system: '', monitoring_model: '', monitoring_id: '', monitoring_user: '', monitoring_pw: '', monitoring_notes: '',
     has_4g: false, key_number: '', local_association: '', old_owner: '',
     sales_company: input.sales_company || '', referrer: input.referrer || '',
     customer_referrer: input.referrer || '', project_referrer: '',
@@ -1104,10 +1110,10 @@ export async function convertProspectToCustomer(prospect: Prospect): Promise<num
     site_postal_code: '', site_prefecture: '', site_address: prospect.site_address || '',
     latitude: '', longitude: '', google_coordinates: '',
     panel_kw: prospect.panel_kw?.toString() ?? '', panel_count: '',
-    panel_maker: '', panel_model: '', pcs_kw: '', pcs_count: '', pcs_maker: '', pcs_model: '',
+    panel_maker: '', panel_model: '', panel_notes: '', pcs_kw: '', pcs_count: '', pcs_maker: '', pcs_model: '', pcs_notes: '',
     grid_id: '', grid_certified_at: '', fit_period: '', fit_term_years: '', fit_end_date: '', power_supply_start_date: '',
     customer_number: '', generation_point_id: '', meter_reading_day: '',
-    monitoring_system: '', monitoring_model: '', monitoring_id: '', monitoring_user: '', monitoring_pw: '',
+    monitoring_system: '', monitoring_model: '', monitoring_id: '', monitoring_user: '', monitoring_pw: '', monitoring_notes: '',
     has_4g: false, key_number: '', local_association: '', old_owner: '',
     sales_company: prospect.sales_company || '', referrer: prospect.referrer || '',
     customer_referrer: prospect.referrer || '', project_referrer: '',

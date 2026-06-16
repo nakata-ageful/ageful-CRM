@@ -35,11 +35,13 @@ export type Project = {
   panel_count: number | null
   panel_maker: string | null
   panel_model: string | null
+  panel_notes?: string | null
   // PCS情報
   pcs_kw: number | null
   pcs_count: number | null
   pcs_maker: string | null
   pcs_model: string | null
+  pcs_notes?: string | null
   // 経産・FIT
   grid_id: string | null
   grid_certified_at: string | null
@@ -57,6 +59,7 @@ export type Project = {
   monitoring_user: string | null
   monitoring_pw: string | null
   has_4g: boolean | null
+  monitoring_notes?: string | null
   // その他
   key_number: string | null
   local_association: string | null

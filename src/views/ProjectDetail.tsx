@@ -166,10 +166,12 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
     panel_count: project.panel_count != null ? String(project.panel_count) : '',
     panel_maker: project.panel_maker ?? '',
     panel_model: project.panel_model ?? '',
+    panel_notes: project.panel_notes ?? '',
     pcs_kw: project.pcs_kw != null ? String(project.pcs_kw) : '',
     pcs_count: project.pcs_count != null ? String(project.pcs_count) : '',
     pcs_maker: project.pcs_maker ?? '',
     pcs_model: project.pcs_model ?? '',
+    pcs_notes: project.pcs_notes ?? '',
     grid_id: project.grid_id ?? '',
     grid_certified_at: project.grid_certified_at ?? '',
     fit_period: project.fit_period != null ? String(project.fit_period) : '',
@@ -184,6 +186,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
     monitoring_id: project.monitoring_id ?? '',
     monitoring_user: project.monitoring_user ?? '',
     monitoring_pw: project.monitoring_pw ?? '',
+    monitoring_notes: project.monitoring_notes ?? '',
     has_4g: project.has_4g == null ? '' : project.has_4g ? 'true' : 'false',
     key_number: project.key_number ?? '',
     local_association: project.local_association ?? '',
@@ -466,10 +469,12 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       panel_count: project.panel_count != null ? String(project.panel_count) : '',
       panel_maker: project.panel_maker ?? '',
       panel_model: project.panel_model ?? '',
+      panel_notes: project.panel_notes ?? '',
       pcs_kw: project.pcs_kw != null ? String(project.pcs_kw) : '',
       pcs_count: project.pcs_count != null ? String(project.pcs_count) : '',
       pcs_maker: project.pcs_maker ?? '',
       pcs_model: project.pcs_model ?? '',
+      pcs_notes: project.pcs_notes ?? '',
       grid_id: project.grid_id ?? '',
       grid_certified_at: project.grid_certified_at ?? '',
       fit_period: project.fit_period != null ? String(project.fit_period) : '',
@@ -484,6 +489,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       monitoring_id: project.monitoring_id ?? '',
       monitoring_user: project.monitoring_user ?? '',
       monitoring_pw: project.monitoring_pw ?? '',
+    monitoring_notes: project.monitoring_notes ?? '',
       has_4g: project.has_4g == null ? '' : project.has_4g ? 'true' : 'false',
       key_number: project.key_number ?? '',
       local_association: project.local_association ?? '',
@@ -725,6 +731,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               <div className="info-field"><span>型式</span><b>{project.panel_model ?? '-'}</b></div>
               <div className="info-field"><span>w/枚</span><b>{project.panel_kw != null && project.panel_count != null && project.panel_count > 0 ? `${Math.round(project.panel_kw * 1000 / project.panel_count)}W` : '-'}</b></div>
               <div className="info-field"><span>枚数</span><b>{project.panel_count != null ? `${project.panel_count}枚` : '-'}</b></div>
+              <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap' }}>{project.panel_notes || '-'}</b></div>
             </div>
           </div>
 
@@ -740,6 +747,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               <div className="info-field"><span>型式</span><b>{project.pcs_model ?? '-'}</b></div>
               <div className="info-field"><span>kw/台</span><b>{project.pcs_kw != null && project.pcs_count != null && project.pcs_count > 0 ? `${(project.pcs_kw / project.pcs_count).toFixed(1)}kW` : '-'}</b></div>
               <div className="info-field"><span>台数</span><b>{project.pcs_count != null ? `${project.pcs_count}台` : '-'}</b></div>
+              <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap' }}>{project.pcs_notes || '-'}</b></div>
             </div>
           </div>
 
@@ -755,6 +763,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               <div className="info-field"><span>ID</span><b>{project.monitoring_id ?? '-'}</b></div>
               <div className="info-field"><span>パスワード</span><b>{project.monitoring_pw ?? '-'}</b></div>
               <div className="info-field"><span>4G対応</span><b>{project.has_4g == null ? '-' : project.has_4g ? 'あり' : 'なし'}</b></div>
+              <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap' }}>{project.monitoring_notes || '-'}</b></div>
             </div>
           </div>
         </div>
@@ -1793,6 +1802,10 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                   <span>w/枚（自動計算）</span>
                   <b>{projForm.panel_kw && projForm.panel_count && Number(projForm.panel_count) > 0 ? `${Math.round(Number(projForm.panel_kw) * 1000 / Number(projForm.panel_count))}W` : '-'}</b>
                 </div>
+                <label className="form-label" style={{ gridColumn: '1/-1' }}>
+                  備考
+                  <textarea className="form-input" rows={3} value={projForm.panel_notes} onChange={e => setProjForm(f => ({ ...f, panel_notes: e.target.value }))} style={{ resize: 'vertical' }} />
+                </label>
               </>
             )}
 
@@ -1819,6 +1832,10 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                   <span>kw/台（自動計算）</span>
                   <b>{projForm.pcs_kw && projForm.pcs_count && Number(projForm.pcs_count) > 0 ? `${(Number(projForm.pcs_kw) / Number(projForm.pcs_count)).toFixed(1)}kW` : '-'}</b>
                 </div>
+                <label className="form-label" style={{ gridColumn: '1/-1' }}>
+                  備考
+                  <textarea className="form-input" rows={3} value={projForm.pcs_notes} onChange={e => setProjForm(f => ({ ...f, pcs_notes: e.target.value }))} style={{ resize: 'vertical' }} />
+                </label>
               </>
             )}
 
@@ -1848,6 +1865,10 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                     <option value="true">あり</option>
                     <option value="false">なし</option>
                   </select>
+                </label>
+                <label className="form-label" style={{ gridColumn: '1/-1' }}>
+                  備考
+                  <textarea className="form-input" rows={3} value={projForm.monitoring_notes} onChange={e => setProjForm(f => ({ ...f, monitoring_notes: e.target.value }))} style={{ resize: 'vertical' }} />
                 </label>
               </>
             )}

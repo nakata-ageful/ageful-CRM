@@ -1468,6 +1468,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                 <option value="">-</option>
                 <option value="なし">なし</option>
                 <option value="年1回">年1回</option>
+                <option value="年2回">年2回</option>
               </select>
             </label>
             <label className="form-label">
@@ -2019,6 +2020,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                     <option value="">未設定</option>
                     <option value="なし">なし</option>
                     <option value="年1回">年1回</option>
+                    <option value="年2回">年2回</option>
                   </select>
                 </label>
                 <label className="form-label">

@@ -277,7 +277,8 @@ export type BillingRow = {
   customer_name: string
   company_name: string | null
   contract: Contract | null
-  currentYearRecord: AnnualRecord | null
+  currentYearRecord: AnnualRecord | null   // 既存ロジック用（最初の1件）
+  currentYearRecords: AnnualRecord[]        // 同年複数対応
   currentYear: number
 }
 

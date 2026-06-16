@@ -337,7 +337,8 @@ export async function getBillingRows(): Promise<BillingRow[]> {
       const c = customerStore.getById(p.customer_id)
       const contract = contractStore.getByProjectId(p.id)
       const records = contract ? annualRecordStore.getByContractId(contract.id) : []
-      const currentYearRecord = records.find(r => r.year === currentYear) ?? null
+      const currentYearRecords = records.filter(r => r.year === currentYear)
+      const currentYearRecord = currentYearRecords[0] ?? null
       return {
         project_id: p.id,
         project_name: p.project_name,
@@ -345,6 +346,7 @@ export async function getBillingRows(): Promise<BillingRow[]> {
         company_name: c?.company_name ?? null,
         contract: contract ?? null,
         currentYearRecord,
+        currentYearRecords,
         currentYear,
       }
     })
@@ -363,14 +365,16 @@ export async function getBillingRows(): Promise<BillingRow[]> {
     const conArr = row.contracts as Record<string, unknown>[] | null
     const con = conArr?.[0] ?? null
     const records = (con?.annual_records as Record<string, unknown>[] | null) ?? []
-    const currentYearRecord = records.find(r => (r.year as number) === currentYear) ?? null
+    const currentYearRecords = records.filter(r => (r.year as number) === currentYear) as import('../types').AnnualRecord[]
+    const currentYearRecord = currentYearRecords[0] ?? null
     return {
       project_id: row.id as number,
       project_name: row.project_name as string,
       customer_name: (cust?.company_name as string) ?? (cust?.name as string) ?? '-',
       company_name: (cust?.company_name as string) ?? null,
       contract: con as import('../types').Contract | null,
-      currentYearRecord: currentYearRecord as import('../types').AnnualRecord | null,
+      currentYearRecord,
+      currentYearRecords,
       currentYear,
     }
   })

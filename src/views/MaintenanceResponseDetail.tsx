@@ -51,9 +51,8 @@ export function MaintenanceResponseDetail({ response, onBack, onReload, onViewPr
 
   return (
     <>
-      <button className="back-btn" onClick={onBack}>← 戻る</button>
-
-      <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 16 }}>
+      <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+        <button className="back-btn" style={{ margin: 0 }} onClick={onBack}>← 戻る</button>
         <span style={{ fontSize: 13, color: '#64748b' }}>発電所：</span>
         <button className="link-btn" onClick={() => onViewProject(response.project_id)}>
           {response.plant_name || response.project_name || '-'}

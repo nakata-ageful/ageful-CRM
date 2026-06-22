@@ -84,33 +84,53 @@ export function Billing({ rows, onReload, onViewDetail }: Props) {
     amount: number
   }
   const upcomingInvoices: UpcomingItem[] = rows.flatMap(r => {
-    if (r.contract?.billing_method !== '請求書') return []
-    const days = r.contract?.billing_schedule_days ?? []
+    const c = r.contract
+    if (c?.billing_method !== '請求書') return []
+    const days = c?.billing_schedule_days ?? []
     const totalRounds = days.length
     if (totalRounds === 0) return []
+
+    // 当月/翌月にあたる予定回を候補として抽出
+    const candidates = days
+      .map((day, i) => ({ day, round: i + 1, month: parseScheduleDay(day).month }))
+      .filter(cd => cd.month === currentMonth || cd.month === nextMonth)
+      .map(cd => {
+        const isNextMonth = cd.month === nextMonth
+        const year = isNextMonth ? nextMonthYear : currentYear
+        return { ...cd, year, iso: toIsoDate(year, cd.day) }
+      })
+      .filter(cd => cd.iso != null) as { day: string; round: number; year: number; iso: string }[]
+    if (candidates.length === 0) return []
+
+    // 年度ごとに「予定日が未設定のまま請求/入金/振替失敗が入った記録」の数を数える。
+    // これらは発行ボタンを通さず（CSVインポート等で）作られた記録で、実質その年の請求が
+    // 済んでいることを意味する。スケジュール回に正確に紐づく記録は除く（=正規の発行済み）。
+    const floatingByYear: Record<number, number> = {}
+    for (const rec of r.currentYearRecords) {
+      const handled = rec.billing_date || rec.received_date || rec.transfer_failed
+      if (!handled) continue
+      const tied = days.some(d => toIsoDate(rec.year, d) === rec.billing_scheduled_date)
+      if (tied) continue
+      floatingByYear[rec.year] = (floatingByYear[rec.year] ?? 0) + 1
+    }
+
     const results: UpcomingItem[] = []
-    days.forEach((day, i) => {
-      const { month } = parseScheduleDay(day)
-      if (month == null) return
-      // 当月か翌月のものだけ
-      const isCurrentMonth = month === currentMonth
-      const isNextMonth = month === nextMonth
-      if (!isCurrentMonth && !isNextMonth) return
-      const year = isNextMonth ? nextMonthYear : currentYear
-      const scheduledDateISO = toIsoDate(year, day)
-      if (!scheduledDateISO) return
-      // 既存 annual_record で同じ scheduled_date があれば未入金 or 入金済セクションへ
-      const existing = r.currentYearRecords.find(rec => rec.billing_scheduled_date === scheduledDateISO)
-      if (existing) return
+    candidates.sort((a, b) => a.iso.localeCompare(b.iso))
+    for (const cand of candidates) {
+      const yearRecs = r.currentYearRecords.filter(rec => rec.year === cand.year)
+      // 既にこの予定日そのものの記録がある（発行済 or 入金済）→ 未入金/入金済セクション側へ
+      if (yearRecs.some(rec => rec.billing_scheduled_date === cand.iso)) continue
+      // 予定日未設定のまま請求された記録がこの年度にあれば、その分この回を消費して除外
+      if ((floatingByYear[cand.year] ?? 0) > 0) { floatingByYear[cand.year]--; continue }
       results.push({
         row: r,
-        round: i + 1,
+        round: cand.round,
         totalRounds,
-        scheduledDateISO,
-        scheduleDayLabel: day,
-        amount: invoiceAmount(r.contract, i + 1, totalRounds),
+        scheduledDateISO: cand.iso,
+        scheduleDayLabel: cand.day,
+        amount: invoiceAmount(c, cand.round, totalRounds),
       })
-    })
+    }
     return results
   }).sort((a, b) => a.scheduledDateISO.localeCompare(b.scheduledDateISO))
 

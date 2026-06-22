@@ -65,7 +65,8 @@ function annualTotalIncFromContract(c: { annual_maintenance_inc?: number | null;
 }
 
 
-const TABS: Tab[] = ['基本情報', '設備情報', '契約情報', '保守情報', '請求情報', '保守対応', '年次請求記録', 'その他']
+// 年次請求記録タブは請求タブ／請求詳細に運用を集約したため非表示（描画コードは dormant で残置）
+const TABS: Tab[] = ['基本情報', '設備情報', '契約情報', '保守情報', '請求情報', '保守対応', 'その他']
 
 function readTabFromHash(): Tab {
   const h = window.location.hash

@@ -753,7 +753,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               <div className="info-field"><span>KW</span><b>{project.pcs_kw != null ? `${project.pcs_kw.toFixed(3)}kW` : '-'}</b></div>
               <div className="info-field"><span>メーカー</span><b>{project.pcs_maker ?? '-'}</b></div>
               <div className="info-field"><span>型式</span><b>{project.pcs_model ?? '-'}</b></div>
-              <div className="info-field"><span>kw/台</span><b>{project.pcs_kw != null && project.pcs_count != null && project.pcs_count > 0 ? `${(project.pcs_kw / project.pcs_count).toFixed(1)}kW` : '-'}</b></div>
+              <div className="info-field"><span>kw/台</span><b>{project.pcs_kw != null && project.pcs_count != null && project.pcs_count > 0 ? `${(project.pcs_kw / project.pcs_count).toFixed(3)}kW` : '-'}</b></div>
               <div className="info-field"><span>台数</span><b>{project.pcs_count != null ? `${project.pcs_count}台` : '-'}</b></div>
               <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap' }}>{project.pcs_notes || '-'}</b></div>
             </div>
@@ -1839,7 +1839,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                 </label>
                 <div className="info-field" style={{ gridColumn: '1/-1' }}>
                   <span>kw/台（自動計算）</span>
-                  <b>{projForm.pcs_kw && projForm.pcs_count && Number(projForm.pcs_count) > 0 ? `${(Number(projForm.pcs_kw) / Number(projForm.pcs_count)).toFixed(1)}kW` : '-'}</b>
+                  <b>{projForm.pcs_kw && projForm.pcs_count && Number(projForm.pcs_count) > 0 ? `${(Number(projForm.pcs_kw) / Number(projForm.pcs_count)).toFixed(3)}kW` : '-'}</b>
                 </div>
                 <label className="form-label" style={{ gridColumn: '1/-1' }}>
                   備考

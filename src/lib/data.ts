@@ -15,6 +15,32 @@ function db() {
   return supabase
 }
 
+// 発電所一覧の検索用テキストを生成する。
+// 基本情報・設備情報は projects テーブルの全カラム、契約情報は contracts 側の
+// 各項目（契約日・販売経路・備考など）と顧客名を連結して小文字化する。
+function buildProjectSearchText(
+  projectSource: Record<string, unknown>,
+  contract: Record<string, unknown> | null,
+  customerName: string | null,
+  companyName: string | null,
+): string {
+  const parts: unknown[] = [...Object.values(projectSource)]
+  if (contract) {
+    parts.push(
+      contract.sale_contract_date, contract.equipment_contract_date,
+      contract.land_contract_date, contract.ownership_transfer_date,
+      contract.sales_to_neosys, contract.neosys_to_referrer,
+      contract.equipment_contract_notes, contract.land_contract_notes,
+      contract.subcontractor, contract.maintenance_start_date,
+    )
+  }
+  parts.push(customerName, companyName)
+  return parts
+    .filter(v => typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean')
+    .map(v => String(v).toLowerCase())
+    .join(' ')
+}
+
 // ── Dashboard ─────────────────────────────────────────────
 
 export async function getDashboard(): Promise<DashboardStats> {
@@ -162,6 +188,12 @@ export async function getProjects(): Promise<ProjectRow[]> {
         created_at: p.created_at,
         customer_name: c?.company_name ?? c?.name ?? '-',
         company_name: c?.company_name ?? null,
+        search_text: buildProjectSearchText(
+          p as unknown as Record<string, unknown>,
+          (contract ?? null) as unknown as Record<string, unknown> | null,
+          c?.company_name ?? c?.name ?? null,
+          c?.company_name ?? null,
+        ),
       }
     })
   }
@@ -169,7 +201,7 @@ export async function getProjects(): Promise<ProjectRow[]> {
   const client = db()
   const { data, error } = await client
     .from('projects')
-    .select('*, customers(name, company_name), contracts(subcontractor, maintenance_start_date)')
+    .select('*, customers(name, company_name), contracts(subcontractor, maintenance_start_date, sale_contract_date, equipment_contract_date, land_contract_date, ownership_transfer_date, sales_to_neosys, neosys_to_referrer, equipment_contract_notes, land_contract_notes)')
     .order('created_at', { ascending: false })
     // TODO: 大規模データセットに対しては適切なページネーションを実装すべき
     .limit(1000)
@@ -177,6 +209,10 @@ export async function getProjects(): Promise<ProjectRow[]> {
   return (data ?? []).map((row: Record<string, unknown>) => {
     const cust = row.customers as Record<string, unknown> | null
     const con = (Array.isArray(row.contracts) ? row.contracts[0] : row.contracts) as Record<string, unknown> | null
+    const customerName = (cust?.company_name as string) ?? (cust?.name as string) ?? '-'
+    const companyName = (cust?.company_name as string) ?? null
+    // ネストした customers / contracts は検索テキストから除外して project 本体のみ渡す
+    const { customers: _c, contracts: _ct, ...projOnly } = row
     return {
       id: row.id as number,
       customer_id: row.customer_id as number,
@@ -191,8 +227,9 @@ export async function getProjects(): Promise<ProjectRow[]> {
       subcontractor: (con?.subcontractor as string) ?? null,
       maintenance_start_date: (con?.maintenance_start_date as string) ?? null,
       created_at: row.created_at as string,
-      customer_name: (cust?.company_name as string) ?? (cust?.name as string) ?? '-',
-      company_name: (cust?.company_name as string) ?? null,
+      customer_name: customerName,
+      company_name: companyName,
+      search_text: buildProjectSearchText(projOnly, con, customerName, companyName),
     }
   })
 }

@@ -81,7 +81,11 @@ const emptyProjectForm: Omit<ProjectInput, 'customer_id'> = {
 
 export function Projects({ projects, customers, onReload, onViewDetail }: Props) {
   const toast = useToast()
-  const [search, setSearch] = useState('')
+  const [search, setSearchState] = useState(() => sessionStorage.getItem('projects_search') ?? '')
+  const setSearch = (s: string) => {
+    setSearchState(s)
+    sessionStorage.setItem('projects_search', s)
+  }
   const [modal, setModal] = useState(false)
   const [customerMode, setCustomerMode] = useState<CustomerMode>('existing')
   const [selectedCustomerId, setSelectedCustomerId] = useState<number>(customers[0]?.id ?? 0)
@@ -91,7 +95,11 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
   const [error, setError] = useState('')
 
   const filtered = projects.filter(p => {
-    const q = search.toLowerCase()
+    const q = search.toLowerCase().trim()
+    if (!q) return true
+    // search_text（基本情報・設備情報・契約情報を連結）があればそれで検索。
+    // 無い場合（古いデータ等）は従来の主要項目でフォールバック。
+    if (p.search_text != null) return p.search_text.includes(q)
     return (
       p.project_name.toLowerCase().includes(q) ||
       (p.project_no ?? '').toLowerCase().includes(q) ||
@@ -146,7 +154,7 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
         <input
           className="search-input"
           type="search"
-          placeholder="案件名・案件番号・顧客名・設置住所で検索..."
+          placeholder="基本情報・設備情報・契約情報のあらゆる項目で検索..."
           value={search}
           onChange={e => setSearch(e.target.value)}
         />

@@ -254,6 +254,7 @@ export type ProjectRow = {
   created_at: string
   customer_name: string
   company_name: string | null
+  search_text?: string  // 一覧検索用。基本情報・設備情報・契約情報の各項目を連結した小文字テキスト
 }
 
 export type ProjectDetail = {

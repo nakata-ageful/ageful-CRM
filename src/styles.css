@@ -446,6 +446,17 @@ tr:last-child td { border-bottom: none; }
 }
 .form-textarea { resize: vertical; }
 
+/* 数値入力の上下スピナー（矢印）を全画面で非表示にする */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 /* 日付入力のカレンダーアイコンを目立たせる */
 .form-input[type="date"] {
   cursor: pointer;

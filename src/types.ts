@@ -78,7 +78,7 @@ export type Project = {
   created_at: string
 }
 
-export type MaintenancePlanLevel = 'なし' | '年1回' | '年2回' | '年3回' | '無制限'
+export type MaintenancePlanLevel = 'なし' | '年1回' | '年2回' | '年3回' | '年4回' | '無制限'
 
 export type Contract = {
   id: number

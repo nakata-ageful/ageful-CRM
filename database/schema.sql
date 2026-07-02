@@ -110,9 +110,9 @@ CREATE TABLE IF NOT EXISTS contracts (
   subcontract_start_date    DATE,
   maintenance_start_date    DATE,
   -- 保守プラン
-  plan_inspection           TEXT CHECK (plan_inspection IN ('なし','年1回')),
-  plan_weeding              TEXT CHECK (plan_weeding IN ('なし','年1回','年2回','年3回')),
-  plan_emergency            TEXT CHECK (plan_emergency IN ('なし','年1回','無制限')),
+  plan_inspection           TEXT CHECK (plan_inspection IN ('なし','年1回','年2回','年3回','年4回','無制限')),
+  plan_weeding              TEXT CHECK (plan_weeding IN ('なし','年1回','年2回','年3回','年4回','無制限')),
+  plan_emergency            TEXT CHECK (plan_emergency IN ('なし','年1回','年2回','年3回','年4回','無制限')),
   notes                     TEXT,
   created_at                TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at                TIMESTAMPTZ NOT NULL DEFAULT NOW()

@@ -571,6 +571,8 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
     const writesContract = CONTRACT_SECTIONS.includes(editSection)
     // 概要 (summary) は plant_name が必須
     if (editSection === 'summary' && !projForm.plant_name.trim()) { setErr('発電所名は必須です'); return }
+    // FIT期間は年4桁が揃うまで保存不可（入力途中の "20-01-01" 等が DATE として保存されるのを防ぐ）
+    if (projForm.fit_end_date && !/^\d{4}-\d{2}-\d{2}$/.test(projForm.fit_end_date)) { setErr('FIT期間の年は西暦4桁で入力してください'); return }
     const toNum = (v: string) => v ? parseInt(v.replace(/,/g, ''), 10) : null
     setSaving(true); setErr('')
     try {
@@ -1756,15 +1758,17 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                 <label className="form-label">
                   FIT期間（満了）
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    <input className="form-input" inputMode="numeric" placeholder="年" style={{ flex: 1 }} maxLength={4} value={projForm.fit_end_date ? projForm.fit_end_date.slice(0, 4) : ''} onChange={e => {
-                      const y = e.target.value.replace(/\D/g, '').slice(0, 4)
-                      const m = projForm.fit_end_date ? projForm.fit_end_date.slice(5, 7) : ''
+                    {/* 年は入力途中（4桁未満）でも "Y-MM-01" 形式で保持するため、桁数固定の slice ではなく split で取り出す */}
+                    <input className="form-input" inputMode="numeric" placeholder="年" style={{ flex: 1 }} maxLength={4} value={projForm.fit_end_date.split('-')[0] ?? ''} onChange={e => {
+                      // 全角数字は半角に自動変換（"２０３８" → "2038"）
+                      const y = e.target.value.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/\D/g, '').slice(0, 4)
+                      const m = projForm.fit_end_date.split('-')[1] ?? ''
                       setProjForm(f => ({ ...f, fit_end_date: y ? `${y}-${m || '01'}-01` : '' }))
                     }} />
                     <span style={{ fontSize: 13 }}>年</span>
-                    <select className="form-select" style={{ flex: 1 }} value={projForm.fit_end_date ? projForm.fit_end_date.slice(5, 7) : ''} onChange={e => {
+                    <select className="form-select" style={{ flex: 1 }} value={projForm.fit_end_date.split('-')[1] ?? ''} onChange={e => {
                       const m = e.target.value
-                      const y = projForm.fit_end_date ? projForm.fit_end_date.slice(0, 4) : ''
+                      const y = projForm.fit_end_date.split('-')[0] ?? ''
                       if (!y) return
                       setProjForm(f => ({ ...f, fit_end_date: `${y}-${m || '01'}-01` }))
                     }}>

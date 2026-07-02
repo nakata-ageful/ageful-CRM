@@ -172,6 +172,7 @@ export function Billing({ rows, onReload, onViewDetail }: Props) {
   const [receivedDates, setReceivedDates] = useState<Record<number, string>>({})
   const [saving, setSaving] = useState(false)
   const [showPaid, setShowPaid] = useState(false)
+  const [showWithdrawal, setShowWithdrawal] = useState(false)
 
   /** 発行: annual_record 作成して未入金へ移動 */
   async function handleIssue(u: UpcomingItem) {
@@ -357,9 +358,21 @@ export function Billing({ rows, onReload, onViewDetail }: Props) {
         )}
       </SectionCard>
 
-      {/* ── 3. 口座振替（常時表示） ── */}
-      <SectionCard title="口座振替（常時）" color="#8b5cf6" emptyText="口座振替の発電所はありません">
-        {withdrawalRows.length > 0 && (
+      {/* ── 3. 口座振替（開閉式） ── */}
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <button
+          style={{ width: '100%', padding: '12px 20px', borderLeft: '4px solid #8b5cf6', background: '#fff', border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left' }}
+          onClick={() => setShowWithdrawal(p => !p)}
+        >
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#7c3aed' }}>
+            口座振替（常時）
+            <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 400, color: '#94a3b8' }}>{withdrawalRows.length}件</span>
+          </span>
+          <span style={{ fontSize: 11, color: '#94a3b8' }}>{showWithdrawal ? '▲ 閉じる' : '▼ 開く'}</span>
+        </button>
+        {showWithdrawal && (withdrawalRows.length === 0 ? (
+          <div style={{ padding: '20px 24px', color: '#94a3b8', fontSize: 13 }}>口座振替の発電所はありません</div>
+        ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
               <thead>
@@ -402,8 +415,8 @@ export function Billing({ rows, onReload, onViewDetail }: Props) {
               </tbody>
             </table>
           </div>
-        )}
-      </SectionCard>
+        ))}
+      </div>
 
       {/* ── 4. 入金済（今年度） ── */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>

@@ -2369,16 +2369,17 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                   <div style={{ gridColumn: '1/-1', padding: '8px 12px', background: '#fef3c7', borderRadius: 6, marginTop: 4 }}>
                     <details>
                       <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>個別に金額を上書きする（イレギュラー対応）</summary>
-                      <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 6 }}>
+                      <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 6 }}>
                         {Array.from({ length: count }, (_, i) => {
                           const k = String(i + 1)
                           const override = contractForm.billing_amount_overrides[k]
                           return (
                             <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                              <span style={{ fontSize: 11, minWidth: 40 }}>{isInvoice ? `${k}回目` : `${k}月`}</span>
+                              <span style={{ fontSize: 11, minWidth: 40, flexShrink: 0 }}>{isInvoice ? `${k}回目` : `${k}月`}</span>
+                              {/* minWidth:0 が無いと input の固有幅(約170px)以下に縮まず隣のマスへはみ出す */}
                               <input
                                 className="form-input"
-                                style={{ flex: 1, fontSize: 12, padding: '2px 6px' }}
+                                style={{ flex: 1, minWidth: 0, fontSize: 12, padding: '2px 6px' }}
                                 inputMode="numeric"
                                 placeholder={String(baseAmount)}
                                 value={override != null ? fmtFormNum(String(override)) : ''}

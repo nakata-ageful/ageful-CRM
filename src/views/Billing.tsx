@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { BillingRow, AnnualRecord, Contract } from '../types'
+import type { BillingRow, AnnualRecord, Contract, PaymentEntry } from '../types'
 import { updateAnnualRecord, createAnnualRecord, deleteAnnualRecord } from '../lib/actions'
 import { fmtYen, dateInputRange } from '../lib/utils'
 import { useToast } from '../components/Toast'
@@ -105,8 +105,10 @@ export function Billing({ rows, onReload, onViewDetail }: Props) {
     // 年度ごとに「予定日が未設定のまま請求/入金/振替失敗が入った記録」の数を数える。
     // これらは発行ボタンを通さず（CSVインポート等で）作られた記録で、実質その年の請求が
     // 済んでいることを意味する。スケジュール回に正確に紐づく記録は除く（=正規の発行済み）。
+    // 回ごとデータ（payments）を持つ記録は各回に日付が明示されているので浮遊扱いしない。
     const floatingByYear: Record<number, number> = {}
-    for (const rec of r.currentYearRecords) {
+    for (const rec of r.records) {
+      if (rec.payments?.length) continue
       const handled = rec.billing_date || rec.received_date || rec.transfer_failed
       if (!handled) continue
       const tied = days.some(d => toIsoDate(rec.year, d) === rec.billing_scheduled_date)
@@ -117,9 +119,9 @@ export function Billing({ rows, onReload, onViewDetail }: Props) {
     const results: UpcomingItem[] = []
     candidates.sort((a, b) => a.iso.localeCompare(b.iso))
     for (const cand of candidates) {
-      const yearRecs = r.currentYearRecords.filter(rec => rec.year === cand.year)
       // 既にこの予定日そのものの記録がある（発行済 or 入金済）→ 未入金/入金済セクション側へ
-      if (yearRecs.some(rec => rec.billing_scheduled_date === cand.iso)) continue
+      // 記録全体の予定日でも、回ごとデータ内の予定日でもひも付いていれば発行済みとみなす
+      if (r.records.some(rec => rec.billing_scheduled_date === cand.iso || rec.payments?.some(p => p.scheduled_date === cand.iso))) continue
       // 予定日未設定のまま請求された記録がこの年度にあれば、その分この回を消費して除外
       if ((floatingByYear[cand.year] ?? 0) > 0) { floatingByYear[cand.year]--; continue }
       results.push({
@@ -135,27 +137,37 @@ export function Billing({ rows, onReload, onViewDetail }: Props) {
   }).sort((a, b) => a.scheduledDateISO.localeCompare(b.scheduledDateISO))
 
   /**
-   * 未入金: annual_records で
-   *   (billing_date あり & received_date なし) ← 請求書発行済み未入金
-   *   または (transfer_failed=true & received_date なし) ← 口座振替失敗
-   * 全 records を対象（複数年次対応）
+   * 未入金・入金済は「回」単位で判定する（対象は今年度＋昨年度＝過去1年。ユーザー指定）。
+   * - 分割入金の記録（payments あり）: 回ごとの billing_date / received_date で判定。
+   *   記録全体の received_date は「最後に入金があった回の日付」が入る仕様なので判定に使わない。
+   * - 単回の記録（payments なし）: 従来通り記録全体の billing_date / received_date で判定。
    */
-  type UnpaidItem = { row: BillingRow; record: AnnualRecord }
+  const inScopeYear = (rec: AnnualRecord) => rec.year >= currentYear - 1
+  type UnpaidItem = { row: BillingRow; record: AnnualRecord; payment?: PaymentEntry; totalRounds?: number }
   const unpaidItems: UnpaidItem[] = rows.flatMap(r =>
-    r.currentYearRecords
-      .filter(rec => !rec.received_date && (rec.billing_date || rec.transfer_failed))
-      .map(rec => ({ row: r, record: rec }))
-  ).sort((a, b) => (a.record.billing_date ?? '').localeCompare(b.record.billing_date ?? ''))
+    r.records.filter(inScopeYear).flatMap((rec): UnpaidItem[] => {
+      if (rec.payments?.length) {
+        return rec.payments
+          .filter(p => !p.received_date && p.billing_date)
+          .map(p => ({ row: r, record: rec, payment: p, totalRounds: rec.payments!.length }))
+      }
+      if (!rec.received_date && (rec.billing_date || rec.transfer_failed)) return [{ row: r, record: rec }]
+      return []
+    })
+  ).sort((a, b) => (a.payment?.billing_date ?? a.record.billing_date ?? '').localeCompare(b.payment?.billing_date ?? b.record.billing_date ?? ''))
 
-  /**
-   * 入金済: annual_records で received_date あり
-   */
-  type PaidItem = { row: BillingRow; record: AnnualRecord }
+  type PaidItem = { row: BillingRow; record: AnnualRecord; payment?: PaymentEntry; totalRounds?: number }
   const paidItems: PaidItem[] = rows.flatMap(r =>
-    r.currentYearRecords
-      .filter(rec => rec.received_date)
-      .map(rec => ({ row: r, record: rec }))
-  ).sort((a, b) => (b.record.received_date ?? '').localeCompare(a.record.received_date ?? ''))
+    r.records.filter(inScopeYear).flatMap((rec): PaidItem[] => {
+      if (rec.payments?.length) {
+        return rec.payments
+          .filter(p => p.received_date)
+          .map(p => ({ row: r, record: rec, payment: p, totalRounds: rec.payments!.length }))
+      }
+      if (rec.received_date) return [{ row: r, record: rec }]
+      return []
+    })
+  ).sort((a, b) => (b.payment?.received_date ?? b.record.received_date ?? '').localeCompare(a.payment?.received_date ?? a.record.received_date ?? ''))
 
   /**
    * 口座振替（常時表示）: billing_method='口座振替' の発電所一覧
@@ -168,8 +180,9 @@ export function Billing({ rows, onReload, onViewDetail }: Props) {
 
   // 請求予定リスト: 行ごとの一時入力（billing_date, payment_due_date）
   const [issueInputs, setIssueInputs] = useState<Record<string, { billing_date: string; payment_due_date: string }>>({})
-  // 未入金リスト: 行ごとの一時入力（received_date）
-  const [receivedDates, setReceivedDates] = useState<Record<number, string>>({})
+  // 未入金リスト: 行ごとの一時入力（received_date）。キーは「記録id:回seq」（単回は seq=0）
+  const [receivedDates, setReceivedDates] = useState<Record<string, string>>({})
+  const unpaidKey = (item: UnpaidItem) => `${item.record.id}:${item.payment?.seq ?? 0}`
   const [saving, setSaving] = useState(false)
   const [showPaid, setShowPaid] = useState(false)
   const [showWithdrawal, setShowWithdrawal] = useState(false)
@@ -193,15 +206,28 @@ export function Billing({ rows, onReload, onViewDetail }: Props) {
     } finally { setSaving(false) }
   }
 
-  /** 入金確認: received_date を入れて入金済へ移動 */
+  /** 入金確認: received_date を入れて入金済へ移動（分割入金はその回だけ入金にする） */
   async function handleMarkPaid(item: UnpaidItem) {
     const rec = item.record
-    const rd = receivedDates[rec.id]
+    const key = unpaidKey(item)
+    const rd = receivedDates[key]
     if (!rd) { toast('入金日を入力してください'); return }
     setSaving(true)
     try {
-      await updateAnnualRecord(rec.id, { received_date: rd, status: '入金済' })
-      setReceivedDates(prev => { const n = { ...prev }; delete n[rec.id]; return n })
+      if (item.payment) {
+        // 記録全体の received_date / status は請求詳細の保存処理と同じルールで更新する
+        const payments = (rec.payments ?? []).map(p => p.seq === item.payment!.seq ? { ...p, received_date: rd } : p)
+        const allReceived = payments.every(p => !!p.received_date)
+        const lastReceived = [...payments].reverse().find(p => p.received_date)?.received_date ?? null
+        await updateAnnualRecord(rec.id, {
+          payments,
+          received_date: lastReceived,
+          status: allReceived ? '入金済' : '請求済',
+        })
+      } else {
+        await updateAnnualRecord(rec.id, { received_date: rd, status: '入金済' })
+      }
+      setReceivedDates(prev => { const n = { ...prev }; delete n[key]; return n })
       await onReload()
       toast('入金済に移動しました')
     } finally { setSaving(false) }
@@ -212,7 +238,7 @@ export function Billing({ rows, onReload, onViewDetail }: Props) {
     if (!r.contract) return
     // 今月分の振替失敗レコードを探す（billing_scheduled_date が今月の1日のもの）
     const failKey = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`
-    const existing = r.currentYearRecords.find(rec => rec.transfer_failed && rec.billing_scheduled_date === failKey)
+    const existing = r.records.find(rec => rec.transfer_failed && rec.billing_scheduled_date === failKey)
     setSaving(true)
     try {
       if (existing) {
@@ -250,6 +276,7 @@ export function Billing({ rows, onReload, onViewDetail }: Props) {
                 <tr>
                   <th style={thStyle}>発電所</th>
                   <th style={thStyle}>顧客</th>
+                  <th style={thStyle}>回数</th>
                   <th style={thStyle}>請求日</th>
                   <th style={thStyle}>入金予定日</th>
                   <th style={{ ...thStyle, textAlign: 'right' }}>金額（税込）</th>
@@ -260,9 +287,12 @@ export function Billing({ rows, onReload, onViewDetail }: Props) {
               <tbody>
                 {unpaidItems.map(item => {
                   const c = item.row.contract
-                  // 金額: 振替失敗なら口座振替の月額、それ以外は line_items / 請求書の概算
+                  const key = unpaidKey(item)
+                  // 金額: 分割入金の回はその回の請求額、振替失敗なら口座振替の月額、それ以外は line_items / 請求書の概算
                   let amount: number | null = null
-                  if (item.record.transfer_failed && item.record.billing_scheduled_date) {
+                  if (item.payment && item.totalRounds) {
+                    amount = invoiceAmount(c, item.payment.seq, item.totalRounds)
+                  } else if (item.record.transfer_failed && item.record.billing_scheduled_date) {
                     const m = Number(item.record.billing_scheduled_date.slice(5, 7))
                     amount = withdrawalAmount(c, m)
                   } else if (item.record.line_items) {
@@ -274,7 +304,7 @@ export function Billing({ rows, onReload, onViewDetail }: Props) {
                     if (idx >= 0) amount = invoiceAmount(c, idx + 1, days.length)
                   }
                   return (
-                    <tr key={item.record.id}>
+                    <tr key={key}>
                       <td style={tdStyle}>
                         <button className="link-btn" onClick={() => onViewDetail(item.row.project_id)}>{item.row.project_name}</button>
                         {item.record.transfer_failed && (
@@ -282,16 +312,17 @@ export function Billing({ rows, onReload, onViewDetail }: Props) {
                         )}
                       </td>
                       <td style={tdStyle}>{item.row.customer_name}</td>
-                      <td style={tdStyle}>{item.record.billing_date ?? '—'}</td>
+                      <td style={tdStyle}>{item.payment && item.totalRounds ? `${item.payment.seq}/${item.totalRounds}回目` : '—'}</td>
+                      <td style={tdStyle}>{item.payment?.billing_date ?? item.record.billing_date ?? '—'}</td>
                       <td style={tdStyle}>{item.record.payment_due_date ?? '—'}</td>
                       <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{amount != null ? fmtYen(amount) : '—'}</td>
                       <td style={tdStyle}>
                         <input type="date" {...dateInputRange()} className="form-input" style={{ padding: '5px 8px', fontSize: 13 }}
-                          value={receivedDates[item.record.id] ?? ''}
-                          onChange={e => setReceivedDates(prev => ({ ...prev, [item.record.id]: e.target.value }))} />
+                          value={receivedDates[key] ?? ''}
+                          onChange={e => setReceivedDates(prev => ({ ...prev, [key]: e.target.value }))} />
                       </td>
                       <td style={tdStyle}>
-                        <button className="btn btn-main btn-sm" disabled={saving || !receivedDates[item.record.id]} onClick={() => handleMarkPaid(item)}>
+                        <button className="btn btn-main btn-sm" disabled={saving || !receivedDates[key]} onClick={() => handleMarkPaid(item)}>
                           入金済に移動
                         </button>
                       </td>
@@ -390,7 +421,7 @@ export function Billing({ rows, onReload, onViewDetail }: Props) {
                   const monthly = withdrawalAmount(r.contract, currentMonth)
                   // 今月の振替失敗が立ってるか
                   const failKey = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`
-                  const failed = r.currentYearRecords.some(rec => rec.transfer_failed && rec.billing_scheduled_date === failKey)
+                  const failed = r.records.some(rec => rec.transfer_failed && rec.billing_scheduled_date === failKey)
                   return (
                     <tr key={r.project_id} style={failed ? { background: '#fef2f2' } : undefined}>
                       <td style={tdStyle}>
@@ -425,7 +456,7 @@ export function Billing({ rows, onReload, onViewDetail }: Props) {
           onClick={() => setShowPaid(p => !p)}
         >
           <span style={{ fontSize: 13, fontWeight: 700, color: '#059669' }}>
-            入金済（今年度）
+            入金済
             <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 400, color: '#94a3b8' }}>{paidItems.length}件</span>
           </span>
           <span style={{ fontSize: 11, color: '#94a3b8' }}>{showPaid ? '▲ 閉じる' : '▼ 開く'}</span>
@@ -440,6 +471,7 @@ export function Billing({ rows, onReload, onViewDetail }: Props) {
                   <tr>
                     <th style={thStyle}>発電所</th>
                     <th style={thStyle}>顧客</th>
+                    <th style={thStyle}>回数</th>
                     <th style={thStyle}>請求日</th>
                     <th style={thStyle}>入金日</th>
                     <th style={{ ...thStyle, textAlign: 'right' }}>金額（税込）</th>
@@ -449,7 +481,9 @@ export function Billing({ rows, onReload, onViewDetail }: Props) {
                   {paidItems.map(item => {
                     const c = item.row.contract
                     let amount: number | null = null
-                    if (item.record.line_items) {
+                    if (item.payment && item.totalRounds) {
+                      amount = invoiceAmount(c, item.payment.seq, item.totalRounds)
+                    } else if (item.record.line_items) {
                       amount = item.record.line_items.reduce((s, i) => s + i.amount, 0)
                     } else if (item.record.transfer_failed && item.record.billing_scheduled_date) {
                       const m = Number(item.record.billing_scheduled_date.slice(5, 7))
@@ -460,13 +494,14 @@ export function Billing({ rows, onReload, onViewDetail }: Props) {
                       if (idx >= 0) amount = invoiceAmount(c, idx + 1, days.length)
                     }
                     return (
-                      <tr key={item.record.id}>
+                      <tr key={`${item.record.id}:${item.payment?.seq ?? 0}`}>
                         <td style={tdStyle}>
                           <button className="link-btn" onClick={() => onViewDetail(item.row.project_id)}>{item.row.project_name}</button>
                         </td>
                         <td style={tdStyle}>{item.row.customer_name}</td>
-                        <td style={tdStyle}>{item.record.billing_date ?? '—'}</td>
-                        <td style={{ ...tdStyle, color: '#059669', fontWeight: 600 }}>{item.record.received_date}</td>
+                        <td style={tdStyle}>{item.payment && item.totalRounds ? `${item.payment.seq}/${item.totalRounds}回目` : '—'}</td>
+                        <td style={tdStyle}>{item.payment?.billing_date ?? item.record.billing_date ?? '—'}</td>
+                        <td style={{ ...tdStyle, color: '#059669', fontWeight: 600 }}>{item.payment?.received_date ?? item.record.received_date}</td>
                         <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{amount != null ? fmtYen(amount) : '—'}</td>
                       </tr>
                     )

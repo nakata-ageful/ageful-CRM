@@ -384,6 +384,7 @@ export async function getBillingRows(): Promise<BillingRow[]> {
         contract: contract ?? null,
         currentYearRecord,
         currentYearRecords,
+        records,
         currentYear,
       }
     })
@@ -412,6 +413,7 @@ export async function getBillingRows(): Promise<BillingRow[]> {
       contract: con as import('../types').Contract | null,
       currentYearRecord,
       currentYearRecords,
+      records: records as import('../types').AnnualRecord[],
       currentYear,
     }
   })

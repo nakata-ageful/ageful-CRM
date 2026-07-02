@@ -280,6 +280,7 @@ export type BillingRow = {
   contract: Contract | null
   currentYearRecord: AnnualRecord | null   // 既存ロジック用（最初の1件）
   currentYearRecords: AnnualRecord[]        // 同年複数対応
+  records: AnnualRecord[]                   // 全年度（過去データの未入金も請求タブで扱うため）
   currentYear: number
 }
 

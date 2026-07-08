@@ -95,14 +95,24 @@ export async function updateCustomer(id: number, input: CustomerInput): Promise<
     address: input.address || null,
     notes: input.notes || null,
   }
+  let updated: Customer
   if (!hasSupabaseEnv) {
-    const updated = customerStore.update(id, payload)
-    if (!updated) throw new Error('Not found')
-    return updated
+    const u = customerStore.update(id, payload)
+    if (!u) throw new Error('Not found')
+    updated = u
+  } else {
+    const { data, error } = await db().from('customers').update(payload).eq('id', id).select().single()
+    if (error) throw error
+    updated = data as Customer
   }
-  const { data, error } = await db().from('customers').update(payload).eq('id', id).select().single()
-  if (error) throw error
-  return data as Customer
+  // 見込みへの書き戻し（顧客名まわり）
+  await syncBackToProspect(id, {
+    customer_name: payload.name,
+    customer_name_kana: payload.name_kana ?? '',
+    company_name: payload.company_name,
+    is_corporate: payload.is_corporate,
+  })
+  return updated
 }
 
 export async function deleteCustomer(id: number): Promise<void> {
@@ -238,14 +248,28 @@ export async function createProject(input: ProjectInput): Promise<Project> {
 
 export async function updateProject(id: number, input: Omit<ProjectInput, 'customer_id'>): Promise<Project> {
   const payload = projectPayload(input)
+  let updated: Project
   if (!hasSupabaseEnv) {
-    const updated = projectStore.update(id, payload)
-    if (!updated) throw new Error('Not found')
-    return updated
+    const u = projectStore.update(id, payload)
+    if (!u) throw new Error('Not found')
+    updated = u
+  } else {
+    const { data, error } = await db().from('projects').update(payload).eq('id', id).select().single()
+    if (error) throw error
+    updated = data as Project
   }
-  const { data, error } = await db().from('projects').update(payload).eq('id', id).select().single()
-  if (error) throw error
-  return data as Project
+  // 見込みへの書き戻し（見込み→発電所 同期の逆方向。項目は syncProspectToCustomerProject と対称）
+  await syncBackToProspect(updated.customer_id, {
+    project_name: payload.plant_name ?? payload.project_name,
+    site_address: payload.site_address ?? '',
+    panel_kw: payload.panel_kw,
+    sales_company: payload.sales_company ?? '',
+    referrer: payload.referrer ?? '',
+    equipment: payload.sales_price,
+    land_cost: payload.land_cost,
+    handover_date: payload.handover_date,
+  })
+  return updated
 }
 
 export async function deleteProject(id: number): Promise<void> {
@@ -500,9 +524,30 @@ export async function createContract(projectId: number, input: Partial<Omit<Cont
 }
 
 export async function updateContract(id: number, input: Partial<Omit<Contract, 'id' | 'created_at'>>): Promise<void> {
-  if (!hasSupabaseEnv) { contractStore.update(id, input); return }
-  const { error } = await db().from('contracts').update(input).eq('id', id)
-  if (error) throw error
+  if (!hasSupabaseEnv) { contractStore.update(id, input) }
+  else {
+    const { error } = await db().from('contracts').update(input).eq('id', id)
+    if (error) throw error
+  }
+  // 契約日の変更を見込みへ書き戻す（見込みの売買契約日/土地契約日 → contracts 同期の逆方向）
+  const prospectUpdate: Record<string, unknown> = {}
+  if ('equipment_contract_date' in input) prospectUpdate.sale_contract_date = input.equipment_contract_date ?? null
+  if ('land_contract_date' in input) prospectUpdate.land_contract_date = input.land_contract_date ?? null
+  if (Object.keys(prospectUpdate).length > 0) {
+    // contract → project → customer とたどって成約元の見込みを特定する
+    if (!hasSupabaseEnv) {
+      const con = contractStore.getAll().find(c => c.id === id)
+      const proj = con ? projectStore.getAll().find((p: { id: number }) => p.id === con.project_id) : null
+      await syncBackToProspect((proj as { customer_id?: number } | null)?.customer_id, prospectUpdate)
+    } else {
+      const { data: con } = await db().from('contracts').select('project_id').eq('id', id).single()
+      const pid = (con as { project_id?: number } | null)?.project_id
+      if (pid != null) {
+        const { data: proj } = await db().from('projects').select('customer_id').eq('id', pid).single()
+        await syncBackToProspect((proj as { customer_id?: number } | null)?.customer_id, prospectUpdate)
+      }
+    }
+  }
 }
 
 // ── CSV Bulk Import ────────────────────────────────────────
@@ -1020,6 +1065,21 @@ export async function updateProspect(id: number, data: Partial<Omit<Prospect, 'i
 }
 
 /** 見込みの共有フィールド変更を顧客・案件に反映 */
+/**
+ * 発電所/顧客/契約側の編集を、成約元の見込み（converted_customer_id でひも付く）へ書き戻す。
+ * syncProspectToCustomerProject（見込み→発電所）の逆方向。ひも付く見込みが無ければ何もしない。
+ */
+async function syncBackToProspect(customerId: number | null | undefined, update: Record<string, unknown>) {
+  if (!customerId || Object.keys(update).length === 0) return
+  if (!hasSupabaseEnv) {
+    const pr = prospectStore.getAll().find(p => p.converted_customer_id === customerId)
+    if (pr) prospectStore.update(pr.id, update as Partial<Omit<Prospect, 'id' | 'created_at'>>)
+    return
+  }
+  const { error } = await db().from('prospects').update(update).eq('converted_customer_id', customerId)
+  if (error) throw error
+}
+
 async function syncProspectToCustomerProject(
   data: Partial<Omit<Prospect, 'id' | 'created_at'>>,
   customerId: number,

@@ -180,12 +180,7 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
                   <strong>{p.plant_name || p.project_name}</strong>
                   {p.project_no && <div style={{ fontSize: 11, color: '#64748b' }}>{p.project_no}</div>}
                 </td>
-                <td>
-                  {p.company_name
-                    ? <><span style={{ fontSize: 12, color: '#64748b' }}>{p.company_name}</span><br />{p.customer_name}</>
-                    : p.customer_name
-                  }
-                </td>
+                <td>{p.company_name || p.customer_name}</td>
                 <td>{p.site_prefecture ?? '-'}</td>
                 <td>{p.fit_period != null ? `${p.fit_period}円` : '-'}</td>
                 <td>{p.subcontractor ?? '-'}</td>

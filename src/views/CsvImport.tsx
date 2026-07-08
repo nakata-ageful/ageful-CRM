@@ -1,6 +1,54 @@
 import { useRef, useState } from 'react'
 import type { CsvImportRow, BillingImportRow } from '../types'
 import { bulkImportProjects, bulkImportBilling, exportAllData, restoreAllData } from '../lib/actions'
+import { EXPORT_FIELD_DEFS, type ExportFieldDef } from '../lib/export-fields'
+import { annualBillableTotalInc } from '../lib/billing'
+import type { Contract } from '../types'
+
+/** 金額確認CSVの費目列（契約テーブルの金額カラムと対応） */
+const KINGAKU_COLS = [
+  { key: 'annual_maintenance_inc', label: '年次保守料（税込）' },
+  { key: 'land_cost_monthly', label: '土地賃料（年間）' },
+  { key: 'insurance_fee', label: '火災保険料' },
+  { key: 'local_association_fee', label: '自治会費' },
+  { key: 'communication_fee', label: '通信費' },
+  { key: 'other_fee', label: 'その他費用' },
+] as const
+
+/**
+ * 金額確認CSV: 1行=1発電所、列=費目。最下行に費目ごとの合計、右端に発電所ごとの合計。
+ * 「年間総額（請求対象のみ）」はアプリの請求計算と同じ値（請求対象フラグ考慮）。
+ */
+function buildKingakuCsv(tables: Record<string, Record<string, unknown>[]>): string {
+  const customersById = new Map((tables.customers ?? []).map(c => [c.id as number, c]))
+  const contractsByProject = new Map((tables.contracts ?? []).map(c => [c.project_id as number, c]))
+  const header = ['発電所名', '顧客名', '請求方法', ...KINGAKU_COLS.map(c => c.label), '年間合計（全費目）', '年間総額（請求対象のみ）']
+  const colSums = KINGAKU_COLS.map(() => 0)
+  let rowTotalSum = 0
+  let billableSum = 0
+  const lines: string[][] = []
+  for (const p of tables.projects ?? []) {
+    const cust = customersById.get(p.customer_id as number)
+    const con = contractsByProject.get(p.id as number) as Contract | undefined
+    const amounts = KINGAKU_COLS.map(c => Number((con as Record<string, unknown> | undefined)?.[c.key] ?? 0) || 0)
+    const rowTotal = amounts.reduce((s, n) => s + n, 0)
+    const billable = con ? annualBillableTotalInc(con) : 0
+    amounts.forEach((n, i) => { colSums[i] += n })
+    rowTotalSum += rowTotal
+    billableSum += billable
+    lines.push([
+      String(p.plant_name ?? p.project_name ?? ''),
+      String((cust?.company_name as string) ?? (cust?.name as string) ?? ''),
+      String(con?.billing_method ?? ''),
+      ...amounts.map(String),
+      String(rowTotal),
+      String(billable),
+    ])
+  }
+  lines.push(['合計', '', '', ...colSums.map(String), String(rowTotalSum), String(billableSum)])
+  return [header, ...lines].map(cols => cols.map(csvEscape).join(',')).join('\n')
+}
+
 import type { ExportData } from '../lib/actions'
 
 type Props = {
@@ -614,16 +662,39 @@ function parseAuto(text: string): { rows: CsvImportRow[]; errors: string[]; isLe
 
 type ImportMode = 'project' | 'billing'
 
-/** エクスポート対象として選択できるデータ種別（ExportData のキーと対応） */
-const EXPORT_TABLES = [
-  { key: 'customers', label: '顧客' },
-  { key: 'projects', label: '発電所' },
-  { key: 'contracts', label: '契約' },
-  { key: 'annual_records', label: '請求記録' },
-  { key: 'maintenance_responses', label: '保守対応' },
-  { key: 'periodic_maintenance', label: '定期保守' },
-  { key: 'prospects', label: '見込み' },
-] as const
+/** CSV用エスケープ。オブジェクト/配列はJSON文字列化して1セルに収める */
+function csvEscape(v: unknown): string {
+  if (v == null) return ''
+  const s = typeof v === 'object' ? JSON.stringify(v) : String(v)
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+}
+
+function buildCsv(fields: ExportFieldDef[], rows: Record<string, unknown>[]): string {
+  const header = fields.map(f => csvEscape(f.label)).join(',')
+  const body = rows.map(r => fields.map(f => csvEscape(r[f.key])).join(',')).join('\n')
+  return header + '\n' + body
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+/** 一部選択のとき indeterminate（－）表示になるチェックボックス */
+function TriCheckbox({ checked, indeterminate, onChange }: { checked: boolean; indeterminate: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <input
+      type="checkbox"
+      checked={checked}
+      ref={el => { if (el) el.indeterminate = indeterminate }}
+      onChange={e => onChange(e.target.checked)}
+    />
+  )
+}
 
 export function CsvImport({ onReload }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
@@ -639,10 +710,23 @@ export function CsvImport({ onReload }: Props) {
   const [csvFormat, setCsvFormat] = useState<FormatType>('template')
   // エクスポート・復元
   const [exporting, setExporting] = useState(false)
-  // エクスポートに含めるデータの選択（デフォルト全選択）
-  const [exportTables, setExportTables] = useState<Record<string, boolean>>(
-    () => Object.fromEntries(EXPORT_TABLES.map(t => [t.key, true]))
+  // エクスポート形式と項目選択（データ種別→項目→boolean。デフォルト全選択）
+  const [exportFormat, setExportFormat] = useState<'json' | 'csv'>('json')
+  // 含めるデータ（種別→項目→boolean。デフォルト全選択）
+  const [fieldSel, setFieldSel] = useState<Record<string, Record<string, boolean>>>(
+    () => Object.fromEntries(EXPORT_FIELD_DEFS.map(t => [t.key, Object.fromEntries(t.fields.map(f => [f.key, true]))]))
   )
+  const [expandedTables, setExpandedTables] = useState<Record<string, boolean>>({})
+  const [fieldSearch, setFieldSearch] = useState('')
+
+  const isFullSelection = EXPORT_FIELD_DEFS.every(t => t.fields.every(f => fieldSel[t.key]?.[f.key]))
+  const hasAnySelection = EXPORT_FIELD_DEFS.some(t => t.fields.some(f => fieldSel[t.key]?.[f.key]))
+
+  function setTableAll(tableKey: string, v: boolean) {
+    const def = EXPORT_FIELD_DEFS.find(t => t.key === tableKey)
+    if (!def) return
+    setFieldSel(prev => ({ ...prev, [tableKey]: Object.fromEntries(def.fields.map(f => [f.key, v])) }))
+  }
   const [restoreProgress, setRestoreProgress] = useState('')
   const [restorePreview, setRestorePreview] = useState<ExportData | null>(null)
 
@@ -702,23 +786,50 @@ export function CsvImport({ onReload }: Props) {
     setState('idle')
   }
 
+  /** 金額確認CSV（発電所×費目、合計行つき）をダウンロード */
+  async function handleExportKingaku() {
+    setExporting(true)
+    try {
+      const data = await exportAllData()
+      const tables = data as unknown as Record<string, Record<string, unknown>[]>
+      const csv = buildKingakuCsv(tables)
+      const date = new Date().toISOString().slice(0, 10)
+      downloadBlob(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }), `ageful_金額確認_${date}.csv`)
+    } catch (e) {
+      alert(`エクスポートに失敗しました: ${String(e)}`)
+    } finally {
+      setExporting(false)
+    }
+  }
+
   async function handleExport() {
     setExporting(true)
     try {
       const data = await exportAllData()
-      // チェックを外したデータ種別は空にして出力（ExportData の形は保ったまま＝復元互換）
-      for (const t of EXPORT_TABLES) {
-        if (!exportTables[t.key]) (data as unknown as Record<string, unknown[]>)[t.key] = []
+      const tables = data as unknown as Record<string, Record<string, unknown>[]>
+      const date = new Date().toISOString().slice(0, 10)
+
+      if (exportFormat === 'csv') {
+        // 選択した種別ごとに1ファイル、選択した項目だけの列構成（日本語見出し・BOM付きUTF-8）
+        for (const t of EXPORT_FIELD_DEFS) {
+          const fields = t.fields.filter(f => fieldSel[t.key]?.[f.key])
+          if (fields.length === 0) continue
+          const csv = buildCsv(fields, tables[t.key] ?? [])
+          downloadBlob(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }), `ageful_${t.label}_${date}.csv`)
+        }
+      } else {
+        // JSON: 選択した種別・項目だけを含める（形は ExportData 互換）
+        for (const t of EXPORT_FIELD_DEFS) {
+          const keys = t.fields.filter(f => fieldSel[t.key]?.[f.key]).map(f => f.key)
+          const rows = tables[t.key] ?? []
+          if (keys.length === 0) tables[t.key] = []
+          else if (keys.length < t.fields.length) {
+            tables[t.key] = rows.map(r => Object.fromEntries(keys.filter(k => k in r).map(k => [k, r[k]])))
+          }
+        }
+        const json = JSON.stringify(data, null, 2)
+        downloadBlob(new Blob([json], { type: 'application/json' }), `ageful_backup${isFullSelection ? '' : '_partial'}_${date}.json`)
       }
-      const isFull = EXPORT_TABLES.every(t => exportTables[t.key])
-      const json = JSON.stringify(data, null, 2)
-      const blob = new Blob([json], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `ageful_backup${isFull ? '' : '_partial'}_${new Date().toISOString().slice(0, 10)}.json`
-      a.click()
-      URL.revokeObjectURL(url)
     } catch (e) {
       alert(`エクスポートに失敗しました: ${String(e)}`)
     } finally {
@@ -785,26 +896,91 @@ export function CsvImport({ onReload }: Props) {
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 14 }}>📦 データ移行（エクスポート / 復元）</div>
         <div style={{ fontSize: 13, color: '#64748b', marginBottom: 12 }}>
-          選択したデータをJSONファイルとしてエクスポートし、別のアカウントで復元できます。
+          出力する形式とデータ・項目を選んでエクスポートできます。
         </div>
-        <div style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 6 }}>エクスポートに含めるデータ</div>
-          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-            {EXPORT_TABLES.map(t => (
-              <label key={t.key} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, cursor: 'pointer' }}>
-                <input type="checkbox" checked={exportTables[t.key]}
-                  onChange={e => setExportTables(prev => ({ ...prev, [t.key]: e.target.checked }))} />
-                {t.label}
-              </label>
-            ))}
+
+        {/* 金額確認CSV（定型・ワンクリック） */}
+        <div style={{ marginBottom: 14, padding: '12px 14px', background: '#f0f9ff', borderRadius: 8, borderLeft: '3px solid #0ea5e9' }}>
+          <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>💰 金額確認CSV（発電所 × 費目）</div>
+          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>
+            1行=1発電所で、費目ごと（年次保守料・土地賃料・保険料など）の金額を横並びにした表。
+            右端に発電所ごとの年間合計、最下行に費目ごとの合計が入り、Excelでそのまま確認できます。
           </div>
-          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 6 }}>
-            ※ 復元に使う場合は、関連するデータも一緒に含めてください（例: 発電所には顧客、契約・請求記録には発電所が必要）
-          </div>
+          <button className="btn btn-main btn-sm" onClick={handleExportKingaku} disabled={exporting}>
+            {exporting ? '⏳ 作成中...' : '⬇ 金額確認CSVをダウンロード'}
+          </button>
         </div>
+
+        {/* 形式選択 */}
+        <div style={{ display: 'flex', gap: 16, marginBottom: 10, fontSize: 13 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
+            <input type="radio" checked={exportFormat === 'json'} onChange={() => setExportFormat('json')} />
+            JSON（バックアップ / 復元用）
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
+            <input type="radio" checked={exportFormat === 'csv'} onChange={() => setExportFormat('csv')} />
+            CSV（Excel用・データ種別ごとに1ファイル）
+          </label>
+        </div>
+
+        {/* 項目検索 */}
+        <input
+          className="form-input"
+          placeholder="🔍 項目名で検索（例: 住所、契約日、パネル）"
+          value={fieldSearch}
+          onChange={e => setFieldSearch(e.target.value)}
+          style={{ marginBottom: 8, width: 300 }}
+        />
+
+        {/* データ種別 → 項目 の階層選択（開くと項目単位でチェックできる） */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
+          {EXPORT_FIELD_DEFS.map(t => {
+            const sel = fieldSel[t.key] ?? {}
+            const q = fieldSearch.trim()
+            const tableLabelHit = q !== '' && t.label.includes(q)
+            const matchedFields = q === '' || tableLabelHit ? t.fields : t.fields.filter(f => f.label.includes(q))
+            if (q !== '' && !tableLabelHit && matchedFields.length === 0) return null
+            const nSel = t.fields.filter(f => sel[f.key]).length
+            const allSel = nSel === t.fields.length
+            const isExpanded = q !== '' ? true : !!expandedTables[t.key]
+            return (
+              <div key={t.key} style={{ border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#f8fafc' }}>
+                  <TriCheckbox checked={allSel} indeterminate={nSel > 0 && !allSel} onChange={v => setTableAll(t.key, v)} />
+                  <span style={{ fontWeight: 600, fontSize: 13 }}>{t.label}</span>
+                  <span style={{ fontSize: 11, color: '#94a3b8' }}>{nSel}/{t.fields.length} 項目</span>
+                  <button
+                    style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: '#64748b' }}
+                    onClick={() => setExpandedTables(prev => ({ ...prev, [t.key]: !isExpanded }))}
+                  >
+                    {isExpanded ? '▲ 閉じる' : '▼ 項目を選ぶ'}
+                  </button>
+                </div>
+                {isExpanded && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 4, padding: '8px 12px' }}>
+                    {matchedFields.map(f => (
+                      <label key={f.key} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, cursor: 'pointer' }}>
+                        <input type="checkbox" checked={!!sel[f.key]}
+                          onChange={e => setFieldSel(prev => ({ ...prev, [t.key]: { ...prev[t.key], [f.key]: e.target.checked } }))} />
+                        {f.label}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 10 }}>
+          {exportFormat === 'json'
+            ? '※ 復元に使う場合は全項目のままエクスポートしてください。項目を絞ったJSONは復元に使えない場合があります'
+            : '※ CSVは選択したデータ種別ごとに1ファイルずつダウンロードされます（ブラウザが複数ダウンロードの許可を求めることがあります）'}
+        </div>
+
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button className="btn btn-main" onClick={handleExport} disabled={exporting || EXPORT_TABLES.every(t => !exportTables[t.key])}>
-            {exporting ? '⏳ エクスポート中...' : EXPORT_TABLES.every(t => exportTables[t.key]) ? '⬇ 全データをエクスポート' : '⬇ 選択したデータをエクスポート'}
+          <button className="btn btn-main" onClick={handleExport} disabled={exporting || !hasAnySelection}>
+            {exporting ? '⏳ エクスポート中...' : isFullSelection && exportFormat === 'json' ? '⬇ 全データをエクスポート' : '⬇ 選択した項目をエクスポート'}
           </button>
           <button className="btn btn-sub" onClick={() => restoreFileRef.current?.click()}>
             ⬆ バックアップから復元

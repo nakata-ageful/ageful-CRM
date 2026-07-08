@@ -105,12 +105,10 @@ export async function updateCustomer(id: number, input: CustomerInput): Promise<
     if (error) throw error
     updated = data as Customer
   }
-  // 見込みへの書き戻し（顧客名まわり）
+  // 見込みへの書き戻し（顧客名まわり。prospects に会社名/法人区分カラムは無いので名前系のみ）
   await syncBackToProspect(id, {
     customer_name: payload.name,
     customer_name_kana: payload.name_kana ?? '',
-    company_name: payload.company_name,
-    is_corporate: payload.is_corporate,
   })
   return updated
 }

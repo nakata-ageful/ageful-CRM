@@ -614,6 +614,17 @@ function parseAuto(text: string): { rows: CsvImportRow[]; errors: string[]; isLe
 
 type ImportMode = 'project' | 'billing'
 
+/** エクスポート対象として選択できるデータ種別（ExportData のキーと対応） */
+const EXPORT_TABLES = [
+  { key: 'customers', label: '顧客' },
+  { key: 'projects', label: '発電所' },
+  { key: 'contracts', label: '契約' },
+  { key: 'annual_records', label: '請求記録' },
+  { key: 'maintenance_responses', label: '保守対応' },
+  { key: 'periodic_maintenance', label: '定期保守' },
+  { key: 'prospects', label: '見込み' },
+] as const
+
 export function CsvImport({ onReload }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
   const restoreFileRef = useRef<HTMLInputElement>(null)
@@ -628,6 +639,10 @@ export function CsvImport({ onReload }: Props) {
   const [csvFormat, setCsvFormat] = useState<FormatType>('template')
   // エクスポート・復元
   const [exporting, setExporting] = useState(false)
+  // エクスポートに含めるデータの選択（デフォルト全選択）
+  const [exportTables, setExportTables] = useState<Record<string, boolean>>(
+    () => Object.fromEntries(EXPORT_TABLES.map(t => [t.key, true]))
+  )
   const [restoreProgress, setRestoreProgress] = useState('')
   const [restorePreview, setRestorePreview] = useState<ExportData | null>(null)
 
@@ -691,12 +706,17 @@ export function CsvImport({ onReload }: Props) {
     setExporting(true)
     try {
       const data = await exportAllData()
+      // チェックを外したデータ種別は空にして出力（ExportData の形は保ったまま＝復元互換）
+      for (const t of EXPORT_TABLES) {
+        if (!exportTables[t.key]) (data as unknown as Record<string, unknown[]>)[t.key] = []
+      }
+      const isFull = EXPORT_TABLES.every(t => exportTables[t.key])
       const json = JSON.stringify(data, null, 2)
       const blob = new Blob([json], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `ageful_backup_${new Date().toISOString().slice(0, 10)}.json`
+      a.download = `ageful_backup${isFull ? '' : '_partial'}_${new Date().toISOString().slice(0, 10)}.json`
       a.click()
       URL.revokeObjectURL(url)
     } catch (e) {
@@ -765,11 +785,26 @@ export function CsvImport({ onReload }: Props) {
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 14 }}>📦 データ移行（エクスポート / 復元）</div>
         <div style={{ fontSize: 13, color: '#64748b', marginBottom: 12 }}>
-          全データをJSONファイルとしてエクスポートし、別のアカウントで復元できます。
+          選択したデータをJSONファイルとしてエクスポートし、別のアカウントで復元できます。
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 6 }}>エクスポートに含めるデータ</div>
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+            {EXPORT_TABLES.map(t => (
+              <label key={t.key} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, cursor: 'pointer' }}>
+                <input type="checkbox" checked={exportTables[t.key]}
+                  onChange={e => setExportTables(prev => ({ ...prev, [t.key]: e.target.checked }))} />
+                {t.label}
+              </label>
+            ))}
+          </div>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 6 }}>
+            ※ 復元に使う場合は、関連するデータも一緒に含めてください（例: 発電所には顧客、契約・請求記録には発電所が必要）
+          </div>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button className="btn btn-main" onClick={handleExport} disabled={exporting}>
-            {exporting ? '⏳ エクスポート中...' : '⬇ 全データをエクスポート'}
+          <button className="btn btn-main" onClick={handleExport} disabled={exporting || EXPORT_TABLES.every(t => !exportTables[t.key])}>
+            {exporting ? '⏳ エクスポート中...' : EXPORT_TABLES.every(t => exportTables[t.key]) ? '⬇ 全データをエクスポート' : '⬇ 選択したデータをエクスポート'}
           </button>
           <button className="btn btn-sub" onClick={() => restoreFileRef.current?.click()}>
             ⬆ バックアップから復元

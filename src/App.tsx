@@ -42,7 +42,7 @@ const NAV: { key: ViewKey; label: string; icon: string }[] = [
   { key: 'customers',             label: '顧客',           icon: '👤' },
   { key: 'maintenance-responses', label: '保守対応',       icon: '🔧' },
   { key: 'billing',               label: '請求',           icon: '📄' },
-  { key: 'import',                label: 'CSVインポート',  icon: '📥' },
+  { key: 'import',                label: 'データのエクスポート', icon: '📤' },
 ]
 
 const DETAIL_VIEWS: ViewKey[] = ['project-detail', 'customer-detail', 'maintenance-response-detail', 'prospect-detail']

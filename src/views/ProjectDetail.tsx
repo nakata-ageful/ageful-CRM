@@ -1,5 +1,8 @@
-import { useState } from 'react'
-import type { ProjectDetail, AnnualRecordInput, PeriodicMaintenanceInput, MaintenanceResponseInput, MaintenancePlanLevel } from '../types'
+import { useEffect, useState } from 'react'
+import type { ProjectDetail, AnnualRecordInput, PeriodicMaintenanceInput, MaintenanceResponseInput, MaintenancePlanLevel, BillingDetail as BillingDetailData } from '../types'
+import { BillingDetailView } from './BillingDetail'
+import { getBillingDetail } from '../lib/data'
+import { BILLING_ITEMS, annualBillableTotalInc } from '../lib/billing'
 import { StatusBadge } from '../components/StatusBadge'
 import { Modal } from '../components/Modal'
 import {
@@ -39,7 +42,7 @@ function fmtFormNum(v: string | number | null | undefined): string {
 }
 import { useToast } from '../components/Toast'
 
-type Tab = '基本情報' | '設備情報' | '契約情報' | '保守情報' | '請求情報' | 'その他' | '保守対応' | '年次請求記録'
+type Tab = '基本情報' | '設備情報' | '契約情報' | '保守情報' | '請求情報' | '請求詳細' | 'その他' | '保守対応' | '年次請求記録'
 
 type Props = {
   detail: ProjectDetail
@@ -53,20 +56,12 @@ const WORK_TYPES = ['点検', '除草', '経産省定期報告']
 const METI_STATUSES = ['未', '申請中', '受理', '不備']
 const BILLING_METHODS = ['請求書', '口座振替'] as const
 
-/** 保守内容セクションの年間金額合計（税込ベース） */
-function annualTotalIncFromContract(c: { annual_maintenance_inc?: number | null; land_cost_monthly?: number | null; insurance_fee?: number | null; local_association_fee?: number | null; communication_fee?: number | null; other_fee?: number | null } | null | undefined): number {
-  if (!c) return 0
-  return (c.annual_maintenance_inc ?? 0)
-    + (c.land_cost_monthly ?? 0)
-    + (c.insurance_fee ?? 0)
-    + (c.local_association_fee ?? 0)
-    + (c.communication_fee ?? 0)
-    + (c.other_fee ?? 0)
-}
+// 年間総額の計算（請求対象フラグ考慮）は lib/billing.ts の annualBillableTotalInc に共通化
 
 
 // 年次請求記録タブは請求タブ／請求詳細に運用を集約したため非表示（描画コードは dormant で残置）
-const TABS: Tab[] = ['基本情報', '設備情報', '契約情報', '保守情報', '請求情報', '保守対応', 'その他']
+// 並び順: 設定系 → 保守関連（保守情報・保守対応）→ 請求関連（請求情報・請求詳細）→ その他
+const TABS: Tab[] = ['基本情報', '設備情報', '契約情報', '保守情報', '保守対応', '請求情報', '請求詳細', 'その他']
 
 function readTabFromHash(): Tab {
   const h = window.location.hash
@@ -93,6 +88,24 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
   const setTab = (t: Tab) => {
     setTabState(t)
     writeTabToHash(t)
+  }
+
+  // 請求詳細タブ: 表示時に請求詳細データ（年次記録・分割入金含む）を遅延ロードする
+  const [billingDetail, setBillingDetail] = useState<BillingDetailData | null>(null)
+  const [billingDetailLoading, setBillingDetailLoading] = useState(false)
+  useEffect(() => {
+    if (tab !== '請求詳細') return
+    let cancelled = false
+    setBillingDetailLoading(true)
+    getBillingDetail(project.id)
+      .then(d => { if (!cancelled) setBillingDetail(d) })
+      .finally(() => { if (!cancelled) setBillingDetailLoading(false) })
+    return () => { cancelled = true }
+  }, [tab, project.id])
+  async function reloadBillingDetail() {
+    const d = await getBillingDetail(project.id)
+    setBillingDetail(d)
+    onReload()  // 一覧・発電所詳細側のデータも更新
   }
 
   // 保守対応フォーム
@@ -228,6 +241,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
     transfer_fee_inc: contract?.transfer_fee_inc != null ? String(contract.transfer_fee_inc) : '',
     billing_schedule_days: (contract?.billing_schedule_days ?? []) as string[],
     billing_amount_overrides: (contract?.billing_amount_overrides ?? {}) as Record<string, number>,
+    billing_item_flags: (contract?.billing_item_flags ?? {}) as Record<string, boolean>,
     transfer_fee: contract?.transfer_fee != null ? String(contract.transfer_fee) : '',
     sale_contract_date: contract?.sale_contract_date ?? '',
     equipment_contract_date: contract?.equipment_contract_date ?? '',
@@ -412,6 +426,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
         transfer_fee_inc: toNum(contractForm.transfer_fee_inc),
         billing_schedule_days: contractForm.billing_schedule_days.length > 0 ? contractForm.billing_schedule_days : null,
         billing_amount_overrides: Object.keys(contractForm.billing_amount_overrides).length > 0 ? contractForm.billing_amount_overrides : null,
+        billing_item_flags: Object.keys(contractForm.billing_item_flags).length > 0 ? contractForm.billing_item_flags : null,
         transfer_fee: toNum(contractForm.transfer_fee),
         sale_contract_date: contractForm.sale_contract_date || null,
         equipment_contract_date: contractForm.equipment_contract_date || null,
@@ -530,6 +545,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
         transfer_fee_inc: contract.transfer_fee_inc != null ? String(contract.transfer_fee_inc) : '',
         billing_schedule_days: (contract.billing_schedule_days ?? []) as string[],
         billing_amount_overrides: (contract.billing_amount_overrides ?? {}) as Record<string, number>,
+        billing_item_flags: (contract.billing_item_flags ?? {}) as Record<string, boolean>,
         transfer_fee: contract.transfer_fee != null ? String(contract.transfer_fee) : '',
         sale_contract_date: contract.sale_contract_date ?? '',
         equipment_contract_date: contract.equipment_contract_date ?? '',
@@ -634,6 +650,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           transfer_fee_inc: toNum(contractForm.transfer_fee_inc),
           billing_schedule_days: contractForm.billing_schedule_days.length > 0 ? contractForm.billing_schedule_days : null,
           billing_amount_overrides: Object.keys(contractForm.billing_amount_overrides).length > 0 ? contractForm.billing_amount_overrides : null,
+          billing_item_flags: Object.keys(contractForm.billing_item_flags).length > 0 ? contractForm.billing_item_flags : null,
         })
       }
       setEditSection(null)
@@ -895,7 +912,8 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               {contract && <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('billing')}>編集</button>}
             </div>
             {(() => {
-              const annualInc = annualTotalIncFromContract(contract)
+              const annualInc = annualBillableTotalInc(contract)
+              const excludedItems = contract ? BILLING_ITEMS.filter(it => contract.billing_item_flags?.[it.key] === false && (contract[it.field] ?? 0) > 0) : []
               const method = contract?.billing_method
               const days = contract?.billing_schedule_days ?? []
               const overrides = contract?.billing_amount_overrides ?? {}
@@ -920,7 +938,10 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                         <div className="info-field"><span>振替手数料</span><b>{contract?.has_transfer_fee ? `あり（税込 ${fmtYen(contract.transfer_fee_inc)}）` : 'なし'}</b></div>
                       </>
                     )}
-                    <div className="info-field"><span>年間総額（税込）</span><b>{fmtYen(annualInc)}</b></div>
+                    <div className="info-field"><span>年間総額（税込・請求対象のみ）</span><b>{fmtYen(annualInc)}</b></div>
+                    {excludedItems.length > 0 && (
+                      <div className="info-field"><span>請求対象外（記載のみ）</span><b style={{ color: '#94a3b8' }}>{excludedItems.map(it => `${it.label} ${fmtYen(contract![it.field] ?? 0)}`).join(' / ')}</b></div>
+                    )}
                     {count > 0 && (
                       <div className="info-field"><span>{isInvoice ? '1回あたり（均等割）' : '月額（均等割）'}</span><b>{fmtYen(baseAmount)}</b></div>
                     )}
@@ -941,6 +962,23 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             })()}
           </div>
         </div>
+      )}
+
+      {/* ── 請求詳細タブ（旧・独立の請求詳細画面を埋め込み） ── */}
+      {tab === '請求詳細' && (
+        billingDetailLoading && !billingDetail ? (
+          <div className="card loading-card">読み込み中...</div>
+        ) : billingDetail ? (
+          <BillingDetailView
+            detail={billingDetail}
+            embedded
+            onBack={() => {}}
+            onReload={reloadBillingDetail}
+            onViewProject={() => setTab('基本情報')}
+          />
+        ) : (
+          <div className="card" style={{ color: '#94a3b8', fontSize: 13 }}>請求詳細を表示できません（契約レコードがありません）</div>
+        )
       )}
 
       {/* ── その他タブ ── */}
@@ -2192,14 +2230,15 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
 
             {/* 請求情報 */}
             {editSection === 'billing' && (() => {
-              const annualInc = annualTotalIncFromContract({
+              const formAmounts = {
                 annual_maintenance_inc: Number(contractForm.annual_maintenance_inc) || 0,
                 land_cost_monthly: Number(contractForm.land_cost_monthly) || 0,
                 insurance_fee: Number(contractForm.insurance_fee) || 0,
                 local_association_fee: Number(contractForm.local_association_fee) || 0,
                 communication_fee: Number(contractForm.communication_fee) || 0,
                 other_fee: Number(contractForm.other_fee) || 0,
-              })
+              }
+              const annualInc = annualBillableTotalInc({ ...formAmounts, billing_item_flags: contractForm.billing_item_flags })
               const isInvoice = contractForm.billing_method === '請求書'
               const isWithdraw = contractForm.billing_method === '口座振替'
               const count = isInvoice ? (Number(contractForm.billing_count) || 0) : (isWithdraw ? 12 : 0)
@@ -2214,8 +2253,28 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                   </select>
                 </label>
                 <div className="info-field" style={{ alignSelf: 'end', padding: '4px 8px', background: '#f1f5f9', borderRadius: 4 }}>
-                  <span>年間総額（税込・保守内容より自動）</span>
+                  <span>年間総額（税込・請求対象のみ）</span>
                   <b>{fmtYen(annualInc)}</b>
+                </div>
+
+                {/* 請求に含める項目の選択（外した項目は記載のみ＝金額計算から除外） */}
+                <div style={{ gridColumn: '1/-1' }}>
+                  <p style={{ margin: '8px 0 4px', fontWeight: 600, fontSize: 13, color: '#475569' }}>── 請求に含める項目（金額は保守内容より）</p>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 6 }}>
+                    {BILLING_ITEMS.map(it => {
+                      const amount = formAmounts[it.field]
+                      const checked = contractForm.billing_item_flags[it.key] !== false
+                      return (
+                        <label key={it.key} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: amount > 0 ? '#0f172a' : '#94a3b8', cursor: 'pointer' }}>
+                          <input type="checkbox" checked={checked}
+                            onChange={e => setContractForm(f => ({ ...f, billing_item_flags: { ...f.billing_item_flags, [it.key]: e.target.checked } }))} />
+                          {it.label}
+                          <span style={{ marginLeft: 'auto', fontVariantNumeric: 'tabular-nums' }}>{amount > 0 ? fmtYen(amount) : '—'}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                  <p style={{ fontSize: 11, color: '#94a3b8', margin: '6px 0 0' }}>※ チェックを外した項目は保守内容に記載のみで、請求金額の計算に入りません</p>
                 </div>
 
                 {isInvoice && (

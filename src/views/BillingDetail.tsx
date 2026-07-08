@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { BillingDetail, BillingLineItem, PaymentEntry, MaintenanceResponse, PeriodicMaintenance } from '../types'
 import { updateAnnualRecord, createAnnualRecord, deleteAnnualRecord, updateContract } from '../lib/actions'
+import { annualBillableTotalInc, invoiceAmount, withdrawalAmount } from '../lib/billing'
 import { fmtYen, fmtDate, dateInputRange } from '../lib/utils'
 import { useToast } from '../components/Toast'
 
@@ -21,10 +22,12 @@ type Props = {
   onBack: () => void
   onReload: () => void
   onViewProject: (projectId: number) => void
+  /** 発電所詳細の「請求詳細」タブに埋め込む場合 true。独自ヘッダー（戻る/発電所名）を出さない */
+  embedded?: boolean
 }
 
 
-export function BillingDetailView({ detail, onBack, onReload, onViewProject }: Props) {
+export function BillingDetailView({ detail, onBack, onReload, onViewProject, embedded = false }: Props) {
   const toast = useToast()
   const { project, customer, contract, annualRecords, maintenanceResponses, periodicMaintenance } = detail
   const currentYear = new Date().getFullYear()
@@ -117,6 +120,19 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject }: P
   }
 
   const total = lineItems.reduce((sum, item) => sum + (parseInt(item.amount.replace(/,/g, '')) || 0), 0)
+
+  // 今回の請求 = 次の未完了（未入金）の回。年間総額は「請求に含める」項目のみの合計
+  const currentMonth = new Date().getMonth() + 1
+  const annualBillable = annualBillableTotalInc(contract)
+  const nextSeq = billingCount > 1
+    ? (payments.find(p => !p.received_date)?.seq ?? null)
+    : (receivedDate ? null : 1)
+  const nextScheduled = billingCount > 1
+    ? (payments.find(p => !p.received_date)?.scheduled_date ?? null)
+    : scheduledDate || null
+  const currentAmount = isTransfer
+    ? withdrawalAmount(contract, currentMonth)
+    : (nextSeq != null ? invoiceAmount(contract, nextSeq, billingCount) : null)
 
   function updateItem(i: number, field: keyof LineItemForm, value: string) {
     setLineItems(prev => prev.map((item, idx) => idx === i ? { ...item, [field]: value } : item))
@@ -231,13 +247,15 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject }: P
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <button className="back-btn" onClick={onBack}>← 請求一覧へ</button>
-        <button className="link-btn" onClick={() => onViewProject(project.id)}>{project.project_name}</button>
-        <span style={{ color: '#64748b', fontSize: 13 }}>{custName}</span>
-        {saving && <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 'auto' }}>保存中...</span>}
-      </div>
+      {/* Header（埋め込み時は発電所詳細側にヘッダーがあるので出さない） */}
+      {!embedded && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <button className="back-btn" onClick={onBack}>← 請求一覧へ</button>
+          <button className="link-btn" onClick={() => onViewProject(project.id)}>{project.project_name}</button>
+          <span style={{ color: '#64748b', fontSize: 13 }}>{custName}</span>
+          {saving && <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 'auto' }}>保存中...</span>}
+        </div>
+      )}
 
       {/* 2-column layout */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 520px', gap: 20, alignItems: 'start' }}>
@@ -245,11 +263,15 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject }: P
         {/* ── Left main panel ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-          {/* 請求金額 */}
+          {/* 今回の請求金額（次の未完了の回。口座振替は今月分） */}
           <div className="card" style={{ padding: '20px 24px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
               <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: '#94a3b8' }}>
-                請求金額（税込）
+                {isTransfer
+                  ? `今月の請求（${currentMonth}月・税込）`
+                  : nextSeq != null
+                    ? `今回の請求（第${nextSeq}回／全${billingCount}回・税込）`
+                    : '今回の請求（税込）'}
               </div>
               <span style={{
                 fontSize: 10, fontWeight: 700, borderRadius: 4, padding: '2px 8px',
@@ -258,9 +280,19 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject }: P
               }}>
                 {contract.billing_method ?? '—'}
               </span>
+              {!isTransfer && nextScheduled && (
+                <span style={{ fontSize: 11, color: '#64748b' }}>予定日 {fmtDate(nextScheduled)}</span>
+              )}
             </div>
             <div style={{ fontSize: 38, fontWeight: 800, color: '#0f172a', letterSpacing: '-1px', lineHeight: 1 }}>
-              {total > 0 ? fmtYen(total) : '—'}
+              {currentAmount != null ? fmtYen(currentAmount) : '—'}
+            </div>
+            {!isTransfer && nextSeq == null && (
+              <div style={{ fontSize: 12, color: '#059669', fontWeight: 600, marginTop: 8 }}>今年度の請求はすべて入金済みです</div>
+            )}
+            <div style={{ fontSize: 12, color: '#64748b', marginTop: 8 }}>
+              年間総額（請求対象のみ）: <b style={{ color: '#0f172a' }}>{fmtYen(annualBillable)}</b>
+              <span style={{ marginLeft: 8, fontSize: 11, color: '#94a3b8' }}>※ 内訳・請求対象の変更は 請求情報タブ／保守情報タブ から</span>
             </div>
           </div>
 
@@ -395,7 +427,10 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject }: P
                     {payments.map((p, i) => (
                       <div key={i} style={{ background: '#f8fafc', borderRadius: 8, padding: '12px 14px', borderLeft: `3px solid ${p.received_date ? '#10b981' : p.billing_date ? '#f59e0b' : '#0ea5e9'}` }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                          <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>第{p.seq}回</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>
+                            第{p.seq}回
+                            <span style={{ marginLeft: 8, fontWeight: 600, color: '#475569' }}>{fmtYen(invoiceAmount(contract, p.seq, billingCount))}</span>
+                          </span>
                           <span style={{ fontSize: 10, fontWeight: 600, borderRadius: 4, padding: '1px 6px',
                             background: p.received_date ? '#dcfce7' : p.billing_date ? '#fef3c7' : '#f0f9ff',
                             color: p.received_date ? '#059669' : p.billing_date ? '#d97706' : '#0369a1',
@@ -436,10 +471,13 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject }: P
               </div>
             )}
 
-            {/* 請求明細 */}
+            {/* 請求明細（年間内訳の手動記録。総額の計算は保守内容＋請求対象フラグが主） */}
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                <span style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>請求明細</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#475569' }}>
+                  請求明細（年間・記録用）
+                  <span style={{ marginLeft: 8, fontWeight: 600, fontSize: 12, color: '#64748b' }}>合計 {fmtYen(total)}</span>
+                </span>
                 <button
                   className="btn btn-sub btn-sm"
                   onClick={() => setLineItems(prev => [...prev, { name: '', amount: '' }])}
@@ -447,6 +485,11 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject }: P
                   ＋ 項目を追加
                 </button>
               </div>
+              {annualBillable > 0 && total > 0 && total !== annualBillable && (
+                <p style={{ fontSize: 12, color: '#d97706', background: '#fffbeb', borderRadius: 6, padding: '6px 10px', margin: '0 0 10px' }}>
+                  ⚠ 明細の合計（{fmtYen(total)}）が、保守内容から計算した年間総額（{fmtYen(annualBillable)}）と一致していません。どちらが正しいか確認してください
+                </p>
+              )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {lineItems.map((item, i) => (
                   <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8, alignItems: 'center' }}>

@@ -5,12 +5,12 @@ import { hasSupabaseEnv } from './lib/supabase'
 import {
   getDashboard, getCustomers, getProjects, getProjectDetail,
   getCustomerDetail, getMaintenanceResponses, getMaintenanceResponseById,
-  getBillingRows, getBillingDetail, getProspects, getProspectById,
+  getBillingRows, getProspects, getProspectById,
   getProjectIdByCustomerId, getPeriodicMaintenance,
 } from './lib/data'
 import type {
   DashboardStats, Customer, ProjectRow, ProjectDetail,
-  CustomerDetailData, MaintenanceResponse, BillingRow, BillingDetail, Prospect,
+  CustomerDetailData, MaintenanceResponse, BillingRow, Prospect,
   PeriodicMaintenance,
 } from './types'
 
@@ -22,7 +22,6 @@ import { CustomerDetailView } from './views/CustomerDetail'
 import { MaintenanceResponses } from './views/MaintenanceResponses'
 import { MaintenanceResponseDetail } from './views/MaintenanceResponseDetail'
 import { Billing } from './views/Billing'
-import { BillingDetailView } from './views/BillingDetail'
 import { CsvImport } from './views/CsvImport'
 import { Prospects } from './views/Prospects'
 import { ProspectDetailView } from './views/ProspectDetail'
@@ -32,7 +31,7 @@ type ViewKey =
   | 'projects' | 'project-detail'
   | 'customers' | 'customer-detail'
   | 'maintenance-responses' | 'maintenance-response-detail'
-  | 'billing' | 'billing-detail'
+  | 'billing'
   | 'import'
   | 'prospects' | 'prospect-detail'
 
@@ -46,11 +45,11 @@ const NAV: { key: ViewKey; label: string; icon: string }[] = [
   { key: 'import',                label: 'CSVインポート',  icon: '📥' },
 ]
 
-const DETAIL_VIEWS: ViewKey[] = ['project-detail', 'customer-detail', 'maintenance-response-detail', 'billing-detail', 'prospect-detail']
+const DETAIL_VIEWS: ViewKey[] = ['project-detail', 'customer-detail', 'maintenance-response-detail', 'prospect-detail']
 
 const ALL_VIEWS: ViewKey[] = [
   'dashboard', 'projects', 'project-detail', 'customers', 'customer-detail',
-  'maintenance-responses', 'maintenance-response-detail', 'billing', 'billing-detail',
+  'maintenance-responses', 'maintenance-response-detail', 'billing',
   'import', 'prospects', 'prospect-detail',
 ]
 
@@ -76,7 +75,6 @@ function navActive(navKey: ViewKey, currentView: ViewKey): boolean {
   if (navKey === 'projects' && currentView === 'project-detail') return true
   if (navKey === 'customers' && currentView === 'customer-detail') return true
   if (navKey === 'maintenance-responses' && currentView === 'maintenance-response-detail') return true
-  if (navKey === 'billing' && currentView === 'billing-detail') return true
   if (navKey === 'prospects' && currentView === 'prospect-detail') return true
   return false
 }
@@ -102,7 +100,6 @@ export default function App() {
   const [projectDetail, setProjectDetail] = useState<ProjectDetail | null>(null)
   const [customerDetail, setCustomerDetail] = useState<CustomerDetailData | null>(null)
   const [maintenanceDetail, setMaintenanceDetail] = useState<MaintenanceResponse | null>(null)
-  const [billingDetail, setBillingDetail] = useState<BillingDetail | null>(null)
   const [prospectDetail, setProspectDetail] = useState<Prospect | null>(null)
 
   // Wrap setView to also update the URL hash + reset scroll position
@@ -166,7 +163,6 @@ export default function App() {
     else if (view === 'project-detail') navToProjectDetail(id)
     else if (view === 'customer-detail') navToCustomerDetail(id)
     else if (view === 'maintenance-response-detail') navToMaintenanceDetail(id)
-    else if (view === 'billing-detail') navToBillingDetail(id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading])
 
@@ -217,14 +213,6 @@ export default function App() {
     }
   }
 
-  async function navToBillingDetail(projectId: number) {
-    const detail = await getBillingDetail(projectId)
-    if (detail) {
-      setBillingDetail(detail)
-      setView('billing-detail', projectId)
-    }
-  }
-
   async function navToProspectDetail(id: number) {
     const detail = await getProspectById(id)
     if (detail) {
@@ -259,13 +247,6 @@ export default function App() {
     loadAll(true)
   }
 
-  async function reloadBillingDetail() {
-    if (!billingDetail) return
-    const detail = await getBillingDetail(billingDetail.project.id)
-    setBillingDetail(detail)
-    loadAll(true)
-  }
-
   function handleNavClick(key: ViewKey) {
     setView(key)
     // Clear detail state when navigating to list
@@ -273,7 +254,6 @@ export default function App() {
       setProjectDetail(null)
       setCustomerDetail(null)
       setMaintenanceDetail(null)
-      setBillingDetail(null)
       setProspectDetail(null)
     }
   }
@@ -320,7 +300,7 @@ export default function App() {
                 billingRows={billingRows}
                 onNavigate={v => handleNavClick(v as ViewKey)}
                 onViewMaintenance={navToMaintenanceDetail}
-                onViewBilling={navToBillingDetail}
+                onViewBilling={(id) => navToProjectDetail(id, '請求詳細')}
               />
             )}
             {view === 'projects' && (
@@ -397,15 +377,7 @@ export default function App() {
               <Billing
                 rows={billingRows}
                 onReload={loadAll}
-                onViewDetail={navToBillingDetail}
-              />
-            )}
-            {view === 'billing-detail' && billingDetail && (
-              <BillingDetailView
-                detail={billingDetail}
-                onBack={() => { setView('billing'); loadAll(true) }}
-                onReload={reloadBillingDetail}
-                onViewProject={navToProjectDetail}
+                onViewDetail={(id) => navToProjectDetail(id, '請求詳細')}
               />
             )}
             {view === 'import' && (

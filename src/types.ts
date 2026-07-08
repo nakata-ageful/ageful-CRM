@@ -144,6 +144,9 @@ export type Contract = {
   billing_schedule_days?: string[] | null
   // 各回/月の金額上書き JSON（請求書: { "1": 50000 } はround1=50000円 / 口座振替: { "11": 50000 } は11月）
   billing_amount_overrides?: Record<string, number> | null
+  // 請求計算に含める項目 JSON（key: annual_maintenance/land_cost/insurance/local_association/communication/other → boolean）
+  // 未設定（null/キー欠落）は「含める」扱い。false の項目は記載のみで請求金額の計算から除外
+  billing_item_flags?: Record<string, boolean> | null
   created_at: string
 }
 

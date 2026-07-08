@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import type { BillingRow, AnnualRecord, Contract, PaymentEntry } from '../types'
+import type { BillingRow, AnnualRecord, PaymentEntry } from '../types'
 import { updateAnnualRecord, createAnnualRecord, deleteAnnualRecord } from '../lib/actions'
+import { invoiceAmount, withdrawalAmount } from '../lib/billing'
 import { fmtYen, dateInputRange } from '../lib/utils'
 import { useToast } from '../components/Toast'
 
@@ -25,38 +26,7 @@ function toIsoDate(year: number, dayStr: string, monthDefault?: number): string 
   return `${year}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
 
-/** 年間総額（税込）を保守内容から算出 */
-function annualTotalInc(c: Contract | null): number {
-  if (!c) return 0
-  return (c.annual_maintenance_inc ?? 0)
-    + (c.land_cost_monthly ?? 0)
-    + (c.insurance_fee ?? 0)
-    + (c.local_association_fee ?? 0)
-    + (c.communication_fee ?? 0)
-    + (c.other_fee ?? 0)
-}
-
-/** 1回 / 1ヶ月 あたりの基本金額（上書き考慮、手数料なし） */
-function baseAmountForKey(c: Contract | null, key: string, divisor: number): number {
-  if (!c || divisor === 0) return 0
-  const over = c.billing_amount_overrides?.[key]
-  if (over != null) return over
-  return Math.floor(annualTotalInc(c) / divisor)
-}
-
-/** 請求書1回あたりの金額（手数料込み） */
-function invoiceAmount(c: Contract | null, round: number, totalRounds: number): number {
-  const base = baseAmountForKey(c, String(round), totalRounds)
-  const fee = (c?.has_issuance_fee && c?.issuance_fee_inc != null) ? c.issuance_fee_inc : 0
-  return base + fee
-}
-
-/** 口座振替1ヶ月あたりの金額（手数料込み） */
-function withdrawalAmount(c: Contract | null, month: number): number {
-  const base = baseAmountForKey(c, String(month), 12)
-  const fee = (c?.has_transfer_fee && c?.transfer_fee_inc != null) ? c.transfer_fee_inc : 0
-  return base + fee
-}
+// 金額計算（年間総額・均等割・手数料・請求対象フラグ）は lib/billing.ts に共通化
 
 export function Billing({ rows, onReload, onViewDetail }: Props) {
   const toast = useToast()

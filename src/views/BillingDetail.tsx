@@ -33,7 +33,10 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject, emb
   const currentYear = new Date().getFullYear()
 
   const currentRecord = annualRecords.find(r => r.year === currentYear) ?? null
-  const historyRecords = annualRecords.filter(r => r.year !== currentYear).sort((a, b) => b.year - a.year)
+  // 履歴 = 過去年度の全記録 + 今年度の入金済み記録（今年度分は左の編集エリアにも表示されるが、履歴でも見られるようにする）
+  const historyRecords = annualRecords
+    .filter(r => r.year !== currentYear || r.status === '入金済')
+    .sort((a, b) => b.year - a.year)
 
   function initLineItems(): LineItemForm[] {
     if (currentRecord?.line_items?.length) {
@@ -747,9 +750,9 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject, emb
             periodicMaintenance={periodicMaintenance}
           />
 
-          {/* 過去の請求・入金履歴 */}
+          {/* 請求・入金履歴（過去年度 + 今年度の入金済み） */}
           <div className="card" style={{ padding: '20px 22px' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 14, letterSpacing: '.01em' }}>過去の請求・入金履歴</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 14, letterSpacing: '.01em' }}>請求・入金履歴</div>
             {historyRecords.length === 0 ? (
               <p style={{ fontSize: 12.5, color: '#94a3b8' }}>履歴はありません</p>
             ) : (

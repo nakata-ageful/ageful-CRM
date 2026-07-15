@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import type { BillingDetail, BillingLineItem, PaymentEntry, MaintenanceResponse, PeriodicMaintenance } from '../types'
 import { updateAnnualRecord, createAnnualRecord, deleteAnnualRecord, updateContract } from '../lib/actions'
 import { annualBillableTotalInc, invoiceAmount, withdrawalAmount } from '../lib/billing'
@@ -100,6 +100,16 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject, emb
     const items: BillingLineItem[] = historyEdit.line_items
       .filter(i => i.name.trim())
       .map(i => ({ name: i.name.trim(), amount: parseInt(i.amount.replace(/,/g, '')) || 0 }))
+    // 分割入金（payments）を持つ記録は、日付・状態は回ごとデータが正なので明細だけ更新する
+    const rec = historyRecords.find(r => r.id === id)
+    if (rec?.payments?.length) {
+      await updateAnnualRecord(id, { line_items: items.length ? items : null })
+      setEditingHistoryId(null)
+      await onReload()
+      setSaving(false)
+      toast('履歴を保存しました')
+      return
+    }
     const newStatus = historyEdit.billing_date
       ? (historyEdit.received_date ? '入金済' : '請求済')
       : ''
@@ -790,8 +800,28 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject, emb
                           </div>
                         )}
                       </div>
-                      {/* データ行 */}
+                      {/* データ行（分割入金の記録は回ごとに全回表示する） */}
                       {!isEditing ? (
+                        r.payments?.length ? (
+                          <div style={{ display: 'grid', gridTemplateColumns: '44px 1fr 1fr auto', gap: '4px 8px', fontSize: 12.5, alignItems: 'center' }}>
+                            <div></div>
+                            <div style={{ color: '#64748b', fontSize: 11 }}>請求日</div>
+                            <div style={{ color: '#64748b', fontSize: 11 }}>入金日</div>
+                            <div style={{ color: '#64748b', fontSize: 11, textAlign: 'right' }}>金額</div>
+                            {r.payments.map(p => (
+                              <Fragment key={p.seq}>
+                                <div style={{ fontSize: 11, color: '#64748b' }}>第{p.seq}回</div>
+                                <div style={{ fontWeight: 500 }}>{p.billing_date ? fmtDate(p.billing_date) : '—'}</div>
+                                <div style={{ fontWeight: 700, color: p.received_date ? '#059669' : '#ef4444' }}>
+                                  {p.received_date ? fmtDate(p.received_date) : '未入金'}
+                                </div>
+                                <div style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700, textAlign: 'right', color: '#0f172a' }}>
+                                  {fmtYen(invoiceAmount(contract, p.seq, r.payments!.length))}
+                                </div>
+                              </Fragment>
+                            ))}
+                          </div>
+                        ) : (
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '4px 8px', fontSize: 12.5 }}>
                           <div style={{ color: '#64748b', fontSize: 11 }}>請求日</div>
                           <div style={{ color: '#64748b', fontSize: 11 }}>入金日</div>
@@ -804,8 +834,13 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject, emb
                             {fmtYen(amount)}
                           </div>
                         </div>
+                        )
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {r.payments?.length ? (
+                            <p style={{ fontSize: 11, color: '#94a3b8', margin: 0 }}>※ 回ごとの請求日・入金日は分割入金データで管理されています（ここでは明細のみ編集できます）</p>
+                          ) : (
+                            <>
                           <label style={{ fontSize: 11, color: '#64748b', display: 'flex', flexDirection: 'column', gap: 3 }}>
                             請求日
                             <input
@@ -824,6 +859,8 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject, emb
                               onChange={e => setHistoryEdit(prev => ({ ...prev, received_date: e.target.value }))}
                             />
                           </label>
+                            </>
+                          )}
                           <div style={{ fontSize: 11, color: '#64748b' }}>
                             請求明細
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>

@@ -68,15 +68,21 @@ export function MaintenanceResponses({ responses, periodic, billingRows, onReloa
     )
   })
 
+  // project_id → 契約（受託会社・保守委託先の検索用）
+  const contractByProjectId = new Map(billingRows.map(r => [r.project_id, r.contract]))
+
   const filteredPeriodic = periodic.filter(p => {
     if (!search) return true
     const q = search.toLowerCase()
+    const c = contractByProjectId.get(p.project_id)
     return (
       (p.plant_name ?? '').toLowerCase().includes(q) ||
       (p.project_name ?? '').toLowerCase().includes(q) ||
       (p.customer_name ?? '').toLowerCase().includes(q) ||
       (p.work_type ?? '').toLowerCase().includes(q) ||
-      (p.content ?? '').toLowerCase().includes(q)
+      (p.content ?? '').toLowerCase().includes(q) ||
+      (c?.maintenance_contractor ?? '').toLowerCase().includes(q) ||
+      (c?.subcontractor ?? '').toLowerCase().includes(q)
     )
   })
 
@@ -97,7 +103,7 @@ export function MaintenanceResponses({ responses, periodic, billingRows, onReloa
 
   const placeholderByTab: Record<TopTab, string> = {
     '保守対応': '発電所名・顧客名・対象箇所・状況で検索...',
-    '定期保守': '発電所名・顧客名・作業種別・内容で検索...',
+    '定期保守': '発電所名・顧客名・作業種別・内容・受託会社・保守委託先で検索...',
     '受託情報': '発電所名・顧客名・受託会社で検索...',
     '委託情報': '発電所名・顧客名・保守委託先で検索...',
   }

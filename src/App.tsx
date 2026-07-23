@@ -35,14 +35,14 @@ type ViewKey =
   | 'import'
   | 'prospects' | 'prospect-detail'
 
-const NAV: { key: ViewKey; label: string; icon: string }[] = [
-  { key: 'dashboard',             label: 'ダッシュボード', icon: '◎' },
-  { key: 'prospects',             label: '見込み管理',     icon: '📋' },
-  { key: 'projects',              label: '発電所',         icon: '🏭' },
-  { key: 'customers',             label: '顧客',           icon: '👤' },
-  { key: 'maintenance-responses', label: '保守対応',       icon: '🔧' },
-  { key: 'billing',               label: '請求',           icon: '📄' },
-  { key: 'import',                label: 'データのエクスポート', icon: '📤' },
+const NAV: { key: ViewKey; label: string }[] = [
+  { key: 'dashboard',             label: 'ダッシュボード' },
+  { key: 'prospects',             label: '見込み管理' },
+  { key: 'projects',              label: '発電所' },
+  { key: 'customers',             label: '顧客' },
+  { key: 'maintenance-responses', label: '保守対応' },
+  { key: 'billing',               label: '請求' },
+  { key: 'import',                label: 'データのエクスポート' },
 ]
 
 const DETAIL_VIEWS: ViewKey[] = ['project-detail', 'customer-detail', 'maintenance-response-detail', 'prospect-detail']
@@ -275,7 +275,6 @@ export default function App() {
             className={`nav-btn ${navActive(n.key, view) ? 'active' : ''}`}
             onClick={() => handleNavClick(n.key)}
           >
-            <span className="nav-icon">{n.icon}</span>
             {n.label}
           </button>
         ))}

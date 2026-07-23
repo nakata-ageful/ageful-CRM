@@ -33,9 +33,12 @@ export function Billing({ rows, onReload, onViewDetail }: Props) {
   const today = new Date()
   const currentYear = today.getFullYear()
   const currentMonth = today.getMonth() + 1
-  const nextMonthRaw = currentMonth + 1
-  const nextMonth = nextMonthRaw > 12 ? 1 : nextMonthRaw
-  const nextMonthYear = nextMonthRaw > 12 ? currentYear + 1 : currentYear
+  // 請求予定の対象範囲: 今月・来月・再来月（3ヶ月分）。月をキーに年を引けるようにする（3ヶ月の窓なので月の重複は起きない）
+  const upcomingMonthYears = Array.from({ length: 3 }, (_, i) => {
+    const raw = currentMonth - 1 + i
+    return { month: (raw % 12) + 1, year: currentYear + Math.floor(raw / 12) }
+  })
+  const yearByUpcomingMonth = new Map(upcomingMonthYears.map(m => [m.month, m.year]))
 
   // ───────────────────────────────────────────────
   // データ展開
@@ -60,13 +63,12 @@ export function Billing({ rows, onReload, onViewDetail }: Props) {
     const totalRounds = days.length
     if (totalRounds === 0) return []
 
-    // 当月/翌月にあたる予定回を候補として抽出
+    // 今月・来月・再来月にあたる予定回を候補として抽出
     const candidates = days
       .map((day, i) => ({ day, round: i + 1, month: parseScheduleDay(day).month }))
-      .filter(cd => cd.month === currentMonth || cd.month === nextMonth)
+      .filter(cd => cd.month != null && yearByUpcomingMonth.has(cd.month))
       .map(cd => {
-        const isNextMonth = cd.month === nextMonth
-        const year = isNextMonth ? nextMonthYear : currentYear
+        const year = yearByUpcomingMonth.get(cd.month!)!
         return { ...cd, year, iso: toIsoDate(year, cd.day) }
       })
       .filter(cd => cd.iso != null) as { day: string; round: number; year: number; iso: string }[]
@@ -305,8 +307,8 @@ export function Billing({ rows, onReload, onViewDetail }: Props) {
         )}
       </SectionCard>
 
-      {/* ── 2. 今月・来月の請求予定 ── */}
-      <SectionCard title="今月・来月の請求予定" color="#0ea5e9" emptyText="該当する請求予定はありません">
+      {/* ── 2. 今月・来月・再来月の請求予定 ── */}
+      <SectionCard title="今月・来月・再来月の請求予定" color="#0ea5e9" emptyText="該当する請求予定はありません">
         {upcomingInvoices.length > 0 && (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>

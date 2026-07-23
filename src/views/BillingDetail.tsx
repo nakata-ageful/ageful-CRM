@@ -132,6 +132,57 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject, emb
     toast(`${year}年度の年次記録を削除しました`)
   }
 
+  // 過去の年度の記録を新規追加（履歴セクション）。現在の契約の請求回数に合わせて回ごとの入力欄を出す
+  const [addingHistory, setAddingHistory] = useState(false)
+  const [newHistoryYear, setNewHistoryYear] = useState('')
+  const [newHistoryPayments, setNewHistoryPayments] = useState<PaymentEntry[]>([])
+  const [newHistoryLineItems, setNewHistoryLineItems] = useState<LineItemForm[]>([{ name: '', amount: '' }])
+
+  function openAddHistory() {
+    // 既存の履歴年度と被らない直近の年をデフォルト候補にする
+    const usedYears = new Set(annualRecords.map(r => r.year))
+    let y = currentYear - 1
+    while (usedYears.has(y) && y > currentYear - 20) y--
+    setNewHistoryYear(String(y))
+    setNewHistoryPayments(Array.from({ length: billingCount }, (_, i) => ({ seq: i + 1, scheduled_date: null, billing_date: null, received_date: null })))
+    setNewHistoryLineItems([{ name: '', amount: '' }])
+    setAddingHistory(true)
+  }
+
+  async function handleAddHistory() {
+    const year = parseInt(newHistoryYear, 10)
+    if (!year || year < 2000 || year > 2100) { toast('年度を正しく入力してください'); return }
+    setSaving(true)
+    try {
+      const items: BillingLineItem[] = newHistoryLineItems
+        .filter(i => i.name.trim())
+        .map(i => ({ name: i.name.trim(), amount: parseInt(i.amount.replace(/,/g, '')) || 0 }))
+      if (billingCount > 1) {
+        // 分割入金: 回ごとのデータを保持。記録全体の請求日/入金日は最終回の値を入れておく（他画面の集計は payments を見るので参考値）
+        const lastBilled = [...newHistoryPayments].reverse().find(p => p.billing_date)?.billing_date ?? null
+        const lastReceived = [...newHistoryPayments].reverse().find(p => p.received_date)?.received_date ?? null
+        await createAnnualRecord(contract.id, year, {
+          billing_date: lastBilled,
+          received_date: lastReceived,
+          payments: newHistoryPayments,
+          line_items: items.length ? items : null,
+        })
+      } else {
+        const p = newHistoryPayments[0]
+        await createAnnualRecord(contract.id, year, {
+          billing_date: p?.billing_date || null,
+          received_date: p?.received_date || null,
+          line_items: items.length ? items : null,
+        })
+      }
+      setAddingHistory(false)
+      await onReload()
+      toast(`${year}年度の記録を追加しました`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const total = lineItems.reduce((sum, item) => sum + (parseInt(item.amount.replace(/,/g, '')) || 0), 0)
 
   // 今回の請求 = 次の未完了（未入金）の回。年間総額は「請求に含める」項目のみの合計
@@ -762,7 +813,89 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject, emb
 
           {/* 請求・入金履歴（過去年度 + 今年度の入金済み） */}
           <div className="card" style={{ padding: '20px 22px' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 14, letterSpacing: '.01em' }}>請求・入金履歴</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', letterSpacing: '.01em' }}>請求・入金履歴</span>
+              {!addingHistory && (
+                <button
+                  style={{ fontSize: 10.5, padding: '2px 8px', background: '#f1f5f9', border: 'none', borderRadius: 4, cursor: 'pointer', color: '#475569', fontWeight: 600 }}
+                  onClick={openAddHistory}
+                >＋ 過去の記録を追加</button>
+              )}
+            </div>
+
+            {addingHistory && (
+              <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '12px 14px', marginBottom: 14, background: '#f8fafc' }}>
+                <label style={{ fontSize: 11, color: '#64748b', display: 'flex', flexDirection: 'column', gap: 3, marginBottom: 10, width: 120 }}>
+                  年度
+                  <input
+                    className="form-input" type="number" inputMode="numeric"
+                    style={{ padding: '4px 8px', fontSize: 12 }}
+                    value={newHistoryYear}
+                    onChange={e => setNewHistoryYear(e.target.value)}
+                  />
+                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+                  {newHistoryPayments.map((p, i) => (
+                    <div key={p.seq} style={{ display: 'grid', gridTemplateColumns: '44px 1fr 1fr', gap: 8, alignItems: 'center' }}>
+                      <span style={{ fontSize: 11, color: '#64748b' }}>{newHistoryPayments.length > 1 ? `第${p.seq}回` : '請求'}</span>
+                      <label style={{ fontSize: 10, color: '#94a3b8', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        請求日
+                        <input
+                          type="date" {...dateInputRange()} className="form-input" style={{ padding: '4px 6px', fontSize: 12 }}
+                          value={p.billing_date ?? ''}
+                          onChange={e => setNewHistoryPayments(prev => prev.map((pp, j) => j === i ? { ...pp, billing_date: e.target.value || null } : pp))}
+                        />
+                      </label>
+                      <label style={{ fontSize: 10, color: '#94a3b8', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        入金日
+                        <input
+                          type="date" {...dateInputRange()} className="form-input" style={{ padding: '4px 6px', fontSize: 12 }}
+                          value={p.received_date ?? ''}
+                          onChange={e => setNewHistoryPayments(prev => prev.map((pp, j) => j === i ? { ...pp, received_date: e.target.value || null } : pp))}
+                        />
+                      </label>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>請求明細（任意）</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
+                  {newHistoryLineItems.map((item, i) => (
+                    <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 4, alignItems: 'center' }}>
+                      <input
+                        className="form-input" placeholder="項目名" style={{ padding: '3px 6px', fontSize: 11 }}
+                        value={item.name}
+                        onChange={e => setNewHistoryLineItems(prev => prev.map((it, j) => j === i ? { ...it, name: e.target.value } : it))}
+                      />
+                      <input
+                        className="form-input" type="number" placeholder="0" style={{ padding: '3px 6px', fontSize: 11, width: 90, textAlign: 'right' }}
+                        value={item.amount}
+                        onChange={e => setNewHistoryLineItems(prev => prev.map((it, j) => j === i ? { ...it, amount: e.target.value } : it))}
+                      />
+                      <button
+                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 13, padding: '2px 4px', lineHeight: 1 }}
+                        onClick={() => setNewHistoryLineItems(prev => prev.filter((_, j) => j !== i))}
+                      >✕</button>
+                    </div>
+                  ))}
+                  <button
+                    style={{ fontSize: 10.5, padding: '2px 6px', background: '#f1f5f9', border: 'none', borderRadius: 4, cursor: 'pointer', color: '#475569', alignSelf: 'flex-start', marginTop: 2 }}
+                    onClick={() => setNewHistoryLineItems(prev => [...prev, { name: '', amount: '' }])}
+                  >＋ 明細を追加</button>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    style={{ fontSize: 11, padding: '4px 12px', background: '#0ea5e9', border: 'none', borderRadius: 4, cursor: 'pointer', color: '#fff', fontWeight: 700 }}
+                    onClick={handleAddHistory}
+                    disabled={saving}
+                  >この年度の記録を追加</button>
+                  <button
+                    style={{ fontSize: 11, padding: '4px 12px', background: '#e2e8f0', border: 'none', borderRadius: 4, cursor: 'pointer', color: '#64748b' }}
+                    onClick={() => setAddingHistory(false)}
+                  >キャンセル</button>
+                </div>
+              </div>
+            )}
+
             {historyRecords.length === 0 ? (
               <p style={{ fontSize: 12.5, color: '#94a3b8' }}>履歴はありません</p>
             ) : (

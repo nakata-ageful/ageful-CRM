@@ -84,6 +84,7 @@ export default function App() {
   const [view, setViewRaw] = useState<ViewKey>(initial.view)
   const [pendingDetailId, setPendingDetailId] = useState<number | null>(initial.detailId)
   const [loading, setLoading] = useState(true)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [error, setError] = useState('')
   // List data
   const [stats, setStats] = useState<DashboardStats>({ totalCustomers: 0, totalProjects: 0, activeMaintenanceCount: 0, pendingBillingCount: 0 })
@@ -108,6 +109,7 @@ export default function App() {
     pushHash(v, detailId)
     // ビュー切替時は常にページ先頭にスクロールする（前画面のスクロール位置を引き継がない）
     window.scrollTo({ top: 0, left: 0 })
+    setMobileNavOpen(false)
   }, [])
 
   // Listen for browser back/forward
@@ -256,6 +258,7 @@ export default function App() {
       setMaintenanceDetail(null)
       setProspectDetail(null)
     }
+    setMobileNavOpen(false)
   }
 
 
@@ -263,7 +266,16 @@ export default function App() {
     <ErrorBoundary>
     <ToastProvider>
     <div className="app">
-      <aside className="sidebar">
+      <button
+        className="mobile-nav-toggle"
+        aria-label="メニューを開く"
+        onClick={() => setMobileNavOpen(o => !o)}
+      >
+        {mobileNavOpen ? '✕' : '☰'}
+      </button>
+      {mobileNavOpen && <div className="mobile-nav-backdrop" onClick={() => setMobileNavOpen(false)} />}
+
+      <aside className={`sidebar ${mobileNavOpen ? 'mobile-open' : ''}`}>
         <div className="logo-block">
           <img src="/logo.png" alt="Ageful" className="logo-img" />
           <div className="logo-divider" />

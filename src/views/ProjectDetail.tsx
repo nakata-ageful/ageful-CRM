@@ -1128,6 +1128,9 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                 {contract?.plan_emergency && contract.plan_emergency !== 'なし' && (
                   <span style={{ fontSize: 12, color: '#64748b' }}>駆けつけ 契約: {contract.plan_emergency}</span>
                 )}
+                {contract?.maintenance_start_date && (
+                  <span style={{ fontSize: 12, color: '#64748b' }}>保守開始日: {contract.maintenance_start_date}</span>
+                )}
               </div>
               <button className="btn btn-main btn-sm" onClick={() => { setMrForm({ inquiry_date: '', occurrence_date: '', target_area: '', serial_number: '', situation: '', response_content: '', report: '' }); setErr(''); setMrModal(true) }}>
                 ＋ 追加

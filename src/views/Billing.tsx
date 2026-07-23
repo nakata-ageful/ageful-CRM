@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { BillingRow, AnnualRecord, PaymentEntry } from '../types'
 import { updateAnnualRecord, createAnnualRecord, deleteAnnualRecord } from '../lib/actions'
-import { invoiceAmount, withdrawalAmount } from '../lib/billing'
+import { invoiceAmount, withdrawalAmount, toIsoDate, computeUnpaidUnits, computeUpcomingInvoices, type UpcomingItem } from '../lib/billing'
 import { fmtYen, dateInputRange } from '../lib/utils'
 import { useToast } from '../components/Toast'
 
@@ -11,22 +11,7 @@ type Props = {
   onViewDetail: (projectId: number) => void
 }
 
-/** 「1月15日」「15日」から月日抽出 */
-function parseScheduleDay(day: string): { month: number | null; day: number | null } {
-  const m = day.match(/(\d{1,2})月/)?.[1]
-  const d = day.match(/(\d{1,2})日/)?.[1]
-  return { month: m ? Number(m) : null, day: d ? Number(d) : null }
-}
-
-/** 「X月Y日」「Y日」を YYYY-MM-DD に変換（month_default は 口座振替の引落日に使う） */
-function toIsoDate(year: number, dayStr: string, monthDefault?: number): string | null {
-  const { month, day } = parseScheduleDay(dayStr)
-  const m = month ?? monthDefault
-  if (m == null || day == null) return null
-  return `${year}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-}
-
-// 金額計算（年間総額・均等割・手数料・請求対象フラグ）は lib/billing.ts に共通化
+// 日付ヘルパー・金額計算・未入金判定は lib/billing.ts に共通化（ダッシュボードと共有）
 
 export function Billing({ rows, onReload, onViewDetail }: Props) {
   const toast = useToast()
@@ -34,79 +19,17 @@ export function Billing({ rows, onReload, onViewDetail }: Props) {
   const currentYear = today.getFullYear()
   const currentMonth = today.getMonth() + 1
   // 請求予定の対象範囲: 今月・来月・再来月（3ヶ月分）。月をキーに年を引けるようにする（3ヶ月の窓なので月の重複は起きない）
-  const upcomingMonthYears = Array.from({ length: 3 }, (_, i) => {
+  const yearByUpcomingMonth = new Map(Array.from({ length: 3 }, (_, i) => {
     const raw = currentMonth - 1 + i
-    return { month: (raw % 12) + 1, year: currentYear + Math.floor(raw / 12) }
-  })
-  const yearByUpcomingMonth = new Map(upcomingMonthYears.map(m => [m.month, m.year]))
+    return [(raw % 12) + 1, currentYear + Math.floor(raw / 12)] as [number, number]
+  }))
 
   // ───────────────────────────────────────────────
   // データ展開
   // ───────────────────────────────────────────────
 
-  /**
-   * 請求予定: 請求書のみ、当月/翌月の予定日が対象。
-   * 既存 annual_record（同じ year + billing_scheduled_date）があるものは除外（=既に発行済 or 入金済）
-   */
-  type UpcomingItem = {
-    row: BillingRow
-    round: number
-    totalRounds: number
-    scheduledDateISO: string  // YYYY-MM-DD
-    scheduleDayLabel: string  // 例: "1月15日"
-    amount: number
-  }
-  const upcomingInvoices: UpcomingItem[] = rows.flatMap(r => {
-    const c = r.contract
-    if (c?.billing_method !== '請求書') return []
-    const days = c?.billing_schedule_days ?? []
-    const totalRounds = days.length
-    if (totalRounds === 0) return []
-
-    // 今月・来月・再来月にあたる予定回を候補として抽出
-    const candidates = days
-      .map((day, i) => ({ day, round: i + 1, month: parseScheduleDay(day).month }))
-      .filter(cd => cd.month != null && yearByUpcomingMonth.has(cd.month))
-      .map(cd => {
-        const year = yearByUpcomingMonth.get(cd.month!)!
-        return { ...cd, year, iso: toIsoDate(year, cd.day) }
-      })
-      .filter(cd => cd.iso != null) as { day: string; round: number; year: number; iso: string }[]
-    if (candidates.length === 0) return []
-
-    // 年度ごとに「予定日が未設定のまま請求/入金/振替失敗が入った記録」の数を数える。
-    // これらは発行ボタンを通さず（CSVインポート等で）作られた記録で、実質その年の請求が
-    // 済んでいることを意味する。スケジュール回に正確に紐づく記録は除く（=正規の発行済み）。
-    // 回ごとデータ（payments）を持つ記録は各回に日付が明示されているので浮遊扱いしない。
-    const floatingByYear: Record<number, number> = {}
-    for (const rec of r.records) {
-      if (rec.payments?.length) continue
-      const handled = rec.billing_date || rec.received_date || rec.transfer_failed
-      if (!handled) continue
-      const tied = days.some(d => toIsoDate(rec.year, d) === rec.billing_scheduled_date)
-      if (tied) continue
-      floatingByYear[rec.year] = (floatingByYear[rec.year] ?? 0) + 1
-    }
-
-    const results: UpcomingItem[] = []
-    candidates.sort((a, b) => a.iso.localeCompare(b.iso))
-    for (const cand of candidates) {
-      // 既にこの予定日そのものの記録がある（発行済 or 入金済）→ 未入金/入金済セクション側へ
-      // 記録全体の予定日でも、回ごとデータ内の予定日でもひも付いていれば発行済みとみなす
-      if (r.records.some(rec => rec.billing_scheduled_date === cand.iso || rec.payments?.some(p => p.scheduled_date === cand.iso))) continue
-      // 予定日未設定のまま請求された記録がこの年度にあれば、その分この回を消費して除外
-      if ((floatingByYear[cand.year] ?? 0) > 0) { floatingByYear[cand.year]--; continue }
-      results.push({
-        row: r,
-        round: cand.round,
-        totalRounds,
-        scheduledDateISO: cand.iso,
-        scheduleDayLabel: cand.day,
-        amount: invoiceAmount(c, cand.round, totalRounds),
-      })
-    }
-    return results
-  }).sort((a, b) => a.scheduledDateISO.localeCompare(b.scheduledDateISO))
+  // 請求予定（今月・来月・再来月）: ロジックは lib/billing.ts に共通化（ダッシュボードと共有）
+  const upcomingInvoices = computeUpcomingInvoices(rows, yearByUpcomingMonth)
 
   /**
    * 未入金・入金済は「回」単位で判定する（対象は今年度＋昨年度＝過去1年。ユーザー指定）。
@@ -116,17 +39,8 @@ export function Billing({ rows, onReload, onViewDetail }: Props) {
    */
   const inScopeYear = (rec: AnnualRecord) => rec.year >= currentYear - 1
   type UnpaidItem = { row: BillingRow; record: AnnualRecord; payment?: PaymentEntry; totalRounds?: number }
-  const unpaidItems: UnpaidItem[] = rows.flatMap(r =>
-    r.records.filter(inScopeYear).flatMap((rec): UnpaidItem[] => {
-      if (rec.payments?.length) {
-        return rec.payments
-          .filter(p => !p.received_date && p.billing_date)
-          .map(p => ({ row: r, record: rec, payment: p, totalRounds: rec.payments!.length }))
-      }
-      if (!rec.received_date && (rec.billing_date || rec.transfer_failed)) return [{ row: r, record: rec }]
-      return []
-    })
-  ).sort((a, b) => (a.payment?.billing_date ?? a.record.billing_date ?? '').localeCompare(b.payment?.billing_date ?? b.record.billing_date ?? ''))
+  const unpaidItems: UnpaidItem[] = computeUnpaidUnits(rows, currentYear)
+    .sort((a, b) => (a.payment?.billing_date ?? a.record.billing_date ?? '').localeCompare(b.payment?.billing_date ?? b.record.billing_date ?? ''))
 
   type PaidItem = { row: BillingRow; record: AnnualRecord; payment?: PaymentEntry; totalRounds?: number }
   const paidItems: PaidItem[] = rows.flatMap(r =>

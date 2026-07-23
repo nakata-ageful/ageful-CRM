@@ -1,6 +1,7 @@
 import type { DashboardStats, MaintenanceResponse, BillingRow } from '../types'
 import { StatusBadge } from '../components/StatusBadge'
 import { fmtYen } from '../lib/utils'
+import { computeUnpaidUnits, unpaidUnitAmount, computeUpcomingInvoices } from '../lib/billing'
 
 type Props = {
   stats: DashboardStats
@@ -23,52 +24,26 @@ function dueDayToDate(dueDayStr: string | null | undefined): string | null {
 
 export function Dashboard({ stats, maintenanceList, billingRows, onNavigate, onViewMaintenance, onViewBilling }: Props) {
   const today = new Date().toISOString().slice(0, 10)
+  const currentYear = new Date().getFullYear()
   const activeList = maintenanceList.filter(m => m.status === '対応中')
 
-  // 未入金アラート: 請求日あり・入金日なし（分割払い対応）
-  const unpaidRows = billingRows.filter(r => {
-    const rec = r.currentYearRecord
-    if (!rec) return false
-    // 分割払い: payments配列内に請求予定日or請求日があり未入金のエントリがあるか
-    if (rec.payments && rec.payments.length > 0) {
-      return rec.payments.some(p => (p.scheduled_date || p.billing_date) && !p.received_date)
-    }
-    // 単回払い
-    return rec.billing_date && !rec.received_date
-  })
+  // 未入金アラート: 請求タブと同一ロジック（回ごと・今年度＋昨年度）で算出
+  const unpaidUnits = computeUnpaidUnits(billingRows, currentYear)
+    .sort((a, b) => (a.payment?.billing_date ?? a.record.billing_date ?? '').localeCompare(b.payment?.billing_date ?? b.record.billing_date ?? ''))
+  const unpaidTotal = unpaidUnits.reduce((sum, u) => sum + (unpaidUnitAmount(u) ?? 0), 0)
 
-  // 口座振替で振替日を過ぎているが入金確認がない案件
+  // 口座振替で振替日を過ぎているが入金確認がない案件（今年度＋昨年度の全記録を対象）
   const transferOverdueRows = billingRows.filter(r => {
     if (r.contract?.billing_method !== '口座振替') return false
-    const rec = r.currentYearRecord
-    if (!rec || rec.received_date || rec.transfer_failed) return false
     const dueDate = dueDayToDate(r.contract?.billing_due_day)
-    return dueDate ? dueDate <= today : false
+    if (!dueDate || dueDate > today) return false
+    // 対象期間に「入金済み or 振替失敗」の記録があれば処理済みとみなす
+    const handled = r.records.some(rec => rec.year >= currentYear - 1 && (rec.received_date || rec.transfer_failed))
+    return !handled
   })
 
-  // 請求予定: 請求予定日あり・請求日なし
-  const scheduledRows = billingRows
-    .filter(r => {
-      const rec = r.currentYearRecord
-      return rec?.billing_scheduled_date && !rec.billing_date
-    })
-    .sort((a, b) => {
-      const da = a.currentYearRecord?.billing_scheduled_date ?? ''
-      const db = b.currentYearRecord?.billing_scheduled_date ?? ''
-      return da.localeCompare(db)
-    })
-
-  // 未入金合計金額（分割払い対応: 未入金回数分を加算）
-  const unpaidTotal = unpaidRows.reduce((sum, r) => {
-    const rec = r.currentYearRecord!
-    if (rec.payments && rec.payments.length > 0) {
-      const unpaidCount = rec.payments.filter(p => (p.scheduled_date || p.billing_date) && !p.received_date).length
-      const perPayment = r.contract?.billing_amount_inc ?? 0
-      return sum + perPayment * unpaidCount
-    }
-    const amount = rec.line_items?.reduce((s, i) => s + i.amount, 0) ?? r.contract?.billing_amount_inc ?? 0
-    return sum + amount
-  }, 0)
+  // 請求予定: 請求タブと同じ「今月・来月・再来月の請求予定」を共有ロジックで算出
+  const scheduledItems = computeUpcomingInvoices(billingRows)
 
   return (
     <>
@@ -90,7 +65,7 @@ export function Dashboard({ stats, maintenanceList, billingRows, onNavigate, onV
         </div>
         <div className="kpi-card kpi-card--info">
           <div className="kpi-label">未入金アラート</div>
-          <div className="kpi-value">{unpaidRows.length}</div>
+          <div className="kpi-value">{unpaidUnits.length}</div>
           {unpaidTotal > 0 && (
             <div style={{ fontSize: 12, color: '#dc2626', fontWeight: 700, marginBottom: 4 }}>{fmtYen(unpaidTotal)}</div>
           )}
@@ -145,35 +120,28 @@ export function Dashboard({ stats, maintenanceList, billingRows, onNavigate, onV
               <tr><th>案件</th><th>顧客</th><th>請求金額</th><th>入金予定日</th><th>状態</th></tr>
             </thead>
             <tbody>
-              {unpaidRows.length === 0 && (
+              {unpaidUnits.length === 0 && (
                 <tr><td colSpan={5} className="empty-cell">未入金の請求はありません</td></tr>
               )}
-              {unpaidRows.slice(0, 8).map(r => {
-                const rec = r.currentYearRecord!
-                const hasPayments = rec.payments && rec.payments.length > 0
-                const unpaidPayments = hasPayments ? rec.payments!.filter(p => (p.scheduled_date || p.billing_date) && !p.received_date) : []
-                const amount = hasPayments
-                  ? (r.contract?.billing_amount_inc ?? 0) * unpaidPayments.length
-                  : rec.line_items?.reduce((s, i) => s + i.amount, 0) ?? r.contract?.billing_amount_inc ?? null
-                const isOverdue = hasPayments
-                  ? unpaidPayments.some(p => p.scheduled_date! <= today)
-                  : rec.payment_due_date ? rec.payment_due_date <= today : false
+              {unpaidUnits.slice(0, 8).map((u, i) => {
+                const rec = u.record
+                const amount = unpaidUnitAmount(u)
+                const dueDate = u.payment?.billing_date ?? rec.payment_due_date ?? null
+                const isOverdue = dueDate ? dueDate <= today : false
                 return (
-                  <tr key={r.project_id} className="clickable-row" onClick={() => onViewBilling(r.project_id)}>
+                  <tr key={`${rec.id}:${u.payment?.seq ?? 0}:${i}`} className="clickable-row" onClick={() => onViewBilling(u.row.project_id)}>
                     <td>
-                      <strong>{r.project_name}</strong>
-                      {hasPayments && (
+                      <strong>{u.row.project_name}</strong>
+                      {u.payment && u.totalRounds && (
                         <span style={{ marginLeft: 6, fontSize: 10, background: '#fef3c7', color: '#d97706', borderRadius: 4, padding: '1px 5px', fontWeight: 600 }}>
-                          {rec.payments!.length}回中{unpaidPayments.length}回未入金
+                          第{u.payment.seq}回/全{u.totalRounds}回
                         </span>
                       )}
                     </td>
-                    <td>{r.customer_name}</td>
+                    <td>{u.row.customer_name}</td>
                     <td className="amount">{fmtYen(amount)}</td>
                     <td style={{ color: isOverdue ? '#dc2626' : '#94a3b8', fontWeight: isOverdue ? 600 : 400 }}>
-                      {hasPayments
-                        ? unpaidPayments.map(p => p.scheduled_date).join(', ')
-                        : rec.payment_due_date ?? '—'}
+                      {dueDate ?? '—'}
                       {isOverdue && <span style={{ marginLeft: 4, fontSize: 10, background: '#fee2e2', color: '#dc2626', borderRadius: 99, padding: '1px 5px' }}>超過</span>}
                     </td>
                     <td><StatusBadge status={rec.status} /></td>
@@ -195,26 +163,30 @@ export function Dashboard({ stats, maintenanceList, billingRows, onNavigate, onV
               <tr><th>案件</th><th>顧客</th><th>請求予定日</th><th>請求方法</th><th style={{ textAlign: 'right' }}>請求金額（税込）</th></tr>
             </thead>
             <tbody>
-              {scheduledRows.length === 0 && (
+              {scheduledItems.length === 0 && (
                 <tr><td colSpan={5} className="empty-cell">請求予定のある案件はありません</td></tr>
               )}
-              {scheduledRows.slice(0, 8).map(r => {
-                const rec = r.currentYearRecord!
-                const amount = rec.line_items?.reduce((s, i) => s + i.amount, 0) ?? r.contract?.billing_amount_inc ?? null
-                const isOverdue = rec.billing_scheduled_date! <= today
+              {scheduledItems.slice(0, 8).map((s, i) => {
+                const isOverdue = s.scheduledDateISO <= today
+                const method = s.row.contract?.billing_method ?? null
                 return (
-                  <tr key={r.project_id} className="clickable-row" onClick={() => onViewBilling(r.project_id)}>
-                    <td><strong>{r.project_name}</strong></td>
-                    <td>{r.customer_name}</td>
+                  <tr key={`${s.row.project_id}:${s.scheduledDateISO}:${i}`} className="clickable-row" onClick={() => onViewBilling(s.row.project_id)}>
+                    <td>
+                      <strong>{s.row.project_name}</strong>
+                      {s.totalRounds > 1 && (
+                        <span style={{ marginLeft: 6, fontSize: 10, background: '#f1f5f9', color: '#64748b', borderRadius: 4, padding: '1px 5px', fontWeight: 600 }}>第{s.round}回/全{s.totalRounds}回</span>
+                      )}
+                    </td>
+                    <td>{s.row.customer_name}</td>
                     <td style={{ color: isOverdue ? '#dc2626' : '#0ea5e9', fontWeight: 600 }}>
-                      {rec.billing_scheduled_date}
+                      {s.scheduledDateISO}
                       {isOverdue && <span style={{ marginLeft: 6, fontSize: 10, background: '#fee2e2', color: '#dc2626', borderRadius: 99, padding: '1px 5px' }}>超過</span>}
                     </td>
-                    <td>{r.contract?.billing_method
-                      ? <span style={{ fontSize: 11.5, fontWeight: 600, background: '#f1f5f9', color: '#475569', borderRadius: 4, padding: '2px 8px' }}>{r.contract.billing_method}</span>
+                    <td>{method
+                      ? <span style={{ fontSize: 11.5, fontWeight: 600, background: '#f1f5f9', color: '#475569', borderRadius: 4, padding: '2px 8px' }}>{method}</span>
                       : '—'
                     }</td>
-                    <td className="amount">{fmtYen(amount)}</td>
+                    <td className="amount">{fmtYen(s.amount)}</td>
                   </tr>
                 )
               })}

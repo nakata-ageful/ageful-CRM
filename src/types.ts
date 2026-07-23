@@ -255,6 +255,7 @@ export type ProjectRow = {
   subcontractor: string | null       // 委託先（contractから）
   maintenance_start_date: string | null
   created_at: string
+  updated_at?: string | null
   customer_name: string
   company_name: string | null
   search_text?: string  // 一覧検索用。基本情報・設備情報・契約情報の各項目を連結した小文字テキスト

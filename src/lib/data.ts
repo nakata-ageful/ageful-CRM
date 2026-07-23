@@ -186,6 +186,7 @@ export async function getProjects(): Promise<ProjectRow[]> {
         subcontractor: contract?.subcontractor ?? null,
         maintenance_start_date: contract?.maintenance_start_date ?? null,
         created_at: p.created_at,
+        updated_at: (p as { updated_at?: string | null }).updated_at ?? p.created_at,
         customer_name: c?.company_name ?? c?.name ?? '-',
         company_name: c?.company_name ?? null,
         search_text: buildProjectSearchText(
@@ -227,6 +228,7 @@ export async function getProjects(): Promise<ProjectRow[]> {
       subcontractor: (con?.subcontractor as string) ?? null,
       maintenance_start_date: (con?.maintenance_start_date as string) ?? null,
       created_at: row.created_at as string,
+      updated_at: (row.updated_at as string) ?? null,
       customer_name: customerName,
       company_name: companyName,
       search_text: buildProjectSearchText(projOnly, con, customerName, companyName),

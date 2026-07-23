@@ -79,6 +79,18 @@ const emptyProjectForm: Omit<ProjectInput, 'customer_id'> = {
   notes: '',
 }
 
+/** 発電所一覧の並び替えオプション（値は sessionStorage に保存） */
+const SORT_OPTIONS = [
+  { key: 'updated_desc', label: '更新が新しい順' },
+  { key: 'created_desc', label: '登録が新しい順' },
+  { key: 'created_asc',  label: '登録が古い順（登録順）' },
+  { key: 'handover_desc', label: '引渡日が新しい順' },
+  { key: 'handover_asc',  label: '引渡日が古い順' },
+  { key: 'name_asc',    label: '発電所名順（あいうえお）' },
+  { key: 'project_no_asc', label: '案件番号順' },
+] as const
+type SortKey = typeof SORT_OPTIONS[number]['key']
+
 export function Projects({ projects, customers, onReload, onViewDetail }: Props) {
   const toast = useToast()
   const [search, setSearchState] = useState(() => sessionStorage.getItem('projects_search') ?? '')
@@ -86,6 +98,15 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
     setSearchState(s)
     sessionStorage.setItem('projects_search', s)
   }
+  const [sortKey, setSortKeyState] = useState<SortKey>(() => (sessionStorage.getItem('projects_sort') as SortKey) || 'created_desc')
+  const setSortKey = (k: SortKey) => {
+    setSortKeyState(k)
+    sessionStorage.setItem('projects_sort', k)
+  }
+  // 案件番号が1件も入っていない間は「案件番号順」を選択肢に出さない（登録順とほぼ同じ並びになり紛らわしいため）
+  const hasProjectNo = projects.some(p => p.project_no && p.project_no.trim() !== '')
+  const sortOptions = SORT_OPTIONS.filter(o => o.key !== 'project_no_asc' || hasProjectNo)
+  const effectiveSortKey: SortKey = (sortKey === 'project_no_asc' && !hasProjectNo) ? 'created_desc' : sortKey
   const [modal, setModal] = useState(false)
   const [customerMode, setCustomerMode] = useState<CustomerMode>('existing')
   const [selectedCustomerId, setSelectedCustomerId] = useState<number>(customers[0]?.id ?? 0)
@@ -107,6 +128,32 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
       (p.site_address ?? '').toLowerCase().includes(q) ||
       (p.site_prefecture ?? '').toLowerCase().includes(q)
     )
+  })
+
+  // 選択された並び順を適用（空の日付・番号は常に末尾へ）
+  const sorted = [...filtered].sort((a, b) => {
+    const emptyLast = (v: string | null | undefined) => (v == null || v === '') ? 1 : 0
+    switch (effectiveSortKey) {
+      case 'updated_desc': return (b.updated_at ?? b.created_at ?? '').localeCompare(a.updated_at ?? a.created_at ?? '')
+      case 'created_asc':  return (a.created_at ?? '').localeCompare(b.created_at ?? '')
+      case 'handover_desc':
+      case 'handover_asc': {
+        const el = emptyLast(a.handover_date) - emptyLast(b.handover_date)
+        if (el !== 0) return el
+        const cmp = (a.handover_date ?? '').localeCompare(b.handover_date ?? '')
+        return effectiveSortKey === 'handover_asc' ? cmp : -cmp
+      }
+      case 'name_asc':
+        return (a.plant_name || a.project_name).localeCompare(b.plant_name || b.project_name, 'ja')
+      case 'project_no_asc': {
+        const el = emptyLast(a.project_no) - emptyLast(b.project_no)
+        if (el !== 0) return el
+        return (a.project_no ?? '').localeCompare(b.project_no ?? '', 'ja', { numeric: true })
+      }
+      case 'created_desc':
+      default:
+        return (b.created_at ?? '').localeCompare(a.created_at ?? '')
+    }
   })
 
   function openCreate() {
@@ -158,6 +205,15 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
+        <select
+          className="form-select"
+          style={{ width: 'auto' }}
+          value={effectiveSortKey}
+          onChange={e => setSortKey(e.target.value as SortKey)}
+          title="並び替え"
+        >
+          {sortOptions.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+        </select>
         <button className="btn btn-main" onClick={openCreate}>＋ 新規案件登録</button>
       </div>
 
@@ -171,10 +227,10 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 && (
+            {sorted.length === 0 && (
               <tr><td colSpan={8} className="empty-cell">該当する案件がありません</td></tr>
             )}
-            {filtered.map(p => (
+            {sorted.map(p => (
               <tr key={p.id} className="clickable-row" onClick={() => onViewDetail(p.id)}>
                 <td>
                   <strong>{p.plant_name || p.project_name}</strong>

@@ -13,6 +13,12 @@ type Props = {
   onViewDetail: (projectId: number) => void
 }
 
+/** 長い値を n 文字で切り「…」を付ける（全文はセルの title で確認できる） */
+function truncate(v: string | null | undefined, n = 7): string {
+  if (!v) return '-'
+  return v.length > n ? v.slice(0, n) + '…' : v
+}
+
 type CustomerMode = 'existing' | 'new'
 
 const emptyCustomerForm: CustomerInput = {
@@ -219,7 +225,7 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
 
       <div className="card">
         <div className="table-meta">{filtered.length} 件</div>
-        <table>
+        <table style={{ whiteSpace: 'nowrap' }}>
           <thead>
             <tr>
               <th>発電所名</th><th>顧客</th><th>都道府県</th><th>FIT</th>
@@ -230,18 +236,20 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
             {sorted.length === 0 && (
               <tr><td colSpan={8} className="empty-cell">該当する案件がありません</td></tr>
             )}
-            {sorted.map(p => (
+            {sorted.map(p => {
+              const customer = p.company_name || p.customer_name
+              return (
               <tr key={p.id} className="clickable-row" onClick={() => onViewDetail(p.id)}>
                 <td>
                   <strong>{p.plant_name || p.project_name}</strong>
                   {p.project_no && <div style={{ fontSize: 11, color: '#64748b' }}>{p.project_no}</div>}
                 </td>
-                <td>{p.company_name || p.customer_name}</td>
+                <td title={customer || undefined}>{truncate(customer)}</td>
                 <td>{p.site_prefecture ?? '-'}</td>
                 <td>{p.fit_period != null ? `${p.fit_period}円` : '-'}</td>
-                <td>{p.subcontractor ?? '-'}</td>
+                <td title={p.subcontractor ?? undefined}>{truncate(p.subcontractor)}</td>
                 <td>{p.handover_date ?? '-'}</td>
-                <td>{p.monitoring_system ?? '-'}</td>
+                <td title={p.monitoring_system ?? undefined}>{truncate(p.monitoring_system)}</td>
                 <td>
                   <button
                     className="btn-icon"
@@ -256,7 +264,8 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
                   >🗑</button>
                 </td>
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
       </div>

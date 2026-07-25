@@ -13,6 +13,12 @@ type Props = {
   onViewProjectMaintenance: (projectId: number) => void
 }
 
+/** 長い値を n 文字で切り「…」を付ける（全文はセルの title で確認できる） */
+function truncate(v: string | null | undefined, n = 7): string {
+  if (!v) return '-'
+  return v.length > n ? v.slice(0, n) + '…' : v
+}
+
 type TopTab = '保守対応' | '定期保守' | '受託情報' | '委託情報'
 type Filter = 'all' | '対応中' | '完了'
 
@@ -169,7 +175,7 @@ export function MaintenanceResponses({ responses, periodic, billingRows, onReloa
       {topTab === '保守対応' && (
         <div className="card">
           <div className="table-meta">{filteredResponses.length} 件</div>
-          <table>
+          <table style={{ whiteSpace: 'nowrap' }}>
             <thead>
               <tr>
                 <th>管理番号</th><th>発電所</th><th>顧客</th><th>問合日</th>
@@ -184,10 +190,10 @@ export function MaintenanceResponses({ responses, periodic, billingRows, onReloa
                 <tr key={r.id} className="clickable-row" onClick={() => onViewDetail(r.id)}>
                   <td>{r.response_no ?? '-'}</td>
                   <td><strong>{r.plant_name || r.project_name || '-'}</strong></td>
-                  <td>{r.customer_name ?? '-'}</td>
+                  <td title={r.customer_name ?? undefined}>{truncate(r.customer_name)}</td>
                   <td>{r.inquiry_date ?? '-'}</td>
                   <td>{r.occurrence_date ?? '-'}</td>
-                  <td>{r.target_area ?? '-'}</td>
+                  <td title={r.target_area ?? undefined}>{truncate(r.target_area, 10)}</td>
                   <td><StatusBadge status={r.status} /></td>
                 </tr>
               ))}
@@ -199,7 +205,7 @@ export function MaintenanceResponses({ responses, periodic, billingRows, onReloa
       {topTab === '定期保守' && (
         <div className="card">
           <div className="table-meta">{filteredPeriodic.length} 件</div>
-          <table>
+          <table style={{ whiteSpace: 'nowrap' }}>
             <thead>
               <tr>
                 <th>実施日</th><th>発電所</th><th>顧客</th><th>作業種別</th><th>内容</th>
@@ -213,9 +219,9 @@ export function MaintenanceResponses({ responses, periodic, billingRows, onReloa
                 <tr key={p.id} className="clickable-row" onClick={() => onViewProject(p.project_id)}>
                   <td>{p.record_date ?? '-'}</td>
                   <td><strong>{p.plant_name || p.project_name || '-'}</strong></td>
-                  <td>{p.customer_name ?? '-'}</td>
+                  <td title={p.customer_name ?? undefined}>{truncate(p.customer_name)}</td>
                   <td>{p.work_type ?? '-'}</td>
-                  <td>{p.content ?? '-'}</td>
+                  <td title={p.content ?? undefined}>{truncate(p.content, 16)}</td>
                 </tr>
               ))}
             </tbody>
@@ -243,9 +249,9 @@ export function MaintenanceResponses({ responses, periodic, billingRows, onReloa
                 const c = r.contract
                 return (
                   <tr key={r.project_id} className="clickable-row" onClick={() => onViewProjectMaintenance(r.project_id)}>
-                    <td>{c?.maintenance_contractor ?? '-'}</td>
+                    <td title={c?.maintenance_contractor ?? undefined}>{truncate(c?.maintenance_contractor)}</td>
                     <td><strong>{r.project_name || '-'}</strong></td>
-                    <td>{r.customer_name ?? '-'}</td>
+                    <td title={r.customer_name ?? undefined}>{truncate(r.customer_name)}</td>
                     <td>{c?.annual_maintenance_inc != null ? fmtYen(c.annual_maintenance_inc) : '-'}</td>
                     <td>{c?.maintenance_start_date ?? '-'}</td>
                     <td>{c?.plan_weeding ?? '-'}</td>
@@ -279,9 +285,9 @@ export function MaintenanceResponses({ responses, periodic, billingRows, onReloa
                 const c = r.contract
                 return (
                   <tr key={r.project_id} className="clickable-row" onClick={() => onViewProjectMaintenance(r.project_id)}>
-                    <td>{c?.subcontractor ?? '-'}</td>
+                    <td title={c?.subcontractor ?? undefined}>{truncate(c?.subcontractor)}</td>
                     <td><strong>{r.project_name || '-'}</strong></td>
-                    <td>{r.customer_name ?? '-'}</td>
+                    <td title={r.customer_name ?? undefined}>{truncate(r.customer_name)}</td>
                     <td>{c?.subcontract_fee_inc != null ? fmtYen(c.subcontract_fee_inc) : '-'}</td>
                     <td>{c?.subcontract_start_date ?? '-'}</td>
                   </tr>

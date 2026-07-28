@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ProjectDetail, AnnualRecordInput, PeriodicMaintenanceInput, MaintenanceResponseInput, MaintenancePlanLevel, BillingDetail as BillingDetailData } from '../types'
 import { BillingDetailView } from './BillingDetail'
 import { getBillingDetail } from '../lib/data'
@@ -41,6 +41,56 @@ function fmtFormNum(v: string | number | null | undefined): string {
   return n.toLocaleString('ja-JP')
 }
 import { useToast } from '../components/Toast'
+
+/** カーソルを合わせる（スマホはタップ）と説明の吹き出しが出る「?」インフォマーク */
+function InfoTip({ text }: { text: string }) {
+  const [open, setOpen] = useState(false)
+  const markRef = useRef<HTMLSpanElement>(null)
+  const [pos, setPos] = useState<{ left: number; top: number }>({ left: 0, top: 0 })
+  const WIDTH = 240
+
+  // 開くたびにマークの画面上の位置から吹き出し位置を計算し、画面端で切れないよう内側に収める
+  useEffect(() => {
+    if (!open || !markRef.current) return
+    const r = markRef.current.getBoundingClientRect()
+    const margin = 8
+    let left = r.left + r.width / 2 - WIDTH / 2
+    left = Math.max(margin, Math.min(left, window.innerWidth - WIDTH - margin))
+    setPos({ left, top: r.top }) // top は吹き出しの下端基準に使う
+  }, [open])
+
+  return (
+    <span
+      ref={markRef}
+      style={{ position: 'relative', display: 'inline-flex', verticalAlign: 'middle', marginLeft: 4 }}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <span
+        role="button"
+        aria-label={text}
+        onClick={e => { e.preventDefault(); e.stopPropagation(); setOpen(o => !o) }}
+        style={{
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          width: 15, height: 15, borderRadius: '50%', background: '#94a3b8', color: '#fff',
+          fontSize: 10, fontWeight: 700, cursor: 'help', flexShrink: 0,
+        }}
+      >?</span>
+      {open && (
+        <span
+          role="tooltip"
+          style={{
+            position: 'fixed', left: pos.left, top: pos.top, transform: 'translateY(-100%)', marginTop: -6,
+            width: WIDTH, background: '#1e293b', color: '#fff',
+            fontSize: 11.5, fontWeight: 400, lineHeight: 1.5, textAlign: 'left',
+            borderRadius: 6, padding: '8px 10px', boxShadow: '0 4px 12px rgba(0,0,0,.2)',
+            zIndex: 3000, whiteSpace: 'normal', pointerEvents: 'none',
+          }}
+        >{text}</span>
+      )}
+    </span>
+  )
+}
 
 type Tab = '基本情報' | '設備情報' | '契約情報' | '保守情報' | '請求情報' | '請求詳細' | 'その他' | '保守対応' | '年次請求記録'
 
@@ -2370,6 +2420,30 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                         </label>
                       </>
                     )}
+                    {count > 0 && (() => {
+                      const issuanceFee = contractForm.has_issuance_fee ? (Number(contractForm.issuance_fee_inc) || 0) : 0
+                      const perRound = baseAmount + issuanceFee
+                      return (
+                        <div style={{ gridColumn: '1/-1', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8, padding: '12px 14px', marginTop: 4 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: '#0369a1', marginBottom: 8, display: 'flex', alignItems: 'center' }}>
+                            1回あたりの請求額の計算
+                            <InfoTip text="請求書では、年間総額（請求対象の項目のみ）を請求回数で割った額に、発行手数料（ありの場合）を毎回加算した金額を各回で請求します。" />
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12.5, color: '#334155' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>年間総額（請求対象のみ）</span><b>{fmtYen(annualInc)}</b></div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>÷ {count}回 ＝ 1回あたり（均等割）</span><b>{fmtYen(baseAmount)}</b></div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>＋ 発行手数料（税込）</span><b>{issuanceFee > 0 ? fmtYen(issuanceFee) : 'なし'}</b></div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #bae6fd', marginTop: 4, paddingTop: 6, fontSize: 14, color: '#0f172a' }}>
+                              <span style={{ fontWeight: 700 }}>1回あたりの請求額</span><b>{fmtYen(perRound)}</b>
+                            </div>
+                          </div>
+                          <p style={{ fontSize: 11, color: '#64748b', margin: '8px 0 0', display: 'flex', alignItems: 'flex-start' }}>
+                            <span>回ごとに金額を変えたい場合は下の「個別に金額を上書きする」で設定できます。</span>
+                            <InfoTip text="金額の上書きは『手数料を除いた基本額』を差し替える扱いです。上書きした回にも発行手数料は自動で加算されるため、手数料を含めた最終額をそのまま入れると手数料が二重に乗ります。上書きには手数料を除いた額を入力してください。" />
+                          </p>
+                        </div>
+                      )
+                    })()}
                   </>
                 )}
 
@@ -2421,16 +2495,40 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                         </label>
                       </>
                     )}
-                    <div style={{ gridColumn: '1/-1', fontSize: 13, color: '#64748b', padding: '4px 0' }}>
-                      月額（均等割）: <b style={{ color: '#0f172a' }}>{fmtYen(baseAmount)}</b>
-                    </div>
+                    {(() => {
+                      const transferFee = contractForm.has_transfer_fee ? (Number(contractForm.transfer_fee_inc) || 0) : 0
+                      const monthly = baseAmount + transferFee
+                      return (
+                        <div style={{ gridColumn: '1/-1', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8, padding: '12px 14px', marginTop: 4 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: '#0369a1', marginBottom: 8, display: 'flex', alignItems: 'center' }}>
+                            毎月の請求額の計算
+                            <InfoTip text="口座振替では、年間総額（請求対象の項目のみ）を12ヶ月で割った額に、振替手数料（ありの場合）を毎月加算した金額を毎月請求します。" />
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12.5, color: '#334155' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>年間総額（請求対象のみ）</span><b>{fmtYen(annualInc)}</b></div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>÷ 12ヶ月 ＝ 月額（均等割）</span><b>{fmtYen(baseAmount)}</b></div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>＋ 振替手数料（税込）</span><b>{transferFee > 0 ? fmtYen(transferFee) : 'なし'}</b></div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #bae6fd', marginTop: 4, paddingTop: 6, fontSize: 14, color: '#0f172a' }}>
+                              <span style={{ fontWeight: 700 }}>毎月の請求額</span><b>{fmtYen(monthly)}</b>
+                            </div>
+                          </div>
+                          <p style={{ fontSize: 11, color: '#64748b', margin: '8px 0 0', display: 'flex', alignItems: 'flex-start' }}>
+                            <span>特定の月だけ金額を変えたい場合は下の「個別に金額を上書きする」で設定できます。</span>
+                            <InfoTip text="金額の上書きは『手数料を除いた基本額』を差し替える扱いです。上書きした月にも振替手数料は自動で加算されるため、手数料を含めた最終額をそのまま入れると手数料が二重に乗ります。上書きには手数料を除いた額を入力してください。" />
+                          </p>
+                        </div>
+                      )
+                    })()}
                   </>
                 )}
 
                 {count > 0 && (
                   <div style={{ gridColumn: '1/-1', padding: '8px 12px', background: '#fef3c7', borderRadius: 6, marginTop: 4 }}>
                     <details>
-                      <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>個別に金額を上書きする（イレギュラー対応）</summary>
+                      <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                        個別に金額を上書きする（イレギュラー対応）
+                        <InfoTip text="ここに入れる金額は『手数料を除いた基本額』です。上書きした回・月にも手数料は自動で加算されるので、手数料を含めた最終額をそのまま入れると二重に乗ります。" />
+                      </summary>
                       <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 6 }}>
                         {Array.from({ length: count }, (_, i) => {
                           const k = String(i + 1)

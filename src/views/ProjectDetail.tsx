@@ -474,7 +474,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
         has_transfer_fee: contractForm.has_transfer_fee,
         transfer_fee_ex: toNum(contractForm.transfer_fee_ex),
         transfer_fee_inc: toNum(contractForm.transfer_fee_inc),
-        billing_schedule_days: contractForm.billing_schedule_days.length > 0 ? contractForm.billing_schedule_days : null,
+        billing_schedule_days: contractForm.billing_method === '口座振替' ? ['25日'] : (contractForm.billing_schedule_days.length > 0 ? contractForm.billing_schedule_days : null),
         billing_amount_overrides: Object.keys(contractForm.billing_amount_overrides).length > 0 ? contractForm.billing_amount_overrides : null,
         billing_item_flags: Object.keys(contractForm.billing_item_flags).length > 0 ? contractForm.billing_item_flags : null,
         transfer_fee: toNum(contractForm.transfer_fee),
@@ -698,7 +698,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           has_transfer_fee: contractForm.has_transfer_fee,
           transfer_fee_ex: toNum(contractForm.transfer_fee_ex),
           transfer_fee_inc: toNum(contractForm.transfer_fee_inc),
-          billing_schedule_days: contractForm.billing_schedule_days.length > 0 ? contractForm.billing_schedule_days : null,
+          billing_schedule_days: contractForm.billing_method === '口座振替' ? ['25日'] : (contractForm.billing_schedule_days.length > 0 ? contractForm.billing_schedule_days : null),
           billing_amount_overrides: Object.keys(contractForm.billing_amount_overrides).length > 0 ? contractForm.billing_amount_overrides : null,
           billing_item_flags: Object.keys(contractForm.billing_item_flags).length > 0 ? contractForm.billing_item_flags : null,
         })
@@ -2300,7 +2300,15 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               <>
                 <label className="form-label">
                   請求方法
-                  <select className="form-select" value={contractForm.billing_method} onChange={e => setContractForm(f => ({ ...f, billing_method: e.target.value }))}>
+                  <select className="form-select" value={contractForm.billing_method} onChange={e => {
+                    const method = e.target.value
+                    setContractForm(f => ({
+                      ...f,
+                      billing_method: method,
+                      // 口座振替は引落日25日固定。切替時に自動セット
+                      billing_schedule_days: method === '口座振替' ? ['25日'] : f.billing_schedule_days,
+                    }))
+                  }}>
                     <option value="">未設定</option>
                     {BILLING_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
                   </select>
@@ -2452,13 +2460,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                     <p style={{ gridColumn: '1/-1', margin: '8px 0 4px', fontWeight: 600, fontSize: 13, color: '#475569' }}>── 口座振替の設定</p>
                     <label className="form-label">
                       毎月の引落日
-                      <select className="form-select" value={(contractForm.billing_schedule_days[0] ?? '').match(/(\d{1,2})日/)?.[1] ?? ''} onChange={e => {
-                        const day = e.target.value
-                        setContractForm(f => ({ ...f, billing_schedule_days: day ? [`${day}日`] : [] }))
-                      }}>
-                        <option value="">日</option>
-                        {Array.from({ length: 31 }, (_, k) => <option key={k + 1} value={k + 1}>{k + 1}日</option>)}
-                      </select>
+                      <input className="form-input" value="25日" readOnly disabled style={{ background: '#f1f5f9', color: '#475569' }} />
                     </label>
                     <label className="form-label">
                       振替手数料

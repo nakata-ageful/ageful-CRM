@@ -695,6 +695,40 @@ function buildCsv(fields: ExportFieldDef[], rows: Record<string, unknown>[]): st
   return header + '\n' + body
 }
 
+/**
+ * 顧客・発電所・契約の選択項目を「1発電所=1行」に結合したCSVを生成する。
+ * 顧客は project.customer_id、契約は contract.project_id で結合（いずれも発電所に対し1件）。
+ * 列名は種別が分かるよう顧客/契約側に接頭辞を付ける。
+ */
+function buildJoinedCsv(
+  tables: Record<string, Record<string, unknown>[]>,
+  fieldSel: Record<string, Record<string, boolean>>,
+): string {
+  const customersById = new Map((tables.customers ?? []).map(c => [c.id as number, c]))
+  const contractsByProject = new Map((tables.contracts ?? []).map(c => [c.project_id as number, c]))
+  const defOf = (key: string) => EXPORT_FIELD_DEFS.find(t => t.key === key)?.fields ?? []
+  const projFields = defOf('projects').filter(f => fieldSel.projects?.[f.key])
+  const custFields = defOf('customers').filter(f => fieldSel.customers?.[f.key])
+  const conFields = defOf('contracts').filter(f => fieldSel.contracts?.[f.key])
+  if (projFields.length + custFields.length + conFields.length === 0) return ''
+
+  const header = [
+    ...projFields.map(f => f.label),
+    ...custFields.map(f => `顧客: ${f.label}`),
+    ...conFields.map(f => `契約: ${f.label}`),
+  ]
+  const lines = (tables.projects ?? []).map(p => {
+    const cust = customersById.get(p.customer_id as number) ?? {}
+    const con = contractsByProject.get(p.id as number) ?? {}
+    return [
+      ...projFields.map(f => p[f.key]),
+      ...custFields.map(f => cust[f.key]),
+      ...conFields.map(f => con[f.key]),
+    ]
+  })
+  return [header, ...lines].map(cols => cols.map(csvEscape).join(',')).join('\n')
+}
+
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -738,6 +772,8 @@ export function CsvImport({ onReload }: Props) {
   )
   const [expandedTables, setExpandedTables] = useState<Record<string, boolean>>({})
   const [fieldSearch, setFieldSearch] = useState('')
+  // CSV出力時、顧客・発電所・契約を「発電所ごと1行」に結合するか
+  const [csvJoin, setCsvJoin] = useState(false)
 
   const isFullSelection = EXPORT_FIELD_DEFS.every(t => t.fields.every(f => fieldSel[t.key]?.[f.key]))
   const hasAnySelection = EXPORT_FIELD_DEFS.some(t => t.fields.some(f => fieldSel[t.key]?.[f.key]))
@@ -832,7 +868,14 @@ export function CsvImport({ onReload }: Props) {
       if (exportFormat === 'csv') {
         // 選択した種別・項目を1ファイルにまとめる。種別ごとに見出し行＋表を積み上げ、間に空行を入れる
         const sections: string[] = []
+        // 結合モード: 顧客・発電所・契約を発電所ごと1行に統合して先頭に置く
+        const joinKeys = ['customers', 'projects', 'contracts']
+        if (csvJoin) {
+          const joined = buildJoinedCsv(tables, fieldSel)
+          if (joined) sections.push('■ 発電所一覧（顧客・契約と結合）\n' + joined)
+        }
         for (const t of EXPORT_FIELD_DEFS) {
+          if (csvJoin && joinKeys.includes(t.key)) continue // 結合モードでは3種は上でまとめて出力済み
           const fields = t.fields.filter(f => fieldSel[t.key]?.[f.key])
           if (fields.length === 0) continue
           sections.push(`■ ${t.label}\n` + buildCsv(fields, tables[t.key] ?? []))
@@ -944,6 +987,15 @@ export function CsvImport({ onReload }: Props) {
             CSV（Excel用・1ファイルにまとめて出力）
           </label>
         </div>
+
+        {exportFormat === 'csv' && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13, marginBottom: 10, padding: '8px 10px', background: '#f8fafc', borderRadius: 6 }}>
+            <input type="checkbox" checked={csvJoin} onChange={e => setCsvJoin(e.target.checked)} />
+            <span>顧客・発電所・契約の項目を「発電所ごと1行」に結合して1つの表にする
+              <span style={{ display: 'block', fontSize: 11, color: '#94a3b8', marginTop: 2 }}>選択した各項目が横に並んだ一覧になります。請求記録・保守などは別表として続けて出力します。</span>
+            </span>
+          </label>
+        )}
 
         {/* 項目検索 */}
         <input

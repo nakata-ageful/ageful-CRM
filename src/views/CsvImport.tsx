@@ -15,38 +15,58 @@ const KINGAKU_COLS = [
   { key: 'other_fee', label: 'その他費用' },
 ] as const
 
+/** 列インデックス（0始まり）を Excel の列名（A, B, ... Z, AA...）に変換 */
+function colLetter(idx: number): string {
+  let s = ''
+  let n = idx + 1
+  while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26) }
+  return s
+}
+
 /**
  * 金額確認CSV: 1行=1発電所、列=費目。最下行に費目ごとの合計、右端に発電所ごとの合計。
+ * 合計セルは Excel の数式（=SUM(...)）で出力し、開いた側で再計算できるようにする。
  * 「年間総額（請求対象のみ）」はアプリの請求計算と同じ値（請求対象フラグ考慮）。
  */
 function buildKingakuCsv(tables: Record<string, Record<string, unknown>[]>): string {
   const customersById = new Map((tables.customers ?? []).map(c => [c.id as number, c]))
   const contractsByProject = new Map((tables.contracts ?? []).map(c => [c.project_id as number, c]))
-  const header = ['発電所名', '顧客名', '請求方法', ...KINGAKU_COLS.map(c => c.label), '年間合計（全費目）', '年間総額（請求対象のみ）']
-  const colSums = KINGAKU_COLS.map(() => 0)
-  let rowTotalSum = 0
-  let billableSum = 0
-  const lines: string[][] = []
-  for (const p of tables.projects ?? []) {
+  const fixedCols = ['発電所名', '顧客名', '受託会社', '請求方法']
+  const header = [...fixedCols, ...KINGAKU_COLS.map(c => c.label), '年間合計（全費目）', '年間総額（請求対象のみ）']
+
+  // 列位置（0始まり）。費目列は fixedCols の次から並ぶ
+  const feeStart = fixedCols.length
+  const feeEnd = feeStart + KINGAKU_COLS.length - 1
+  const rowTotalCol = feeEnd + 1
+  const billableCol = rowTotalCol + 1
+
+  const dataRows: string[][] = (tables.projects ?? []).map((p, i) => {
+    const excelRow = i + 2 // 1行目はヘッダー
     const cust = customersById.get(p.customer_id as number)
     const con = contractsByProject.get(p.id as number) as Contract | undefined
     const amounts = KINGAKU_COLS.map(c => Number((con as Record<string, unknown> | undefined)?.[c.key] ?? 0) || 0)
-    const rowTotal = amounts.reduce((s, n) => s + n, 0)
     const billable = con ? annualBillableTotalInc(con) : 0
-    amounts.forEach((n, i) => { colSums[i] += n })
-    rowTotalSum += rowTotal
-    billableSum += billable
-    lines.push([
+    // 年間合計（全費目）は費目セルの数式で
+    const rowTotalFormula = `=SUM(${colLetter(feeStart)}${excelRow}:${colLetter(feeEnd)}${excelRow})`
+    return [
       String(p.plant_name ?? p.project_name ?? ''),
       String((cust?.company_name as string) ?? (cust?.name as string) ?? ''),
+      String(con?.maintenance_contractor ?? ''),
       String(con?.billing_method ?? ''),
       ...amounts.map(String),
-      String(rowTotal),
+      rowTotalFormula,
       String(billable),
-    ])
+    ]
+  })
+
+  // 合計行: 各金額列を列方向に合計する数式
+  const lastDataRow = dataRows.length + 1 // データ最終行の Excel 行番号
+  const totalRow: string[] = ['合計', '', '', '']
+  for (let c = feeStart; c <= billableCol; c++) {
+    totalRow.push(dataRows.length > 0 ? `=SUM(${colLetter(c)}2:${colLetter(c)}${lastDataRow})` : '0')
   }
-  lines.push(['合計', '', '', ...colSums.map(String), String(rowTotalSum), String(billableSum)])
-  return [header, ...lines].map(cols => cols.map(csvEscape).join(',')).join('\n')
+
+  return [header, ...dataRows, totalRow].map(cols => cols.map(csvEscape).join(',')).join('\n')
 }
 
 import type { ExportData } from '../lib/actions'
@@ -810,13 +830,15 @@ export function CsvImport({ onReload }: Props) {
       const date = new Date().toISOString().slice(0, 10)
 
       if (exportFormat === 'csv') {
-        // 選択した種別ごとに1ファイル、選択した項目だけの列構成（日本語見出し・BOM付きUTF-8）
+        // 選択した種別・項目を1ファイルにまとめる。種別ごとに見出し行＋表を積み上げ、間に空行を入れる
+        const sections: string[] = []
         for (const t of EXPORT_FIELD_DEFS) {
           const fields = t.fields.filter(f => fieldSel[t.key]?.[f.key])
           if (fields.length === 0) continue
-          const csv = buildCsv(fields, tables[t.key] ?? [])
-          downloadBlob(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }), `ageful_${t.label}_${date}.csv`)
+          sections.push(`■ ${t.label}\n` + buildCsv(fields, tables[t.key] ?? []))
         }
+        const combined = sections.join('\n\n')
+        downloadBlob(new Blob(['\uFEFF' + combined], { type: 'text/csv;charset=utf-8' }), `ageful_export_${date}.csv`)
       } else {
         // JSON: 選択した種別・項目だけを含める（形は ExportData 互換）
         for (const t of EXPORT_FIELD_DEFS) {
@@ -919,7 +941,7 @@ export function CsvImport({ onReload }: Props) {
           </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
             <input type="radio" checked={exportFormat === 'csv'} onChange={() => setExportFormat('csv')} />
-            CSV（Excel用・データ種別ごとに1ファイル）
+            CSV（Excel用・1ファイルにまとめて出力）
           </label>
         </div>
 
@@ -975,7 +997,7 @@ export function CsvImport({ onReload }: Props) {
         <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 10 }}>
           {exportFormat === 'json'
             ? '※ 復元に使う場合は全項目のままエクスポートしてください。項目を絞ったJSONは復元に使えない場合があります'
-            : '※ CSVは選択したデータ種別ごとに1ファイルずつダウンロードされます（ブラウザが複数ダウンロードの許可を求めることがあります）'}
+            : '※ 選択したデータ種別を1つのCSVファイルにまとめて出力します（種別ごとに見出しを付けて縦に並びます）'}
         </div>
 
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>

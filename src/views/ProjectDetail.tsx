@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import type { ProjectDetail, AnnualRecordInput, PeriodicMaintenanceInput, MaintenanceResponseInput, MaintenancePlanLevel, BillingDetail as BillingDetailData } from '../types'
 import { BillingDetailView } from './BillingDetail'
 import { getBillingDetail } from '../lib/data'
+import { hasSupabaseEnv } from '../lib/supabase'
+import { BASIC_NOTE_KEYS } from '../lib/project-basic-notes'
 import { BILLING_ITEMS, annualBillableTotalInc } from '../lib/billing'
 import { StatusBadge } from '../components/StatusBadge'
 import { Modal } from '../components/Modal'
@@ -133,6 +135,8 @@ function writeTabToHash(t: Tab) {
 export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, onViewMaintenance }: Props) {
   const toast = useToast()
   const { project, customer, contract, annualRecords, maintenanceResponses, periodicMaintenance } = detail
+  // DB追加前は新列を送信しない。モックではDBを変更せず動作確認できる。
+  const basicNotesAvailable = !hasSupabaseEnv || BASIC_NOTE_KEYS.every(key => Object.prototype.hasOwnProperty.call(project, key))
   const [tab, setTabState] = useState<Tab>(() => readTabFromHash())
   // タブ切り替え時に URL ハッシュに ?tab= を反映し、戻る操作で復元できるようにする
   const setTab = (t: Tab) => {
@@ -217,6 +221,9 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
   // 案件基本情報編集フォーム（既存。中項目編集時にも使う）
   const [projModal, setProjModal] = useState(false)
   const [projForm, setProjForm] = useState({
+    summary_notes: basicNotesAvailable ? (project.summary_notes ?? '') : undefined,
+    meti_notes: basicNotesAvailable ? (project.meti_notes ?? '') : undefined,
+    power_company_notes: basicNotesAvailable ? (project.power_company_notes ?? '') : undefined,
     project_no: project.project_no ?? '',
     project_name: project.project_name,
     plant_name: project.plant_name ?? '',
@@ -337,6 +344,10 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       // project_name は DB上 NOT NULL のため、発電所名と同期
       await updateProject(project.id, {
         ...projForm,
+        // この旧フォームでは区分別備考を編集しないため、保存値に触れない。
+        summary_notes: undefined,
+        meti_notes: undefined,
+        power_company_notes: undefined,
         project_name: projForm.plant_name,
         has_4g: projForm.has_4g === 'true' ? true : projForm.has_4g === 'false' ? false : (null as unknown as boolean),
         monitoring_user: projForm.monitoring_user,
@@ -522,6 +533,9 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
   function openSectionEdit(key: EditSectionKey) {
     // projects フォームを最新値で初期化
     setProjForm({
+      summary_notes: basicNotesAvailable ? (project.summary_notes ?? '') : undefined,
+      meti_notes: basicNotesAvailable ? (project.meti_notes ?? '') : undefined,
+      power_company_notes: basicNotesAvailable ? (project.power_company_notes ?? '') : undefined,
       project_no: project.project_no ?? '',
       project_name: project.project_name,
       plant_name: project.plant_name || project.project_name,
@@ -645,6 +659,10 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       if (writesProject) {
         await updateProject(project.id, {
           ...projForm,
+          // 編集した区分だけ送信。他区分の備考を古いフォーム値で上書きしない。
+          summary_notes: editSection === 'summary' ? projForm.summary_notes : undefined,
+          meti_notes: editSection === 'meti' ? projForm.meti_notes : undefined,
+          power_company_notes: editSection === 'power-company' ? projForm.power_company_notes : undefined,
           project_name: projForm.plant_name,
           has_4g: projForm.has_4g === 'true' ? true : projForm.has_4g === 'false' ? false : (null as unknown as boolean),
           monitoring_user: projForm.monitoring_user,
@@ -760,6 +778,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               <div className="info-field"><span>都道府県</span><b>{project.site_prefecture ?? '-'}</b></div>
               <div className="info-field" style={{ gridColumn: '1/-1' }}><span>住所</span><b>{project.site_address ?? '-'}</b></div>
               <div className="info-field"><span>座標</span><b>{project.google_coordinates ?? '-'}</b></div>
+              <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{project.summary_notes || '-'}</b></div>
             </div>
           </div>
 
@@ -772,6 +791,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             <div className="info-grid">
               <div className="info-field"><span>設備ID</span><b>{project.grid_id ?? '-'}</b></div>
               <div className="info-field"><span>認定日</span><b>{project.grid_certified_at ?? '-'}</b></div>
+              <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{project.meti_notes || '-'}</b></div>
             </div>
           </div>
 
@@ -789,6 +809,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               <div className="info-field"><span>FIT期間</span><b>{project.fit_end_date ? `${project.fit_end_date.slice(0, 4)}年${project.fit_end_date.slice(5, 7)}月` : '-'}</b></div>
               <div className="info-field"><span>電力変更日</span><b>{project.power_change_date ?? '-'}</b></div>
               <div className="info-field"><span>検針日</span><b>{project.meter_reading_day ?? '-'}</b></div>
+              <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{project.power_company_notes || '-'}</b></div>
             </div>
           </div>
         </div>
@@ -946,7 +967,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               <div className="info-field"><span>委託料（税別）</span><b>{fmtYen(contract?.subcontract_fee_ex)}</b></div>
               <div className="info-field"><span>委託料（税込）</span><b>{fmtYen(contract?.subcontract_fee_inc)}</b></div>
               <div className="info-field"><span>委託開始日</span><b>{contract?.subcontract_start_date ?? '-'}</b></div>
-              <div className="info-field"><span>委託請求日</span><b>{contract?.subcontract_billing_day ?? '-'}</b></div>
+              <div className="info-field"><span>委託料支払期日（毎年）</span><b>{contract?.subcontract_billing_day ?? '-'}</b></div>
               <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap' }}>{contract?.subcontract_notes || '-'}</b></div>
             </div>
           </div>
@@ -1888,6 +1909,26 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               </>
             )}
 
+            {(editSection === 'summary' || editSection === 'meti' || editSection === 'power-company') && (() => {
+              const noteKey = editSection === 'summary' ? 'summary_notes'
+                : editSection === 'meti' ? 'meti_notes' : 'power_company_notes'
+              return (
+                <label className="form-label" style={{ gridColumn: '1/-1' }}>
+                  備考
+                  <textarea className="form-input" rows={4}
+                    value={projForm[noteKey] ?? ''}
+                    onChange={e => setProjForm(f => ({ ...f, [noteKey]: e.target.value }))}
+                    disabled={!basicNotesAvailable}
+                    style={{ resize: 'vertical' }} />
+                  {!basicNotesAvailable && (
+                    <span style={{ display: 'block', fontSize: 12, color: '#92400e', marginTop: 4 }}>
+                      備考の保存欄は準備中です。DB更新後に入力できるようになります。
+                    </span>
+                  )}
+                </label>
+              )
+            })()}
+
             {/* パネル */}
             {editSection === 'panel' && (
               <>
@@ -2256,7 +2297,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                   <input className="form-input" type="date" {...dateInputRange()} value={contractForm.subcontract_start_date} onChange={e => setContractForm(f => ({ ...f, subcontract_start_date: e.target.value }))} />
                 </label>
                 <label className="form-label">
-                  委託請求日（毎年）
+                  委託料支払期日（毎年）
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <select className="form-select" value={contractForm.subcontract_billing_day.match(/(\d{1,2})月/)?.[1] ?? ''} onChange={e => {
                       const day = contractForm.subcontract_billing_day.match(/(\d{1,2})日/)?.[1] ?? '1'

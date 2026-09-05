@@ -20,6 +20,9 @@ export type Customer = {
 export type Project = {
   id: number
   customer_id: number
+  summary_notes?: string | null
+  meti_notes?: string | null
+  power_company_notes?: string | null
   project_no: string | null
   project_name: string
   plant_name: string | null    // 発電所名（案件名とは別）

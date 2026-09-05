@@ -1,4 +1,5 @@
 import { hasSupabaseEnv, supabase } from './supabase'
+import { basicNotesPayload } from './project-basic-notes'
 import {
   customerStore, projectStore, contractStore, annualRecordStore,
   maintenanceResponseStore, periodicMaintenanceStore, attachmentStore,
@@ -122,6 +123,9 @@ export async function deleteCustomer(id: number): Promise<void> {
 // ── Project CRUD ──────────────────────────────────────────
 
 export type ProjectInput = {
+  summary_notes?: string | null
+  meti_notes?: string | null
+  power_company_notes?: string | null
   customer_id: number
   project_no: string
   project_name: string
@@ -176,6 +180,7 @@ export type ProjectInput = {
 
 function projectPayload(input: Omit<ProjectInput, 'customer_id'>): Omit<Project, 'id' | 'created_at' | 'customer_id'> {
   return {
+    ...basicNotesPayload(input),
     project_no: input.project_no || null,
     project_name: input.project_name,
     plant_name: input.plant_name || null,

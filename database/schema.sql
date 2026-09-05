@@ -27,6 +27,9 @@ CREATE TABLE IF NOT EXISTS projects (
   project_no               TEXT,                -- 管理番号
   project_name             TEXT        NOT NULL,
   plant_name               TEXT,                -- 発電所名
+  summary_notes            TEXT,                -- 概要備考
+  meti_notes               TEXT,                -- 経済産業省備考
+  power_company_notes      TEXT,                -- 電力会社備考
   -- 発電所住所
   site_postal_code         TEXT,
   site_prefecture          TEXT,

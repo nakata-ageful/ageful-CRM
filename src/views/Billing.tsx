@@ -3,6 +3,7 @@ import type { BillingRow, AnnualRecord, PaymentEntry } from '../types'
 import { updateAnnualRecord, createAnnualRecord, deleteAnnualRecord } from '../lib/actions'
 import { invoiceAmount, withdrawalAmount, toIsoDate, computeUnpaidUnits, computeUpcomingInvoices, type UpcomingItem } from '../lib/billing'
 import { fmtYen, dateInputRange } from '../lib/utils'
+import { hasSavedInvoicePlanAt } from '../lib/billing-plan-status'
 import { useToast } from '../components/Toast'
 
 type Props = {
@@ -76,12 +77,17 @@ export function Billing({ rows, onReload, onViewDetail }: Props) {
   /** 発行: annual_record 作成して未入金へ移動 */
   async function handleIssue(u: UpcomingItem) {
     if (!u.row.contract) return
-    const key = `${u.row.project_id}-${u.scheduledDateISO}`
+    // 移行前は保存済み予定への新規INSERTを禁止。回別更新は詳細で確認する。
+    if (hasSavedInvoicePlanAt(u.row.records, u.scheduledDateISO)) {
+      onViewDetail(u.row.project_id)
+      return
+    }
+    const key = `${u.row.project_id}-${u.scheduledDateISO}-${u.round}`
     const inp = issueInputs[key]
     if (!inp?.billing_date) { toast('請求日を入力してください'); return }
     setSaving(true)
     try {
-      await createAnnualRecord(u.row.contract.id, currentYear, {
+      await createAnnualRecord(u.row.contract.id, Number(u.scheduledDateISO.slice(0, 4)), {
         billing_scheduled_date: u.scheduledDateISO,
         billing_date: inp.billing_date,
         payment_due_date: inp.payment_due_date || null,
@@ -240,7 +246,8 @@ export function Billing({ rows, onReload, onViewDetail }: Props) {
               </thead>
               <tbody>
                 {upcomingInvoices.map(u => {
-                  const key = `${u.row.project_id}-${u.scheduledDateISO}`
+                  const key = `${u.row.project_id}-${u.scheduledDateISO}-${u.round}`
+                  const savedPlan = hasSavedInvoicePlanAt(u.row.records, u.scheduledDateISO)
                   const inp = issueInputs[key] ?? { billing_date: '', payment_due_date: '' }
                   return (
                     <tr key={key}>
@@ -252,18 +259,18 @@ export function Billing({ rows, onReload, onViewDetail }: Props) {
                       <td style={tdStyle}>{u.round}/{u.totalRounds}回目</td>
                       <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{fmtYen(u.amount)}</td>
                       <td style={tdStyle}>
-                        <input type="date" {...dateInputRange()} className="form-input" style={{ padding: '5px 8px', fontSize: 13 }}
+                        <input disabled={savedPlan} type="date" {...dateInputRange()} className="form-input" style={{ padding: '5px 8px', fontSize: 13 }}
                           value={inp.billing_date}
                           onChange={e => setIssueInputs(prev => ({ ...prev, [key]: { ...inp, billing_date: e.target.value } }))} />
                       </td>
                       <td style={tdStyle}>
-                        <input type="date" {...dateInputRange()} className="form-input" style={{ padding: '5px 8px', fontSize: 13 }}
+                        <input disabled={savedPlan} type="date" {...dateInputRange()} className="form-input" style={{ padding: '5px 8px', fontSize: 13 }}
                           value={inp.payment_due_date}
                           onChange={e => setIssueInputs(prev => ({ ...prev, [key]: { ...inp, payment_due_date: e.target.value } }))} />
                       </td>
                       <td style={tdStyle}>
-                        <button className="btn btn-main btn-sm" disabled={saving || !inp.billing_date} onClick={() => handleIssue(u)}>
-                          発行
+                        <button className="btn btn-main btn-sm" disabled={saving || (!savedPlan && !inp.billing_date)} onClick={() => handleIssue(u)}>
+                          {savedPlan ? '請求詳細で確認' : '発行'}
                         </button>
                       </td>
                     </tr>

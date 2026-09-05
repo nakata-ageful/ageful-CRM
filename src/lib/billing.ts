@@ -1,4 +1,5 @@
 import type { Contract, BillingRow, AnnualRecord, PaymentEntry } from '../types'
+import { hasHandledInvoiceAt } from './billing-plan-status'
 
 /**
  * 請求計算の共通ロジック。
@@ -157,7 +158,8 @@ export function computeUpcomingInvoices(
     const results: UpcomingItem[] = []
     candidates.sort((a, b) => a.iso.localeCompare(b.iso))
     for (const cand of candidates) {
-      if (r.records.some(rec => rec.billing_scheduled_date === cand.iso || rec.payments?.some(p => p.scheduled_date === cand.iso))) continue
+      const sameDateHasMultipleRounds = days.filter(d => toIsoDate(cand.year, d) === cand.iso).length > 1
+      if (hasHandledInvoiceAt(r.records, cand.iso, cand.round, sameDateHasMultipleRounds)) continue
       if ((floatingByYear[cand.year] ?? 0) > 0) { floatingByYear[cand.year]--; continue }
       results.push({
         row: r,

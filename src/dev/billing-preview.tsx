@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Modal } from '../components/Modal'
 import { BillingUnitTable } from '../components/BillingUnitTable'
-import { applyInvoiceRecipientPlan, issueInvoiceUnit, recipientForUnit, upcomingInvoiceUnits, type BillingUnit, type RecipientPlan } from '../lib/billing-unit'
+import { recipientForUnit, upcomingInvoiceUnits, type BillingUnit, type RecipientPlan } from '../lib/billing-unit'
+import { executeLocalBillingCommand, localCustomerBillingHistory, type LocalBillingCommand, type LocalBillingLedger } from '../lib/local-billing-ledger'
 import { fmtYen } from '../lib/utils'
 import '../styles.css'
 
@@ -18,10 +19,13 @@ const seed = (year: number, fixed = false): BillingUnit => ({
 })
 
 function Preview() {
-  const [units, setUnits] = useState<BillingUnit[]>([seed(2026, true), seed(2027), seed(2028)])
-  const [ownerId, setOwnerId] = useState(1)
-  const [plan, setPlan] = useState<RecipientPlan>({ projectId: 1, defaultRecipientId: 1, overrides: {} })
-  const [annualAmount, setAnnualAmount] = useState(100000)
+  const [ledger, setLedger] = useState<LocalBillingLedger>({ current: {
+    projectId: 1, ownerId: 1, revision: 1, customerIds: [1, 2, 3], plannedAmount: 100000,
+    contract: { id: 1, project_id: 1, annual_maintenance_inc: 100000, notes: '検証用の契約メモ' },
+    plan: { projectId: 1, defaultRecipientId: 1, overrides: {} }, units: [seed(2026, true), seed(2027), seed(2028)],
+  }, events: [] })
+  const { units, ownerId, plan, plannedAmount: annualAmount } = ledger.current
+  const [historyCustomer, setHistoryCustomer] = useState(1)
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState<'settings' | 'confirm'>('settings')
   const [newOwner, setNewOwner] = useState(2)
@@ -32,7 +36,7 @@ function Preview() {
   const next = upcomingInvoiceUnits(units)[0]
   const proposed: RecipientPlan = { projectId: 1, defaultRecipientId: laterRecipient,
     overrides: next ? { ...plan.overrides, [next.id]: nextRecipient } : { ...plan.overrides } }
-  const [confirmed, setConfirmed] = useState<{ plan: RecipientPlan; expected: Record<string, number> } | null>(null)
+  const [confirmed, setConfirmed] = useState<LocalBillingCommand | null>(null)
   const reviewUnits = units.map(unit => ({ ...unit, recipientId: recipientForUnit(unit, proposed) }))
 
   function startTransfer() {
@@ -44,15 +48,19 @@ function Preview() {
   function apply() {
     if (!confirmed) return
     try {
-      const changed = applyInvoiceRecipientPlan(units, confirmed.plan, confirmed.expected)
-      setUnits(changed); setPlan(confirmed.plan); setOwnerId(newOwner); setOpen(false)
-      setMessage('この画面内だけに反映しました。本番の所有者・請求・契約は変更していません。')
+      const changed = executeLocalBillingCommand(ledger, confirmed, new Date().toISOString())
+      setLedger(changed); setOpen(false)
+      setMessage('変更と変更前後の履歴を、この画面内に記録しました。本番の所有者・請求・契約は変更していません。')
     } catch (error) { setMessage(error instanceof Error ? error.message : '確認し直してください'); setOpen(false) }
   }
   function addYear() {
     const year = Math.max(...units.map(u => u.serviceYear)) + 1
     const unit = seed(year)
-    setUnits([...units, { ...unit, recipientId: recipientForUnit(unit, plan) }])
+    run({ kind: 'add-plan', unit, requestId: crypto.randomUUID(), expectedRevision: ledger.current.revision })
+  }
+  function run(command: LocalBillingCommand) {
+    try { setLedger(executeLocalBillingCommand(ledger, command, new Date().toISOString())) }
+    catch (error) { setMessage(error instanceof Error ? error.message : '確認し直してください') }
   }
   const select = (label: string, value: number, set: (v: number) => void) => <label className="form-group">
     <span className="form-label">{label}</span><select className="form-input" value={value} onChange={e => set(Number(e.target.value))}>
@@ -81,28 +89,39 @@ function Preview() {
     </div>
     <div className="card" style={{ padding: 20 }}><h2 style={{ fontSize: 17 }}>動作確認用（完成画面には出さない操作）</h2>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'end' }}>
-        <label className="form-group"><span className="form-label">今後の年次保守料（税込）</span><select className="form-input" value={annualAmount} onChange={e => setAnnualAmount(Number(e.target.value))}>
+        <label className="form-group"><span className="form-label">今後の年次保守料（税込）</span><select className="form-input" value={annualAmount} onChange={e => run({ kind: 'change-estimate', amount: Number(e.target.value), requestId: crypto.randomUUID(), expectedRevision: ledger.current.revision })}>
           <option value={100000}>100,000円</option><option value={120000}>120,000円</option>
         </select></label>
         <button className="btn btn-ghost" onClick={addYear}>翌年の予定を追加して確認</button>
         <button className="btn btn-main" disabled={!next} onClick={() => {
           if (!next) return
-          const issued = issueInvoiceUnit(next, next.revision, { issuedOn: next.scheduledDate!, amount: annualAmount,
-            lineItems: [{ name: '保守料', amount: annualAmount }], frozenAt: `${next.scheduledDate}T00:00:00Z` })
-          setUnits(units.map(u => u.id === issued.id ? issued : u))
-          // 消費済み例外は次回へ移さない。既定先は継続。
-          const overrides = { ...plan.overrides }; delete overrides[issued.id]
-          setPlan({ ...plan, overrides })
-          setMessage('選んだ回を発行済みにしました（画面内のテストのみ）。以降の金額変更では、この回の確定額は変わりません。')
+          run({ kind: 'issue', unitId: next.id, expectedUnitRevision: next.revision, issuedOn: next.scheduledDate!,
+            requestId: crypto.randomUUID(), expectedRevision: ledger.current.revision })
         }}>次回を発行済みにして確認</button>
       </div>
       <p style={{ color: '#64748b' }}>未実装：本番保存、契約項目の変更、口座振替の固定境界、訂正、顧客別履歴、移転履歴の永続保存。</p>
+    </div>
+    <div className="card" style={{ padding: 20 }}><h2 style={{ fontSize: 17 }}>顧客ごとの請求履歴（検証用）</h2>
+      {select('履歴を見る顧客', historyCustomer, setHistoryCustomer)}
+      <BillingUnitTable units={localCustomerBillingHistory(ledger, historyCustomer)} recipientName={name} plannedAmount={() => null} />
+      {!localCustomerBillingHistory(ledger, historyCustomer).length && <p>この顧客への確定済みの請求はありません。</p>}
+      <small>現在の所有者ではなく、各回の請求先で表示します。未発行の予定は上のスケジュールで確認できます。</small>
+    </div>
+    <div className="card" style={{ padding: 20 }}><h2 style={{ fontSize: 17 }}>所有者変更履歴（画面内のみ）</h2>
+      {ledger.events.filter(e => e.command.kind === 'transfer').length === 0 && <p>まだ所有者変更はありません。</p>}
+      {ledger.events.filter(e => e.command.kind === 'transfer').map(event => <details key={event.requestId} style={{ marginBottom: 12 }}>
+        <summary>{event.command.kind === 'transfer' ? event.command.transferDate : ''}　{name(event.before.ownerId)} → {name(event.after.ownerId)}</summary>
+        <p>当時の年次保守料：{fmtYen(event.before.plannedAmount)} → {fmtYen(event.after.plannedAmount)} ／ 保守条件は引継ぎ</p>
+        <BillingUnitTable units={event.after.units} recipientName={name} plannedAmount={() => event.after.plannedAmount} />
+        <small>その後の変更で、この時点の表示は変わりません。これは監査用の記録で、現在の請求額の計算には使いません。</small>
+      </details>)}
     </div>
     {open && <Modal title={step === 'settings' ? '所有者を変更' : '所有者変更の確認'} onClose={() => setOpen(false)} width={800}>
       <p className="notice">画面内の動作確認です。実際の変更・発行・送信・引落口座変更は行いません。</p>
       {step === 'settings' ? <form onSubmit={e => {
         e.preventDefault()
-        setConfirmed({ plan: proposed, expected: Object.fromEntries(upcomingInvoiceUnits(units).map(u => [u.id, u.revision])) })
+        setConfirmed({ kind: 'transfer', requestId: crypto.randomUUID(), expectedRevision: ledger.current.revision,
+          newOwnerId: newOwner, transferDate, plan: proposed, expectedUnits: Object.fromEntries(upcomingInvoiceUnits(units).map(u => [u.id, u.revision])) })
         setStep('confirm')
       }}>
         {select('新しい所有者', newOwner, setNewOwner)}

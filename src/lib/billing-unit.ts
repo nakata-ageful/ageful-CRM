@@ -87,7 +87,7 @@ export type RecipientPlan = {
 export function recipientForUnit(unit: BillingUnit, plan: RecipientPlan): number | null {
   if (unit.projectId !== plan.projectId) throw new Error('別の発電所の請求先指定です')
   if (!isEditableInvoicePlan(unit)) return unit.recipientId
-  return plan.overrides[unit.id] ?? plan.defaultRecipientId
+  return Object.hasOwn(plan.overrides, unit.id) ? plan.overrides[unit.id] : plan.defaultRecipientId
 }
 
 /** 確認済みID/版だけを更新。これは純粋関数でありDBの原子性・権限保証ではない。 */

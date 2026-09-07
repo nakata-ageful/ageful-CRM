@@ -4,6 +4,8 @@ import { bulkImportProjects, bulkImportBilling, exportAllData, restoreAllData } 
 import { EXPORT_FIELD_DEFS, type ExportFieldDef } from '../lib/export-fields'
 import { annualBillableTotalInc } from '../lib/billing'
 import type { Contract } from '../types'
+import { hasSupabaseEnv } from '../lib/supabase'
+import { RESTORE_DISABLED_MESSAGE } from '../lib/restore-safety'
 
 /** 金額確認CSVの費目列（契約テーブルの金額カラムと対応） */
 const KINGAKU_COLS = [
@@ -926,19 +928,25 @@ export function CsvImport({ onReload }: Props) {
     if (!restorePreview) return
     setState('importing')
     setRestoreProgress('復元を開始...')
-    const result = await restoreAllData(restorePreview, setRestoreProgress)
-    setImportResult({
-      success: restorePreview.customers.length + restorePreview.projects.length
-        + restorePreview.contracts.length + restorePreview.annual_records.length
-        + restorePreview.maintenance_responses.length + restorePreview.periodic_maintenance.length
-        + restorePreview.prospects.length - result.errors.length,
-      failed: result.errors.length,
-      errors: result.errors,
-    })
-    setRestorePreview(null)
-    setRestoreProgress('')
-    setState('done')
-    onReload()
+    try {
+      const result = await restoreAllData(restorePreview, setRestoreProgress)
+      setImportResult({
+        success: restorePreview.customers.length + restorePreview.projects.length
+          + restorePreview.contracts.length + restorePreview.annual_records.length
+          + restorePreview.maintenance_responses.length + restorePreview.periodic_maintenance.length
+          + restorePreview.prospects.length - result.errors.length,
+        failed: result.errors.length,
+        errors: result.errors,
+      })
+      setRestorePreview(null)
+      setState('done')
+      onReload()
+    } catch (error) {
+      setImportResult({ success: 0, failed: 1, errors: [error instanceof Error ? error.message : String(error)] })
+      setState('done')
+    } finally {
+      setRestoreProgress('')
+    }
   }
 
   const totalRows = importMode === 'billing' ? billingRows.length : rows.length
@@ -1056,11 +1064,12 @@ export function CsvImport({ onReload }: Props) {
           <button className="btn btn-main" onClick={handleExport} disabled={exporting || !hasAnySelection}>
             {exporting ? '⏳ エクスポート中...' : isFullSelection && exportFormat === 'json' ? '⬇ 全データをエクスポート' : '⬇ 選択した項目をエクスポート'}
           </button>
-          <button className="btn btn-sub" onClick={() => restoreFileRef.current?.click()}>
-            ⬆ バックアップから復元
+          <button className="btn btn-sub" onClick={() => restoreFileRef.current?.click()} disabled={hasSupabaseEnv} title={hasSupabaseEnv ? RESTORE_DISABLED_MESSAGE : undefined}>
+            {hasSupabaseEnv ? '復元は現在停止中' : '⬆ バックアップから復元'}
           </button>
           <input ref={restoreFileRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleRestoreFile} />
         </div>
+        {hasSupabaseEnv && <div style={{ fontSize: 11, color: '#b45309', marginTop: 8 }}>{RESTORE_DISABLED_MESSAGE}</div>}
       </div>
 
       {/* 復元プレビュー */}

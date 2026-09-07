@@ -13,6 +13,7 @@ import type {
 } from '../types'
 import { buildTaskMap, buildSubTaskMap } from './prospect-tasks'
 import { annualRecordFromStorage, annualRecordPayloadForStorage, singleAnnualRecordId, toStoredAnnualRecordStatus } from './annual-record-status-storage'
+import { ensureLegacyRestoreAllowed } from './restore-safety'
 
 function db() {
   if (!supabase) throw new Error('Supabase not configured')
@@ -1349,6 +1350,7 @@ export async function restoreAllData(
   data: ExportData,
   onProgress?: (msg: string) => void,
 ): Promise<{ success: boolean; errors: string[] }> {
+  ensureLegacyRestoreAllowed(hasSupabaseEnv)
   const errors: string[] = []
   const log = (msg: string) => onProgress?.(msg)
 

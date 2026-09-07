@@ -24,6 +24,7 @@ const { prepareMaintenancePreservation: preserve, verifyMaintenancePreservation:
 const { billingUnitStatusLabel: statusLabel, isEditableInvoicePlan, resolveUnitAmount } = load('src/lib/billing-unit.ts')
 const { customerBillingHistory, summarizeBillingHistory } = load('src/lib/billing-history.ts')
 const { buildBillingOverview } = load('src/lib/billing-overview.ts')
+const { createInvoiceWriteSession } = load('src/lib/invoice-write-session.ts')
 const single = { id: 1, contract_id: 1, year: 2025, payments: null, status: '請求済',
   billing_scheduled_date: '2025-06-01', billing_date: '2025-06-01', received_date: null,
   payment_due_date: null, transfer_failed: false, line_items: [{ name: '保守料', amount: 100 }] }
@@ -32,6 +33,23 @@ const split = { ...single, id: 2, payments: [
   { seq: 2, scheduled_date: '2025-12-01', billing_date: null, received_date: null },
 ] }
 async function main() {
+  const calls=[],command={unitId:1,revision:0,mode:'collection',value:{received_on:'2026-06-01'},reason:null}
+  let ids=0,reads=0
+  const writer=createInvoiceWriteSession({operationId:()=>String(++ids),write:async(id,request)=>{calls.push({id,request})},
+    reload:async()=>{if(++reads===1)throw Error('synthetic reload failure');return ['reloaded']}})
+  await assert.rejects(writer.save(command),/reload failure/)
+  await assert.rejects(writer.save({...command,unitId:2}),/未確認/)
+  await writer.save(command)
+  assert.equal(calls.length,2)
+  assert.equal(calls[0].id,calls[1].id,'Retry must reuse the same RPC operation ID')
+  await writer.save({...command,revision:1})
+  assert.equal(ids,2)
+  let rejected=true
+  const editable=createInvoiceWriteSession({operationId:()=>String(++ids),write:async()=>{if(rejected)throw Error('rejected')},
+    reload:async()=>[],definitelyRejected:()=>true})
+  await assert.rejects(editable.save(command),/rejected/)
+  rejected=false
+  await editable.save({...command,unitId:2})
   const maintenance={...single,status:'未入金',billing_scheduled_date:null,billing_date:null,line_items:[],payments:[],maintenance_record:'点検完了',escort_record:'訪問履歴'}
   const retained=await preserve('fixture',[maintenance])
   assert.equal(retained.billingUnitsCreated,0)

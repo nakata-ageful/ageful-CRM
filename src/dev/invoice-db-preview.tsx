@@ -6,6 +6,7 @@ import '../styles.css'
 import { BillingHistorySection } from '../components/BillingHistorySection'
 import { billingUnitFromStorage } from '../lib/billing-unit-storage'
 import type { BillingUnit } from '../lib/billing-unit'
+import { createInvoiceWriteSession } from '../lib/invoice-write-session'
 
 type Mode = 'plan' | 'issue' | 'collection' | 'correction'
 type Unit = { id: number; service_year: number; revision: number; lifecycle: string;
@@ -38,6 +39,7 @@ function InvoiceDbPreview() {
   const [saving, setSaving] = useState(false)
   const busy = useRef(false)
   const alive = useRef(true)
+  const writeSession = useRef<ReturnType<typeof createInvoiceWriteSession<Unit[]>> | null>(null)
 
   async function reload(client: PGlite) {
     // JSON dates use YYYY-MM-DD consistently with the RPC payload and audit snapshots.
@@ -55,6 +57,12 @@ function InvoiceDbPreview() {
       instance = client
       if (!alive.current) { await client.close(); return }
       await reload(client)
+      writeSession.current = createInvoiceWriteSession({operationId:()=>crypto.randomUUID(),
+        write:(operationId,request)=>client.query('select public.write_invoice_unit($1,$2,$3,$4,$5::jsonb,$6)',
+          [operationId,request.unitId,request.revision,request.mode,JSON.stringify(request.value),request.reason]),
+        reload:()=>reload(client),
+        definitelyRejected:error=>typeof error==='object'&&error!==null&&'code' in error
+          && ['P0001','23514','23503','23502','22P02','22007','22008'].includes(String(error.code))})
       if (alive.current) { setDb(client); setMessage('対象の請求の「予定を編集」から操作できます。') }
     }).catch(e => { if (alive.current) { setError(String(e)); setMessage('準備に失敗しました。再読み込みしてください。') } })
     return () => { alive.current = false; if (instance) void instance.close() }
@@ -86,9 +94,8 @@ function InvoiceDbPreview() {
           frozen_amount: total, frozen_line_items: lines, issued_on: issued || null,
           received_on: mode === 'issue' ? null : received || null, payment_due_on: due || null }
       }
-      await db.query('select public.write_invoice_unit($1,$2,$3,$4,$5::jsonb,$6)',
-        [crypto.randomUUID(), selected.id, selected.revision, mode, JSON.stringify(value), mode === 'correction' ? reason : null])
-      const rows = await reload(db)
+      if(!writeSession.current)throw new Error('保存処理の準備ができていません')
+      const rows = await writeSession.current.save({unitId:selected.id,revision:selected.revision,mode,value,reason:mode==='correction'?reason:null})
       const updated = rows.find(u => u.id === selected.id)!
       setMessage(`${selected.service_year}年：「${labels[mode]}」が完了しました。下の変更履歴にも保存されています。`)
       edit(updated, updated.lifecycle === 'planned' ? 'plan' : updated.lifecycle === 'issued' ? 'collection' : 'correction')

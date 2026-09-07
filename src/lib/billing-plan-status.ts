@@ -18,5 +18,8 @@ export function hasHandledInvoiceAt(records: AnnualRecord[], date: string, round
 /** 旧データでは安全な回の更新を保証できない場合がある。新規作成せず詳細へ案内する。 */
 export function hasSavedInvoicePlanAt(records: AnnualRecord[], date: string): boolean {
   return records.some(record => record.billing_scheduled_date === date
-    || record.payments?.some(p => p.scheduled_date === date))
+    || record.payments?.some(p => p.scheduled_date === date)
+    // 同年度に既存記録がある場合、一覧から年度記録全体を上書きしない。
+    // 対象回が不明な実績も詳細で照合してから発行する。
+    || record.year === Number(date.slice(0, 4)))
 }

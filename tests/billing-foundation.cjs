@@ -57,7 +57,14 @@ const sameDay = { ...row([rec({ payments: [pay(1, '2026-06-01', { billing_date: 
 assert.deepEqual(plain(billing.computeUpcomingInvoices([sameDay], window).map(u => u.round)), [2])
 assert.equal(billing.computeUpcomingInvoices([row([rec({ year: 2026, billing_scheduled_date: '2026-06-01', billing_date: '2026-06-01' })])], new Map([[6, 2027]]))[0].scheduledDateISO, '2027-06-01')
 assert.equal(billing.computeUpcomingInvoices([{ ...row([]), contract: { ...row([]).contract, billing_method: '口座振替' } }], window).length, 0)
-assert.equal(upcoming([rec({ billing_date: '2026-01-01' })]).length, 1, 'Legacy floating activity remains accounted for')
+assert.equal(upcoming([rec({ billing_date: '2026-01-01' })]).length, 2, 'Unmapped historical activity must not consume future plans')
+const januaryPaid = rec({ billing_date: '2026-01-15', received_date: '2026-01-20' })
+const julyRow = { ...row([januaryPaid]), contract: { ...row([]).contract, billing_schedule_days: ['1月15日', '7月15日'] } }
+assert.deepEqual(plain(billing.computeUpcomingInvoices([julyRow], new Map([[7, 2026], [8, 2026], [9, 2026]])).map(u => u.scheduledDateISO)), ['2026-07-15'])
+assert.equal(status.hasSavedInvoicePlanAt([januaryPaid], '2026-07-15'), true, 'Unmapped same-year history requires detail review, not a second issue')
+assert.equal(status.hasSavedInvoicePlanAt([januaryPaid], '2027-07-15'), false, 'Previous-year history does not block next year')
+assert.equal(upcoming([rec({ billing_scheduled_date: '2026-03-01', billing_date: '2026-03-01' })]).length, 2, 'A removed schedule date must not consume another round')
+assert.equal(upcoming([rec({ received_date: '2026-01-20' }), rec({ id: 2, transfer_failed: true })]).length, 2, 'Neither unknown received dates nor failed debits hide invoice plans')
 
 const unit = changes => ({ id: 'unit-next', projectId: 1, serviceYear: 2027, roundLabel: '第1回', method: '請求書',
   scheduledDate: '2027-06-01', recipientId: 1, lifecycle: 'planned', issuedOn: null, receivedOn: null,
@@ -170,6 +177,11 @@ async function testLegacyBillingButtons() {
   await check.props.onClick()
   assert.equal(calls.length, 1, 'Saved plan must not create another annual record')
   assert.deepEqual(links, [1])
+  const unknown = buttons(render([rec({ year: 2027, billing_date: '2027-01-02' })])).find(b => b.props.children === '請求詳細で確認')
+  assert.ok(unknown, 'An unbound historical invoice remains visible for review')
+  await unknown.props.onClick()
+  assert.equal(calls.length, 1, 'Unknown historical activity must not cause an automatic write')
+  assert.deepEqual(links, [1, 1])
   console.log('PASS: actual Billing handlers use scheduled year and route saved plans to detail without writes (isolated mocks).')
 }
 testLegacyBillingButtons().catch(error => { console.error(error); process.exitCode = 1 })

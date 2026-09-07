@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import type { CsvImportRow, BillingImportRow } from '../types'
-import { bulkImportProjects, bulkImportBilling, exportAllData, restoreAllData } from '../lib/actions'
+import { bulkImportProjects, exportAllData, restoreAllData } from '../lib/actions'
+import { useToast } from '../components/Toast'
 import { EXPORT_FIELD_DEFS, type ExportFieldDef } from '../lib/export-fields'
 import { annualBillableTotalInc } from '../lib/billing'
 import type { Contract } from '../types'
@@ -755,6 +756,7 @@ function TriCheckbox({ checked, indeterminate, onChange }: { checked: boolean; i
 export function CsvImport({ onReload }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
   const restoreFileRef = useRef<HTMLInputElement>(null)
+  const toast = useToast()
   const [state, setState] = useState<ImportState>('idle')
   const [importMode, setImportMode] = useState<ImportMode>('project')
   // 案件インポート用
@@ -821,17 +823,21 @@ export function CsvImport({ onReload }: Props) {
   }
 
   async function handleImport() {
-    setState('importing')
     if (importMode === 'billing') {
-      const result = await bulkImportBilling(billingRows)
-      setImportResult(result)
-    } else {
-      if (rows.length === 0) return
+      toast('請求CSVの取り込みは現在停止中です。内容の確認のみ利用できます。')
+      return
+    }
+    if (rows.length === 0) return
+    setState('importing')
+    try {
       const result = await bulkImportProjects(rows)
       setImportResult(result)
+      setState('done')
+      onReload()
+    } catch (error) {
+      toast(`インポートに失敗しました: ${String(error)}`)
+      setState('preview')
     }
-    setState('done')
-    onReload()
   }
 
   function reset() {
@@ -1152,15 +1158,15 @@ export function CsvImport({ onReload }: Props) {
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button className="btn btn-sub" onClick={reset}>やり直す</button>
-                <button className="btn btn-main" onClick={handleImport} disabled={totalRows === 0}>
-                  {totalRows}件をインポート
+                <button className="btn btn-main" onClick={handleImport} disabled={totalRows === 0 || importMode === 'billing'}>
+                  {importMode === 'billing' ? '請求CSVの取り込みは停止中' : `${totalRows}件をインポート`}
                 </button>
               </div>
             </div>
 
             {importMode === 'billing' && (
               <div style={{ background: '#fdf2f8', borderRadius: 8, padding: 10, marginBottom: 12, fontSize: 13, color: '#831843' }}>
-                案件名で既存プロジェクトを検索し、契約情報・年度別請求記録を追加します。案件が見つからない行はスキップされます。
+                既存の明細・請求・入金記録を保護するため、請求CSVの取り込みは現在停止中です。以下でファイルの内容を確認できますが、保存はされません。
               </div>
             )}
 

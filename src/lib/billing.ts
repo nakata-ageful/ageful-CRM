@@ -144,23 +144,14 @@ export function computeUpcomingInvoices(
       .filter(cd => cd.iso != null) as { day: string; round: number; year: number; iso: string }[]
     if (candidates.length === 0) return []
 
-    // 予定日未設定のまま請求/入金/振替失敗が入った記録（CSV等由来）は、その年の請求が済んだ分として回を消費する
-    const floatingByYear: Record<number, number> = {}
-    for (const rec of r.records) {
-      if (rec.payments?.length) continue
-      const handled = rec.billing_date || rec.received_date || rec.transfer_failed
-      if (!handled) continue
-      const tied = days.some(d => toIsoDate(rec.year, d) === rec.billing_scheduled_date)
-      if (tied) continue
-      floatingByYear[rec.year] = (floatingByYear[rec.year] ?? 0) + 1
-    }
+    // 対象回が不明な実績で、表示期間内の別の予定を消さない。
+    // 不明な記録がある年度は、発行時に既存の詳細確認導線へ案内する。
 
     const results: UpcomingItem[] = []
     candidates.sort((a, b) => a.iso.localeCompare(b.iso))
     for (const cand of candidates) {
       const sameDateHasMultipleRounds = days.filter(d => toIsoDate(cand.year, d) === cand.iso).length > 1
       if (hasHandledInvoiceAt(r.records, cand.iso, cand.round, sameDateHasMultipleRounds)) continue
-      if ((floatingByYear[cand.year] ?? 0) > 0) { floatingByYear[cand.year]--; continue }
       results.push({
         row: r,
         round: cand.round,

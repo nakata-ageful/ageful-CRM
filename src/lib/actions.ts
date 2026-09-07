@@ -1,5 +1,6 @@
 import { hasSupabaseEnv, supabase } from './supabase'
 import { basicNotesPayload } from './project-basic-notes'
+import { readBackupTables, checkBackupRelations } from './backup-reader'
 import {
   customerStore, projectStore, contractStore, annualRecordStore,
   maintenanceResponseStore, periodicMaintenanceStore, attachmentStore,
@@ -1318,25 +1319,15 @@ export async function exportAllData(): Promise<ExportData> {
     }
   }
   const client = db()
-  const [customers, projects, contracts, annualRecords, maintenance, periodic, prospects] = await Promise.all([
-    client.from('customers').select('*').order('id'),
-    client.from('projects').select('*').order('id'),
-    client.from('contracts').select('*').order('id'),
-    client.from('annual_records').select('*').order('id'),
-    client.from('maintenance_responses').select('*').order('id'),
-    client.from('periodic_maintenance').select('*').order('id'),
-    client.from('prospects').select('*').order('id'),
-  ])
+  const tables = await readBackupTables(async (table, from, to) => {
+    const result = await client.from(table).select('*', { count: 'exact' }).order('id').range(from, to)
+    return { data: result.data as Record<string, unknown>[] | null, count: result.count, error: result.error }
+  })
+  checkBackupRelations(tables)
   return {
     version: 1,
     exported_at: new Date().toISOString(),
-    customers: (customers.data ?? []) as Record<string, unknown>[],
-    projects: (projects.data ?? []) as Record<string, unknown>[],
-    contracts: (contracts.data ?? []) as Record<string, unknown>[],
-    annual_records: (annualRecords.data ?? []) as Record<string, unknown>[],
-    maintenance_responses: (maintenance.data ?? []) as Record<string, unknown>[],
-    periodic_maintenance: (periodic.data ?? []) as Record<string, unknown>[],
-    prospects: (prospects.data ?? []) as Record<string, unknown>[],
+    ...tables,
   }
 }
 

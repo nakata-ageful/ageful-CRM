@@ -210,49 +210,43 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject, emb
 
   async function handleSave() {
     setSaving(true)
-    const items = buildLineItems()
-
-    // 分割入金の場合: 全回入金済 → 入金済、一部 → 請求済、なし → ブランク
-    // 単回の場合: 従来通り
-    let effectiveReceivedDate = receivedDate
-    let newStatus: '' | '請求済' | '入金済'
-
-    if (billingCount > 1) {
-      const allReceived = payments.every(p => !!p.received_date)
-      const someBilled = payments.some(p => !!p.billing_date || !!p.scheduled_date)
-      const lastReceived = [...payments].reverse().find(p => p.received_date)?.received_date ?? null
-      effectiveReceivedDate = lastReceived ?? ''
-
-      if (isTransfer && !transferFailed) {
+    try {
+      const items = buildLineItems()
+      // 予定日だけでは請求済にしない。DBの旧status差異は別途移行で解消する。
+      let effectiveReceivedDate = receivedDate
+      let newStatus: '' | '請求済' | '入金済'
+      if (billingCount > 1) {
+        const allReceived = payments.length > 0 && payments.every(p => !!p.received_date)
+        const someBilled = payments.some(p => !!p.billing_date || !!p.received_date)
+        effectiveReceivedDate = [...payments].reverse().find(p => p.received_date)?.received_date ?? ''
         newStatus = allReceived ? '入金済' : (someBilled ? '請求済' : '')
       } else {
-        newStatus = allReceived ? '入金済' : (someBilled ? '請求済' : '')
+        newStatus = isTransfer && !transferFailed
+          ? (receivedDate ? '入金済' : '')
+          : (billingDate ? (receivedDate ? '入金済' : '請求済') : '')
       }
-    } else {
-      newStatus = isTransfer && !transferFailed
-        ? (receivedDate ? '入金済' : '')
-        : (billingDate ? (receivedDate ? '入金済' : '請求済') : '')
+      const payload = {
+        billing_scheduled_date: isTransfer ? null : (scheduledDate || null),
+        billing_date: (isTransfer && !transferFailed) ? null : (billingDate || null),
+        payment_due_date: paymentDueDate || null,
+        received_date: effectiveReceivedDate || null,
+        line_items: items.length ? items : null,
+        payments: billingCount > 1 ? payments : null,
+        transfer_failed: isTransfer ? transferFailed : null,
+        status: newStatus,
+      }
+      if (currentRecord) {
+        await updateAnnualRecord(currentRecord.id, payload)
+      } else {
+        await createAnnualRecord(contract.id, currentYear, payload)
+      }
+      await onReload()
+      toast('保存しました')
+    } catch {
+      toast('保存に失敗しました。入力内容は残っています。状態を確認して再度お試しください')
+    } finally {
+      setSaving(false)
     }
-
-    const payload = {
-      billing_scheduled_date: isTransfer ? null : (scheduledDate || null),
-      billing_date: (isTransfer && !transferFailed) ? null : (billingDate || null),
-      payment_due_date: paymentDueDate || null,
-      received_date: effectiveReceivedDate || null,
-      line_items: items.length ? items : null,
-      payments: billingCount > 1 ? payments : null,
-      transfer_failed: isTransfer ? transferFailed : null,
-      status: newStatus,
-    }
-
-    if (currentRecord) {
-      await updateAnnualRecord(currentRecord.id, payload)
-    } else {
-      await createAnnualRecord(contract.id, currentYear, payload)
-    }
-    await onReload()
-    setSaving(false)
-    toast('保存しました')
   }
 
   // 保守情報編集
@@ -1189,4 +1183,3 @@ function ContractField({ label, type, value, onChange }: { label: string; type: 
     </label>
   )
 }
-

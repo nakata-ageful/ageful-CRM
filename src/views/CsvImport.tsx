@@ -980,7 +980,7 @@ export function CsvImport({ onReload }: Props) {
         <div style={{ display: 'flex', gap: 16, marginBottom: 10, fontSize: 13 }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
             <input type="radio" checked={exportFormat === 'json'} onChange={() => setExportFormat('json')} />
-            JSON（バックアップ / 復元用）
+            JSON（アプリデータ保全用）
           </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
             <input type="radio" checked={exportFormat === 'csv'} onChange={() => setExportFormat('csv')} />
@@ -1048,8 +1048,8 @@ export function CsvImport({ onReload }: Props) {
 
         <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 10 }}>
           {exportFormat === 'json'
-            ? '※ 復元に使う場合は全項目のままエクスポートしてください。項目を絞ったJSONは復元に使えない場合があります'
-            : '※ 選択したデータ種別を1つのCSVファイルにまとめて出力します（種別ごとに見出しを付けて縦に並びます）'}
+            ? '※ 保全用は全項目を選んでください。対象はアプリの7種類のデータです。DBの構造・権限・添付ファイル本体は含みません。編集中の一貫性は保証されないため、重要なバックアップは編集を止めて取得し、別環境で復元を確認してください。'
+            : '※ CSVはExcelでの確認用です。これだけではDBを元通りに復元できません。全項目のJSONとDB側のバックアップも別途保管してください。'}
         </div>
 
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -1067,6 +1067,7 @@ export function CsvImport({ onReload }: Props) {
       {restorePreview && (
         <div className="card" style={{ marginBottom: 16, borderLeft: '4px solid #2563eb' }}>
           <div style={{ fontWeight: 600, marginBottom: 8 }}>復元プレビュー</div>
+          <p className="notice">現在の復元は既存データへの取り込みです。変更前の状態へ丸ごと戻す機能ではありません。同名顧客・同年度の別記録がある場合などは、別環境で確認してから実行してください。</p>
           <div style={{ fontSize: 13, color: '#475569', marginBottom: 12 }}>
             エクスポート日時: {new Date(restorePreview.exported_at).toLocaleString('ja-JP')}
           </div>

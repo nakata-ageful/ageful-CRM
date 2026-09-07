@@ -12,17 +12,23 @@ const units: BillingUnit[] = [base, { ...base, id: 'next', serviceYear: 2027, sc
   lifecycle: 'planned', issuedOn: null, receivedOn: null, frozenAt: null, frozenAmount: null, frozenLineItems: null }]
 function Preview() {
   const [customer, setCustomer] = useState(1)
+  const [selectedProject, setSelectedProject] = useState<number|null>(null)
   const data = { units, recipientName: (id: number) => `顧客${id === 1 ? 'A' : 'B'}`, projectName: () => 'サンプル発電所（現在の所有者：B）', plannedAmount: () => 82500 }
+  if(selectedProject!==null) return <main style={{maxWidth:1100,margin:'24px auto',padding:20}}>
+    <button type="button" className="btn" onClick={()=>setSelectedProject(null)}>一覧に戻る</button>
+    <h1>請求詳細：{data.projectName()}</h1><p>架空データ・読み取り専用です。</p>
+    <BillingHistorySection data={data} projectId={selectedProject}/>
+  </main>
   return <main style={{ maxWidth: 1100, margin: '24px auto', padding: 20 }}>
     <h1>請求先別の履歴確認</h1><p>架空データ・保存操作なし。本番には接続していません。</p>
     <label>顧客詳細：<select value={customer} onChange={e => setCustomer(Number(e.target.value))}><option value={1}>顧客A</option><option value={2}>顧客B</option></select></label>
     <BillingHistorySection data={data} customerId={customer} />
     <h2>請求詳細（発電所単位）</h2><BillingHistorySection data={data} projectId={1} />
     <h2>請求一覧（本体の新しい表示経路）</h2>
-    <Billing rows={[]} onReload={()=>{}} onViewDetail={()=>{}} billingHistory={data} billingToday="2027-06-01" />
+    <Billing rows={[]} onReload={()=>{}} onViewDetail={setSelectedProject} billingHistory={data} billingToday="2027-06-01" />
     <h2>ダッシュボード（本体の新しい表示経路）</h2>
     <Dashboard stats={{totalCustomers:2,totalProjects:1,activeMaintenanceCount:0,pendingBillingCount:0}}
-      maintenanceList={[]} billingRows={[]} onNavigate={()=>{}} onViewMaintenance={()=>{}} onViewBilling={()=>{}}
+      maintenanceList={[]} billingRows={[]} onNavigate={()=>{}} onViewMaintenance={()=>{}} onViewBilling={setSelectedProject}
       billingHistory={data} billingToday="2027-06-01" />
   </main>
 }

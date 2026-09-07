@@ -200,7 +200,7 @@ export function Dashboard({ stats, maintenanceList, billingRows, onNavigate, onV
             </tbody>
           </table>
         </div>}
-        {billingHistory && <div style={{gridColumn:'1 / -1'}}><BillingOverviewPanel data={billingHistory} today={today} /></div>}
+        {billingHistory && <div style={{gridColumn:'1 / -1'}}><BillingOverviewPanel data={billingHistory} today={today} onViewDetail={onViewBilling} /></div>}
       </div>
     </>
   )

@@ -10,8 +10,8 @@ export type BillingHistoryData = {
   plannedAmount: (unit: BillingUnit) => number | null
 }
 
-export function BillingHistorySection({ data, customerId, projectId }: {
-  data: BillingHistoryData; customerId?: number; projectId?: number
+export function BillingHistorySection({ data, customerId, projectId, onViewDetail }: {
+  data: BillingHistoryData; customerId?: number; projectId?: number; onViewDetail?: (projectId:number)=>void
 }) {
   const selected = customerId == null ? [...data.units] : customerBillingHistory(data.units, customerId)
   const units = projectId == null ? selected : selected.filter(u => u.projectId === projectId)
@@ -24,6 +24,7 @@ export function BillingHistorySection({ data, customerId, projectId }: {
     {!units.length && <p className="empty-cell">この請求先の記録はありません</p>}
     {[...new Set(units.map(u => u.projectId))].map(id => <div key={id}>
       <h4>{data.projectName(id)}</h4>
+      {onViewDetail && <button type="button" className="btn" onClick={()=>onViewDetail(id)} aria-label={`${data.projectName(id)}の請求詳細を開く`}>請求詳細を開く</button>}
       <BillingUnitTable units={units.filter(u => u.projectId === id)} recipientName={data.recipientName} plannedAmount={data.plannedAmount} />
     </div>)}
   </section>

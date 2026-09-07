@@ -23,7 +23,7 @@ export function Billing(props: Props) {
     const now = new Date()
     const today = props.billingToday ?? `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
     return <><p role="status">回別請求の表示確認中です。旧方式の編集操作は使用しません。</p>
-      <BillingOverviewPanel data={props.billingHistory} today={today} />
+      <BillingOverviewPanel data={props.billingHistory} today={today} onViewDetail={props.onViewDetail} />
     </>
   }
   return <LegacyBilling {...props} />

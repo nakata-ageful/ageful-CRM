@@ -12,6 +12,7 @@ export function InvoiceLedgerDetail({data,projectId,onSave}:{data:BillingHistory
   const units=data.units.filter(u=>u.projectId===projectId)
   const unit=units.find(u=>u.id===selected)
   return <><BillingHistorySection data={data} projectId={projectId}/>
+    {onSave&&units.filter(u=>u.method==='口座振替'&&u.lifecycle==='received').map(u=><button key={`correct-${u.id}`} type="button" className="btn" disabled={selected!==null} onClick={()=>{setEditingPlan(false);setSelected(u.id)}}>{u.serviceYear}年 {u.roundLabel}：振替記録を訂正</button>)}
     {onSave&&units.filter(u=>u.method==='口座振替'&&u.lifecycle==='planned'&&!u.receivedOn&&u.frozenAmount===null).map(u=>
       <button key={`debit-${u.id}`} type="button" className="btn" disabled={selected!==null} onClick={()=>{setEditingPlan(false);setSelected(u.id)}}>{u.serviceYear}年 {u.roundLabel}：振替結果を記録</button>)}
     {onSave&&data.recipients&&units.filter(isEditableInvoicePlan).map(u=><button type="button" className="btn" key={`plan-${u.id}`} disabled={selected!==null}

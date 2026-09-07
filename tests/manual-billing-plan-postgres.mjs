@@ -62,7 +62,7 @@ try {
   await correct();assert.deepEqual(await snapshot(),corrected)
   await assert.rejects(db.query("select record_manual_debit_result($1,5,2,'correction',$2::jsonb,'')",[key(),JSON.stringify(correctedValue)]),/確認内容/)
   await db.exec("insert into billing_recipient_plans(project_id,default_recipient_customer_id,effective_from) values(1,2,'2027-06-01')")
-  await assert.rejects(write(key(),next),/統合は未対応/)
+  await assert.rejects(write(key(),next),/全件/)
   await db.exec("set test.actor=''");await assert.rejects(write(key(),cs),/ログイン/)
   assert.equal((await db.query("select has_function_privilege('public','write_manual_billing_plan(uuid,bigint,jsonb,text)','execute') as allowed")).rows[0].allowed,false)
   console.log('PASS: explicit mixed plans, period/note persistence, audit rollback, stable retry, stale/full coverage and auth guards. Isolated only; ownership and recipient-plan integration NOT included.')

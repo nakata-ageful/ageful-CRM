@@ -3,9 +3,10 @@ import './OwnershipBillingPlanEditor.css'
 import { prepareOwnershipBillingPlan, type TransferBillingChoice, type TransferBillingUnit } from '../lib/ownership-billing-plan'
 
 type Owner = { id: number; name: string }
-export function OwnershipBillingPlanEditor({projectId,oldOwner,newOwner,units:initialUnits,onSave}:{
+export function OwnershipBillingPlanEditor({projectId,oldOwner,newOwner,units:initialUnits,onSave,saveScope='plan'}:{
   projectId:number;oldOwner:Owner;newOwner:Owner;units:readonly TransferBillingUnit[];
   onSave?:(choices:TransferBillingChoice[],reason:string)=>Promise<void>
+  saveScope?:'plan'|'ownership'
 }) {
   // Keep the reviewed revision fixed for this editor session.
   const [units]=useState(()=>structuredClone(initialUnits))
@@ -82,8 +83,8 @@ export function OwnershipBillingPlanEditor({projectId,oldOwner,newOwner,units:in
       </div>})}
       <p>変更しない記録：{result.preservedUnitIds.length}件</p>
       {onSave&&<div><label>確認内容・理由<textarea className="form-input" disabled={busy} value={reason} onChange={e=>setReason(e.target.value)}/></label>
-        <p>この検証では請求予定だけを保存します。所有者・契約情報は変更しません。</p>
-        <button className="btn btn-main" type="button" disabled={busy} onClick={()=>void save()}>{busy?'保存中…':'検証用DBに予定と履歴を保存'}</button></div>}
+        <p>{saveScope==='ownership'?'所有者・選択した契約情報・請求予定・履歴をまとめて保存します。':'この検証では請求予定だけを保存します。所有者・契約情報は変更しません。'}</p>
+        <button className="btn btn-main" type="button" disabled={busy} onClick={()=>void save()}>{busy?'保存中…':saveScope==='ownership'?'検証用DBで所有者変更を確定':'検証用DBに予定と履歴を保存'}</button></div>}
     </section>}
   </section>
 }

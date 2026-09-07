@@ -59,7 +59,7 @@ function InvoiceDbPreview() {
       await reload(client)
       writeSession.current = createInvoiceWriteSession({operationId:()=>crypto.randomUUID(),
         write:(operationId,request)=>request.mode.startsWith('debit_')?client.query('select public.record_manual_debit_result($1,$2,$3,$4,$5::jsonb,$6)',
-          [operationId,request.unitId,request.revision,request.mode==='debit_received'?'received':'invoice_switch',JSON.stringify(request.value),request.reason]):client.query('select public.write_invoice_unit($1,$2,$3,$4,$5::jsonb,$6)',
+          [operationId,request.unitId,request.revision,request.mode==='debit_received'?'received':request.mode==='debit_correction'?'correction':'invoice_switch',JSON.stringify(request.value),request.reason]):client.query('select public.write_invoice_unit($1,$2,$3,$4,$5::jsonb,$6)',
           [operationId,request.unitId,request.revision,request.mode,JSON.stringify(request.value),request.reason]),
         reload:()=>reload(client),
         definitelyRejected:error=>typeof error==='object'&&error!==null&&'code' in error

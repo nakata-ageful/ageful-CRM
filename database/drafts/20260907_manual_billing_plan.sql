@@ -11,6 +11,7 @@ CREATE FUNCTION public.write_manual_billing_plan(p_key uuid,p_project bigint,p_c
 RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $$
 DECLARE actor uuid:=auth.uid(); fingerprint text; op public.billing_operations%ROWTYPE;
   old_unit public.billing_units%ROWTYPE; new_unit public.billing_units%ROWTYPE;
+  active_plan public.billing_recipient_plans%ROWTYPE;
   c jsonb; versions jsonb; expected jsonb; result jsonb;
 BEGIN
   IF actor IS NULL THEN RAISE EXCEPTION 'ログインが必要です'; END IF;
@@ -24,11 +25,10 @@ BEGIN
   IF op.request_hash IS DISTINCT FROM fingerprint OR op.actor_user_id IS DISTINCT FROM actor THEN RAISE EXCEPTION '同じ操作IDで別の内容は保存できません'; END IF;
   IF op.completed_at IS NOT NULL THEN RETURN jsonb_build_object('operation_key',p_key,'completed',true); END IF;
   PERFORM 1 FROM public.projects WHERE id=p_project FOR UPDATE;
-  -- Recipient-plan integration must be implemented before enabling this for initialized projects.
   PERFORM id FROM public.billing_recipient_plans WHERE project_id=p_project ORDER BY id FOR UPDATE;
-  IF EXISTS(SELECT 1 FROM public.billing_recipient_plans WHERE project_id=p_project)
-    OR EXISTS(SELECT 1 FROM public.billing_units WHERE project_id=p_project AND (recipient_plan_id IS NOT NULL OR source_annual_record_id IS NOT NULL)) THEN
-    RAISE EXCEPTION '既存請求先計画・移行済み記録との統合は未対応です';
+  SELECT * INTO active_plan FROM public.billing_recipient_plans WHERE project_id=p_project AND retired_at IS NULL;
+  IF EXISTS(SELECT 1 FROM public.billing_units WHERE project_id=p_project AND source_annual_record_id IS NOT NULL) THEN
+    RAISE EXCEPTION '移行済み記録との統合は未対応です';
   END IF;
   PERFORM id FROM public.billing_units WHERE project_id=p_project ORDER BY id FOR UPDATE;
   IF EXISTS(SELECT 1 FROM public.billing_units WHERE project_id=p_project AND lifecycle='review_required') THEN RAISE EXCEPTION '記録要確認の請求があります'; END IF;
@@ -57,14 +57,23 @@ BEGIN
     IF old_unit.collection_state NOT IN ('pending','failed') THEN RAISE EXCEPTION '予定の状態を確認してください'; END IF;
     IF old_unit.collection_state='failed' AND ((c->>'recipientId')::bigint IS DISTINCT FROM old_unit.recipient_customer_id
       OR c->>'method'<>'請求書') THEN RAISE EXCEPTION '振替不能は元の請求先の請求書として残してください'; END IF;
-    UPDATE public.billing_units SET recipient_customer_id=(c->>'recipientId')::bigint,recipient_source='confirmed',
+    UPDATE public.billing_units SET recipient_customer_id=(c->>'recipientId')::bigint,recipient_plan_id=active_plan.id,
+      recipient_source=CASE WHEN active_plan.id IS NULL THEN 'confirmed' WHEN (c->>'recipientId')::bigint=active_plan.default_recipient_customer_id THEN 'default' ELSE 'override' END,
       collection_method=CASE c->>'method' WHEN '請求書' THEN 'invoice' ELSE 'direct_debit' END,
       scheduled_date=(c->>'scheduledDate')::date,planned_amount=(c->>'plannedAmount')::bigint,
       period_start=(c->>'periodStart')::date,period_end=(c->>'periodEnd')::date,plan_note=c->>'note',revision=revision+1
       WHERE id=old_unit.id RETURNING * INTO new_unit;
+    IF active_plan.id IS NOT NULL THEN
+      DELETE FROM public.billing_recipient_plan_overrides WHERE recipient_plan_id=active_plan.id AND billing_unit_id=old_unit.id;
+      IF new_unit.recipient_source='override' THEN
+        INSERT INTO public.billing_recipient_plan_overrides(recipient_plan_id,billing_unit_id,project_id,recipient_customer_id)
+          VALUES(active_plan.id,new_unit.id,p_project,new_unit.recipient_customer_id);
+      END IF;
+    END IF;
     INSERT INTO public.billing_unit_events(project_id,billing_unit_id,operation_key,event_type,before_value,after_value,actor_user_id,reason)
       VALUES(p_project,old_unit.id,p_key,'plan_changed',to_jsonb(old_unit),to_jsonb(new_unit),actor,p_reason);
   END LOOP;
+  IF active_plan.id IS NOT NULL THEN UPDATE public.billing_recipient_plans SET revision=revision+1 WHERE id=active_plan.id; END IF;
   UPDATE public.billing_operations SET completed_at=clock_timestamp() WHERE operation_key=p_key;
   RETURN jsonb_build_object('operation_key',p_key,'completed',true);
 END $$;

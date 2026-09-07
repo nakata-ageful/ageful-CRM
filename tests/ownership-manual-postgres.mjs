@@ -12,7 +12,7 @@ try{
   await db.transaction(async tx=>{await tx.exec("set local ageful.allow_draft_migration='yes'");for(const f of ['20260907_billing_ownership_foundation.sql','20260907_invoice_write_rpc.sql','20260907_transfer_detail_choices.sql','20260907_manual_billing_plan.sql','20260907_transfer_ownership_manual.sql'])await tx.exec(readFileSync(new URL('../database/drafts/'+f,import.meta.url),'utf8'))})
   await db.exec(`insert into billing_units(project_id,contract_id,occurrence_key,service_year,original_method,collection_method,recipient_customer_id,planned_amount)
     values(1,1,'a',2026,'invoice','invoice',1,100),(1,1,'b',2026,'direct_debit','direct_debit',1,200);`)
-  const snapshot=async()=>{const s={};for(const t of ['projects','contracts','billing_units','billing_unit_events','billing_operations','ownership_transfers'])s[t]=(await db.query(`select to_jsonb(x) as v from ${t} x order by to_jsonb(x)::text`)).rows.map(r=>r.v);return s}
+  const snapshot=async()=>{const s={};for(const t of ['projects','contracts','billing_units','billing_unit_events','billing_operations','ownership_transfers','billing_recipient_plans','billing_recipient_plan_overrides'])s[t]=(await db.query(`select to_jsonb(x) as v from ${t} x order by to_jsonb(x)::text`)).rows.map(r=>r.v);return s}
   const choices=(rev,owner)=>[1,2].map(id=>({unitId:String(id),expectedRevision:rev,recipientId:owner,method:id===1?'口座振替':'請求書',scheduledDate:'2026-12-01',plannedAmount:id*100,periodStart:null,periodEnd:null,note:'個別確認'}))
   const transfer=(op,s,owner=2,cs=choices(0,2))=>db.query('select transfer_ownership_manual($1,1,$2,$3,$4::jsonb,$5::jsonb,$6::jsonb,$7::jsonb,$8)',
     [op,owner,'2025-09-01',JSON.stringify(s.projects[0]),JSON.stringify(s.contracts[0]),JSON.stringify({contract:{notes:{mode:'clear'}}}),JSON.stringify(cs),'架空の移転'])
@@ -32,6 +32,7 @@ try{
   await assert.rejects(transfer(key(),before),/更新/)
   await transfer(key(),after,3,choices(1,3));const third=await snapshot()
   assert.equal(third.projects[0].customer_id,3);assert.equal(third.ownership_transfers.length,2)
+  assert.equal(third.billing_recipient_plans.find(p=>p.retired_at===null).default_recipient_customer_id,3)
   assert.ok(third.ownership_transfers.some(t=>t.from_customer_id===1&&t.to_customer_id===2))
   assert.ok(third.ownership_transfers.some(t=>t.from_customer_id===2&&t.to_customer_id===3))
   await transfer(op,before);assert.deepEqual(await snapshot(),third,'Old replay cannot undo C ownership')

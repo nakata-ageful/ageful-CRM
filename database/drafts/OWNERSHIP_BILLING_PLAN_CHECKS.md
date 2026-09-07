@@ -1,5 +1,17 @@
 # 所有者変更時の回別指定チェック
 
+## 最新：一括移転・振替追加/編集/訂正の画面接続と4通り通し試験
+
+ownership-billing-previewはtransfer_ownership_manualを実行し、保存後owner Bと移転履歴へ切替。移転日/契約備考keep/change/clearをUIから指定、契約snapshotの履歴も表示。通常Appではなく架空PGlite。source snapshotを再送中保持する。
+
+移転後同画面からInvoiceLedgerDetailの発行/入金/振替結果/振替訂正へ接続。ManualDebitEditorの訂正では既存明細・日付を初期値にし理由必須。ManualDebitPlanCreator＋create_manual_debit_planで年月/日付/先/額/備考/理由を明示し一回追加、同じ有効対象月の重複を拒否。全plannedの変更欄から振替予定も編集可能。空額/0の区別、予定額と実額の分離維持。
+
+manual planは既存active recipientplanへ各回を紐付けてoverride同期/revision更新。移転は旧planをretireして新所有者をdefaultとするplanを作成し、子操作と一括txn。追加もactive plan/defaultと異なる先はoverrideを記録。旧planと旧override、実績は維持。移行済source拒否は残す（移行工程）。
+
+ownership-four-methods-postgresで4組それぞれに移転→結果確認、Aの旧実績不変、追加→変更→入金、追加監査失敗rollbackを実行。既存DB suite/移行suite/build成功。ブラウザーで一括移転後owner B/履歴1件、invoice→debit入金82500、訂正83000、2027年2月の7500円振替追加を確認。後段active-plan統合はDB suiteで再検証。
+
+境界：これはローカル機能検証であり本番完了ではない。通常App/認証認可/実移行/復元は別工程。契約項目は既存prepare_transfer_detail_choicesの変更allowlistを維持し、UIでは契約備考を接続。他の全契約項目を自由編集可能とはしない。入金取消・請求先訂正、ページ終了後の再送復旧も未解決。本番適用には既存draft DB向け差分migrationも必要。
+
 ## 最新：混在予定＋所有者の原子的移転RPC
 
 transfer_ownership_manualを追加。project/contract全snapshot版確認、A/B先限定、detail_choicesの既存allowlist、manual plan子操作を同txnで実行、所有者/旧名/移転日/選択項目を更新し全snapshot保存。A→B→C/契約備考clear/最終snapshot失敗rollback/古い再送でCを戻さない試験成功。旧年度/既存recipientplans制限は維持。契約の全54項目変更や契約請求方法・回数構成変更を解禁したものではない。新RPCは画面未接続（画面の保存は依然予定のみ）。

@@ -37,6 +37,10 @@ BEGIN
     IF (c->>'recipientId')::bigint NOT IN(old_project.customer_id,p_owner) THEN RAISE EXCEPTION '請求先は変更前後の所有者を指定してください'; END IF;
   END LOOP;
   patches:=public.prepare_transfer_detail_choices(to_jsonb(old_project),to_jsonb(old_contract),p_fields);
+  -- Retain the prior default/overrides as history; future creations use the new owner.
+  UPDATE public.billing_recipient_plans SET retired_at=clock_timestamp(),revision=revision+1 WHERE project_id=p_project AND retired_at IS NULL;
+  INSERT INTO public.billing_recipient_plans(project_id,default_recipient_customer_id,effective_from)
+    VALUES(p_project,p_owner,p_date);
   child:=substr(encode(sha256(convert_to(p_key::text||':manual-plan','UTF8')),'hex'),1,32)::uuid;
   PERFORM public.write_manual_billing_plan(child,p_project,p_choices,p_reason);
   project_patch:=(patches->'project')||jsonb_build_object('customer_id',p_owner,'old_owner',old_name);

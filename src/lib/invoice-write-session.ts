@@ -1,6 +1,6 @@
 import { canonicalJson, copyJson } from './billing-json'
 
-export type InvoiceWriteRequest = { unitId:number; revision:number; mode:'plan'|'issue'|'collection'|'correction'|'debit_received'|'debit_invoice_switch'; value:object; reason:string|null }
+export type InvoiceWriteRequest = { unitId:number; revision:number; mode:'plan'|'issue'|'collection'|'correction'|'debit_received'|'debit_invoice_switch'|'debit_correction'; value:object; reason:string|null }
 
 /** One editor session. Keep the operation ID after uncertain save/reload errors. */
 export function createInvoiceWriteSession<T>(dependencies:{

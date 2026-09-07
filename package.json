@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test:billing-db": "node tests/invoice-write-postgres.mjs && node tests/invoice-recipient-plan-postgres.mjs && node tests/ownership-transfer-postgres.mjs && node tests/invoice-schedule-postgres.mjs",
-    "test:billing-migration": "node tests/billing-backup-audit.cjs && node tests/billing-migration-source.cjs && node tests/invoice-migration-payload.cjs"
+    "test:billing-migration": "node tests/billing-backup-audit.cjs && node tests/billing-migration-source.cjs && node tests/invoice-migration-payload.cjs && node tests/billing-import-reconciliation.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

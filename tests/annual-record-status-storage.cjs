@@ -7,7 +7,7 @@ const source = fs.readFileSync(path.join(__dirname, '../src/lib/annual-record-st
 const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText
 const scope = { exports: {} }
 new Function('exports', compiled)(scope.exports)
-const { toStoredAnnualRecordStatus: convert, annualRecordPayloadForStorage: adapt, annualRecordFromStorage: read } = scope.exports
+const { toStoredAnnualRecordStatus: convert, annualRecordPayloadForStorage: adapt, annualRecordFromStorage: read, singleAnnualRecordId: selectId } = scope.exports
 assert.equal(convert(''), '未入金')
 for (const status of ['未入金', '請求済', '入金済']) assert.equal(convert(status), status)
 for (const status of [null, undefined, false, 0, '未発行', ' 請求済']) assert.throws(() => convert(status))
@@ -22,4 +22,8 @@ assert.equal(Object.hasOwn(adapt(Object.create({ status: '' })), 'status'), fals
 assert.deepEqual(read({ id: 1, status: '未入金' }), { id: 1, status: '' })
 for (const status of ['', '請求済', '入金済']) assert.equal(read({ status }).status, status)
 assert.throws(() => read({ status: 'unexpected' }))
-console.log('PASS: storage adapter maps UI blank to DB 未入金 and back, preserves known/omitted statuses, and rejects invalid values.')
+assert.equal(selectId([]), null)
+assert.equal(selectId([{ id: 42 }]), 42)
+assert.throws(() => selectId([{ id: 42 }, { id: 43 }]), /複数/)
+for (const id of [null, 0, -1, 1.5, '1']) assert.throws(() => selectId([{ id }]))
+console.log('PASS: status storage mapping and single-record targeting reject invalid or ambiguous annual records.')

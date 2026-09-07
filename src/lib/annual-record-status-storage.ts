@@ -28,3 +28,12 @@ export function annualRecordFromStorage<T extends object>(row: T): T {
   if (status === '' || status === '請求済' || status === '入金済') return { ...row }
   throw new Error('Unsupported stored annual record status')
 }
+
+/** Avoid silently choosing one record when legacy data contains the same contract/year twice. */
+export function singleAnnualRecordId(rows: readonly { id: unknown }[]): number | null {
+  if (rows.length > 1) throw new Error('同じ契約・年度の請求記録が複数あります。対象を確認してから保存してください')
+  if (!rows.length) return null
+  const id = rows[0].id
+  if (!Number.isSafeInteger(id) || (id as number) <= 0) throw new Error('請求記録IDが不正です')
+  return id as number
+}

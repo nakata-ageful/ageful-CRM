@@ -12,7 +12,7 @@ import type {
   AnnualRecordInput, AnnualRecordStatus, CsvImportRow, BillingImportRow, Prospect, ProspectInput,
 } from '../types'
 import { buildTaskMap, buildSubTaskMap } from './prospect-tasks'
-import { annualRecordFromStorage, annualRecordPayloadForStorage, toStoredAnnualRecordStatus } from './annual-record-status-storage'
+import { annualRecordFromStorage, annualRecordPayloadForStorage, singleAnnualRecordId, toStoredAnnualRecordStatus } from './annual-record-status-storage'
 
 function db() {
   if (!supabase) throw new Error('Supabase not configured')
@@ -403,6 +403,26 @@ export async function deletePeriodicMaintenance(id: number): Promise<void> {
 
 // ── Annual Record CRUD ────────────────────────────────────
 
+async function writeAnnualRecordByContractYear<T extends { contract_id: number; year: number }>(payload: T): Promise<AnnualRecord> {
+  const client = db()
+  const { data: matches, error: lookupError } = await client
+    .from('annual_records')
+    .select('id')
+    .eq('contract_id', payload.contract_id)
+    .eq('year', payload.year)
+    .order('id')
+    .limit(2)
+  if (lookupError) throw lookupError
+  const existingId = singleAnnualRecordId(matches ?? [])
+  const storagePayload = annualRecordPayloadForStorage(payload)
+  const query = existingId == null
+    ? client.from('annual_records').insert(storagePayload)
+    : client.from('annual_records').update(storagePayload).eq('id', existingId)
+  const { data, error } = await query.select().single()
+  if (error) throw error
+  return annualRecordFromStorage(data) as AnnualRecord
+}
+
 export async function upsertAnnualRecord(input: AnnualRecordInput): Promise<AnnualRecord> {
   const payload = {
     contract_id: input.contract_id,
@@ -428,13 +448,7 @@ export async function upsertAnnualRecord(input: AnnualRecordInput): Promise<Annu
     }
     return annualRecordStore.create(payload)
   }
-  const { data, error } = await db()
-    .from('annual_records')
-    .upsert(annualRecordPayloadForStorage(payload), { onConflict: 'contract_id,year' })
-    .select()
-    .single()
-  if (error) throw error
-  return annualRecordFromStorage(data) as AnnualRecord
+  return writeAnnualRecordByContractYear(payload)
 }
 
 export async function updateAnnualRecordStatus(id: number, status: AnnualRecordStatus): Promise<void> {
@@ -941,10 +955,7 @@ export async function bulkImportBilling(
             annualRecordStore.create(annualPayload)
           }
         } else {
-          const { error: aErr } = await db()
-            .from('annual_records')
-            .upsert(annualRecordPayloadForStorage(annualPayload), { onConflict: 'contract_id,year' })
-          if (aErr) throw aErr
+          await writeAnnualRecordByContractYear(annualPayload)
         }
       }
 

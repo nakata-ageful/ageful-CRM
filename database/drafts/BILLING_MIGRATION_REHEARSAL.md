@@ -43,3 +43,15 @@ node scripts/review-billing-backup.cjs /absolute/path/app-data.json /absolute/pa
 7. 1人利用の最小限の認証・権限、永続復旧試験、本番適用と公開の別承認。
 
 識別テストはPGliteでDB制約を実行するが、実データ監査CLIはDBを使わない。複数接続での競合・本番の権限・復元試験ではない。
+# 最新：請求書の全行payload準備
+
+invoice-migration-payload.tsは、確認候補＋元記録＋明示した契約/発電所対応＋元行hashに固定した請求方法根拠からbilling_unitsの全保存項目と証跡を生成する。readyToWrite=falseを維持。source3列だけのアダプターから進んだが、本番INSERT用の承認・移行RPC・切替ゲートではない。
+
+- 受領日だけある実績はreceivedのまま、請求日を捏造しない。過去の予定日null・年度と請求日年の違いは保持する。
+- 単回0／分割配列位置+1、元ID・seq・全元記録・hashを保持。同年度別行をまとめない。
+- 実績は非負整数の確定額・一致する明細・金額/請求先根拠必須。単回保存明細と完全一致ならsource_record、それ以外の確認額はoperator_confirmed。予定は額・明細・固定時刻null。
+- hashが合っていても呼出元が日付・実績有無だけ書き換えていないかを元記録から再検査。非同期処理前に入力をコピーする。
+- 現契約の請求方法から過去方法を推測しない。invoice/invoiceに対応した明示根拠が必要。振替不能・曖昧な回・不正日付は拒否。D-025は請求先の確認であり、過去方法まで自動確認済みにはしない。
+- importedAtは隔離試験用の時刻。実移行RPCはDBトランザクション時刻を使い、当時の発行時刻と偽らない。初期予定はrecipient_source=confirmed／plan未接続であり、将来指定との初期同期が必要。
+
+npm run test:billing-migrationに既存バックアップ監査・source照合・新payload試験を統合。架空4回（入金日だけの実績、分割実績、予定、同年別行）を実PostgreSQL制約へ通し、合計310円・予定null・二重挿入拒否を確認。実データをこのテストへ持ち込んでいない。元行ロック／全件照合／証跡永続保存／権限・切替・復元は次工程。

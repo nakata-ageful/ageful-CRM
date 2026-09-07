@@ -8,7 +8,8 @@ CREATE FUNCTION public.transfer_ownership_inherit(
   p_operation_key uuid,p_project_id bigint,p_new_owner_id bigint,p_transfer_date date,
   p_expected_project jsonb,p_expected_contract jsonb,
   p_expected_plan_id bigint,p_expected_plan_revision integer,p_expected_units jsonb,
-  p_default_recipient_id bigint,p_overrides jsonb,p_field_choices jsonb DEFAULT '{}'::jsonb
+  p_default_recipient_id bigint,p_overrides jsonb,p_field_choices jsonb DEFAULT '{}'::jsonb,
+  p_schedule_change jsonb DEFAULT NULL
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $$
 DECLARE
   actor uuid:=auth.uid();
@@ -27,6 +28,14 @@ DECLARE
   project_patch jsonb;
   contract_patch jsonb;
   assignments text;
+  schedule_operation uuid;
+  schedule_receipt jsonb;
+  current_contract public.contracts%ROWTYPE;
+  recipient_versions jsonb:=p_expected_units;
+  recipient_plan_revision integer:=p_expected_plan_revision;
+  recipient_overrides jsonb:=p_overrides;
+  entry record;
+  new_id bigint;
 BEGIN
   IF actor IS NULL THEN RAISE EXCEPTION 'ログインが必要です'; END IF;
   IF p_operation_key IS NULL OR p_project_id IS NULL OR p_new_owner_id IS NULL
@@ -39,7 +48,8 @@ BEGIN
     'project',p_project_id,'owner',p_new_owner_id,'date',p_transfer_date,
     'expected_project',p_expected_project,'expected_contract',p_expected_contract,
     'plan',p_expected_plan_id,'plan_revision',p_expected_plan_revision,'units',p_expected_units,
-    'default',p_default_recipient_id,'overrides',p_overrides,'field_choices',p_field_choices,'actor',actor)::text,'UTF8')),'hex');
+    'default',p_default_recipient_id,'overrides',p_overrides,'field_choices',p_field_choices,
+    'schedule_change',p_schedule_change,'actor',actor)::text,'UTF8')),'hex');
   INSERT INTO public.billing_operations(operation_key,operation_kind,project_id,request_hash,actor_user_id)
     VALUES(p_operation_key,'ownership_transfer',p_project_id,fingerprint,actor) ON CONFLICT DO NOTHING;
   SELECT * INTO STRICT op FROM public.billing_operations WHERE operation_key=p_operation_key FOR UPDATE;
@@ -63,7 +73,6 @@ BEGIN
     RAISE EXCEPTION '発電所・契約が更新されています。確認し直してください';
   END IF;
   IF old_project.customer_id=p_new_owner_id THEN RAISE EXCEPTION '現在と同じ所有者です'; END IF;
-  patches:=public.prepare_transfer_detail_choices(to_jsonb(old_project),to_jsonb(old_contract),p_field_choices);
   PERFORM id FROM public.customers WHERE id IN(old_project.customer_id,p_new_owner_id) ORDER BY id FOR KEY SHARE;
   IF NOT EXISTS(SELECT 1 FROM public.customers WHERE id=p_new_owner_id) THEN RAISE EXCEPTION '新所有者が存在しません'; END IF;
   SELECT name INTO STRICT old_owner_name FROM public.customers WHERE id=old_project.customer_id;
@@ -77,10 +86,44 @@ BEGIN
   IF EXISTS(SELECT 1 FROM public.annual_records WHERE contract_id=old_contract.id) THEN
     RAISE EXCEPTION '旧年度記録がある発電所は移行完了の検証接続後に対応します';
   END IF;
+  current_contract:=old_contract;
+  IF p_schedule_change IS NOT NULL THEN
+    IF jsonb_typeof(p_schedule_change) IS DISTINCT FROM 'object' THEN RAISE EXCEPTION '予定構成の形式が不正です'; END IF;
+    IF NOT(p_schedule_change ?& ARRAY['configuration','targets','retire','reason','new_recipient_overrides']) OR
+      EXISTS(SELECT 1 FROM jsonb_object_keys(p_schedule_change) k WHERE k NOT IN('configuration','targets','retire','reason','new_recipient_overrides')) OR
+      jsonb_typeof(p_schedule_change->'reason') IS DISTINCT FROM 'string' OR
+      jsonb_typeof(p_schedule_change->'new_recipient_overrides') IS DISTINCT FROM 'object' OR
+      jsonb_typeof(p_overrides) IS DISTINCT FROM 'object' OR jsonb_typeof(p_expected_units) IS DISTINCT FROM 'object' THEN
+      RAISE EXCEPTION '予定構成・請求先の指定を確認してください';
+    END IF;
+    IF coalesce(p_field_choices->'contract','{}'::jsonb) ?| ARRAY['billing_count','billing_schedule_days','billing_amount_overrides'] THEN
+      RAISE EXCEPTION '回数・予定日・個別金額は予定構成の確認欄だけで指定してください';
+    END IF;
+    IF EXISTS(SELECT 1 FROM jsonb_object_keys(p_overrides) k WHERE NOT(p_expected_units ? k)) THEN
+      RAISE EXCEPTION '既存回の請求先指定は確認した回IDだけに指定してください';
+    END IF;
+    schedule_operation:=substr(encode(sha256(convert_to(p_operation_key::text||':schedule','UTF8')),'hex'),1,32)::uuid;
+    schedule_receipt:=public.write_invoice_schedule(schedule_operation,p_project_id,old_contract.id,p_expected_contract,
+      p_expected_plan_id,p_expected_plan_revision,p_expected_units,p_schedule_change->'configuration',
+      p_schedule_change->'targets',p_schedule_change->'retire',p_schedule_change->>'reason');
+    -- IDs for added rounds are allocated by the DB, never guessed by the browser.
+    FOR entry IN SELECT * FROM jsonb_each(p_schedule_change->'new_recipient_overrides') LOOP
+      SELECT (x->>'unit_id')::bigint INTO new_id FROM jsonb_array_elements(schedule_receipt->'correspondence') x
+        WHERE x->'source_id'='null'::jsonb AND (x->>'service_year')||':'||(x->>'round_number')=entry.key;
+      IF NOT FOUND THEN RAISE EXCEPTION '追加回の請求先指定に対応する予定がありません'; END IF;
+      recipient_overrides:=recipient_overrides||jsonb_build_object(new_id::text,entry.value);
+    END LOOP;
+    SELECT * INTO STRICT current_contract FROM public.contracts WHERE id=old_contract.id;
+    SELECT revision INTO STRICT recipient_plan_revision FROM public.billing_recipient_plans WHERE id=p_expected_plan_id;
+    SELECT coalesce(jsonb_object_agg(id::text,revision),'{}') INTO recipient_versions FROM public.billing_units
+      WHERE project_id=p_project_id AND lifecycle='planned';
+  END IF;
+  -- Validate non-schedule selections against the resulting schedule, not the previous divisor.
+  patches:=public.prepare_transfer_detail_choices(to_jsonb(old_project),to_jsonb(current_contract),p_field_choices);
   -- Child request is deterministic and committed/rolled back with the parent transaction.
   child_operation:=substr(encode(sha256(convert_to(p_operation_key::text||':recipient-plan','UTF8')),'hex'),1,32)::uuid;
   PERFORM public.write_invoice_recipient_plan(child_operation,p_project_id,p_expected_plan_id,
-    p_expected_plan_revision,p_expected_units,p_default_recipient_id,p_overrides);
+    recipient_plan_revision,recipient_versions,p_default_recipient_id,recipient_overrides);
   project_patch:=(patches->'project')||jsonb_build_object('customer_id',p_new_owner_id,'old_owner',old_owner_name);
   contract_patch:=(patches->'contract')||jsonb_build_object('ownership_transfer_date',p_transfer_date);
   -- Column names come only from the server-validated allowlist or the 3 protected system updates.
@@ -95,12 +138,14 @@ BEGIN
     contract_before,contract_after,project_fields_before,project_fields_after,field_decisions,validation_result,actor_user_id)
     VALUES(p_operation_key,p_project_id,old_project.customer_id,p_new_owner_id,p_transfer_date,
       to_jsonb(old_contract),to_jsonb(new_contract),to_jsonb(old_project),to_jsonb(new_project),
-      jsonb_build_object('mode','inherit_with_choices','default','keep','choices',p_field_choices,'policy','D-026','system_updated',
+      jsonb_build_object('mode','inherit_with_choices','default','keep','choices',p_field_choices,
+        'schedule_change',p_schedule_change,'policy','D-026','system_updated',
         jsonb_build_array('projects.customer_id','projects.old_owner','contracts.ownership_transfer_date')),
       jsonb_build_object('scope','isolated_invoice_without_legacy_records','source_rows_matched',true,
-        'recipient_operation_key',child_operation,'field_edits_applied',patches<>'{"project":{},"contract":{}}'::jsonb),actor)
+        'recipient_operation_key',child_operation,'schedule_operation_key',schedule_operation,
+        'field_edits_applied',patches<>'{"project":{},"contract":{}}'::jsonb),actor)
     RETURNING * INTO transfer_row;
   UPDATE public.billing_operations SET completed_at=clock_timestamp() WHERE operation_key=p_operation_key;
   RETURN jsonb_build_object('transfer_id',transfer_row.id,'operation_key',p_operation_key,'completed',true);
 END $$;
-REVOKE ALL ON FUNCTION public.transfer_ownership_inherit(uuid,bigint,bigint,date,jsonb,jsonb,bigint,integer,jsonb,bigint,jsonb,jsonb) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.transfer_ownership_inherit(uuid,bigint,bigint,date,jsonb,jsonb,bigint,integer,jsonb,bigint,jsonb,jsonb,jsonb) FROM PUBLIC;

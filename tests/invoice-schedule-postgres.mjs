@@ -7,7 +7,7 @@ const db=new PGlite()
 let sequence=0
 const key=()=>`55555555-5555-4555-8555-${String(++sequence).padStart(12,'0')}`
 const tables=['projects','contracts','annual_records','billing_units','billing_recipient_plans',
-  'billing_recipient_plan_overrides','billing_operations','billing_unit_events','invoice_schedule_changes']
+  'billing_recipient_plan_overrides','billing_operations','billing_unit_events','invoice_schedule_changes','ownership_transfers']
 async function snapshot(){
   const result={}
   for(const t of tables)result[t]=(await db.query(`select to_jsonb(t) value from ${t} t order by to_jsonb(t)::text`)).rows.map(r=>r.value)
@@ -21,22 +21,23 @@ function save(op,before,configuration,targets,retire=[],reason='請求回数と�
     [op,JSON.stringify(before.contracts[0]),plan.id,plan.revision,JSON.stringify(units),JSON.stringify(configuration),JSON.stringify(targets),JSON.stringify(retire),reason])
 }
 try{
-  await db.exec(`create table customers(id bigint primary key);
-    create table projects(id bigint primary key,customer_id bigint references customers(id));
+  await db.exec(`create table customers(id bigint primary key,name text);
+    create table projects(id bigint primary key,customer_id bigint references customers(id),old_owner text);
     create table contracts(id bigint primary key,project_id bigint references projects(id),billing_method text,
       billing_count integer,billing_schedule_days ${scheduleStorage},billing_amount_overrides jsonb,
-      annual_maintenance_inc bigint,billing_item_flags jsonb,has_issuance_fee boolean,issuance_fee_inc bigint,notes text);
+      annual_maintenance_inc bigint,billing_item_flags jsonb,has_issuance_fee boolean,issuance_fee_inc bigint,notes text,ownership_transfer_date date);
     create table annual_records(id bigint primary key,contract_id bigint references contracts(id));
     create schema auth;
     create function auth.uid() returns uuid language sql as 'select nullif(current_setting(''test.actor'',true),'''')::uuid';
     set test.actor='11111111-1111-4111-8111-111111111111';
-    insert into customers values(1),(2);
+    insert into customers values(1,'架空A'),(2,'架空B');
     insert into projects values(1,1);
     insert into contracts values(1,1,'請求書',2,${scheduleStorage==='text[]'?"ARRAY['6月1日','12月1日']":"'[\"6月1日\",\"12月1日\"]'"},'{"1":82500}',165000,null,false,null,'購入履歴は保持');`)
   await db.transaction(async tx=>{
     await tx.exec("set local ageful.allow_draft_migration='yes'")
     for(const name of ['20260907_billing_ownership_foundation.sql','20260907_invoice_write_rpc.sql',
-      '20260907_transfer_detail_choices.sql','20260907_invoice_schedule_rpc.sql']){
+      '20260907_transfer_detail_choices.sql','20260907_invoice_schedule_rpc.sql','20260907_invoice_recipient_plan_rpc.sql',
+      '20260907_transfer_ownership_inherit_rpc.sql']){
       await tx.exec(readFileSync(new URL('../database/drafts/'+name,import.meta.url),'utf8'))
     }
   })
@@ -127,17 +128,55 @@ try{
   assert.deepEqual(second.invoice_schedule_changes.find(x=>x.operation_key===op),first.invoice_schedule_changes[0])
   await save(op,before,configuration,targets,retire)
   assert.deepEqual(await snapshot(),second,'Old retry does not undo a later schedule change')
+  // Ownership + schedule + new-round exception must be ONE transaction.
+  const schedule={configuration:{billing_count:2,billing_schedule_days:['5月1日','12月1日'],billing_amount_overrides:{'2':91000}},
+    targets:[target(null,1),target(1,2)],retire:[],reason:'所有者変更と同時に年2回へ変更',new_recipient_overrides:{'2100:1':1}}
+  const choices={contract:{notes:{mode:'change',value:'Bの契約備考'},annual_maintenance_inc:{mode:'change',value:180000}}}
+  const transfer=(operation,s=second,change=schedule,overrides={})=>{
+    const plan=s.billing_recipient_plans.find(p=>p.retired_at===null)
+    return db.query('select transfer_ownership_inherit($1,1,2,current_date,$2::jsonb,$3::jsonb,$4,$5,$6::jsonb,2,$7::jsonb,$8::jsonb,$9::jsonb) result',
+      [operation,JSON.stringify(s.projects[0]),JSON.stringify(s.contracts[0]),plan.id,plan.revision,
+        JSON.stringify(Object.fromEntries(s.billing_units.filter(u=>u.lifecycle==='planned').map(u=>[u.id,u.revision]))),
+        JSON.stringify(overrides),JSON.stringify(choices),JSON.stringify(change)])
+  }
+  await assert.rejects(transfer(key(),second,{...schedule,new_recipient_overrides:{'2100:2':1}}),/追加回/)
+  await assert.rejects(transfer(key(),second,{...schedule,new_recipient_overrides:{'2100:1':999}}),/請求先が存在/)
+  await assert.rejects(transfer(key(),second,schedule,{'999':1}),/確認した回ID/)
+  assert.deepEqual(await snapshot(),second)
+  await db.exec(`create function fail_combined_transfer() returns trigger language plpgsql as $$begin
+    raise exception 'synthetic combined transfer failure';end$$;
+    create trigger fail_combined before insert on ownership_transfers for each row execute function fail_combined_transfer();`)
+  await assert.rejects(transfer(key()),/synthetic combined transfer failure/)
+  assert.deepEqual(await snapshot(),second,'Owner, new schedule, added round, payer exceptions, choices and every audit all roll back')
+  await db.exec('drop trigger fail_combined on ownership_transfers')
+  const combinedOp=key(),combinedReceipt=(await transfer(combinedOp)).rows
+  const combined=await snapshot(),newRound=combined.billing_units.find(u=>u.lifecycle==='planned'&&u.round_number===1)
+  assert.equal(combined.projects[0].customer_id,2)
+  assert.equal(combined.projects[0].old_owner,'架空A')
+  assert.equal(newRound.recipient_customer_id,1,'A may receive the newly created next round')
+  assert.equal(combined.billing_units.find(u=>u.id===1).recipient_customer_id,2,'Following retained round uses B')
+  assert.deepEqual(combined.contracts[0].billing_amount_overrides,{'2':91000})
+  assert.equal(combined.contracts[0].annual_maintenance_inc,180000)
+  assert.equal(combined.contracts[0].notes,'Bの契約備考')
+  assert.deepEqual(combined.billing_units.find(u=>u.id===3),before.billing_units.find(u=>u.id===3))
+  assert.deepEqual(combined.ownership_transfers[0].contract_before,second.contracts[0])
+  assert.deepEqual(combined.ownership_transfers[0].contract_after,combined.contracts[0])
+  assert.equal(combined.billing_operations.length-second.billing_operations.length,3)
+  assert.deepEqual((await transfer(combinedOp)).rows,combinedReceipt)
+  assert.deepEqual(await snapshot(),combined)
+  await assert.rejects(transfer(combinedOp,second,{...schedule,new_recipient_overrides:{}}),/同じ操作ID/)
   // A paid occurrence in a target year must not be silently mixed into a new annual divisor.
   await db.exec(`insert into billing_units(project_id,contract_id,recipient_customer_id,recipient_source,occurrence_key,service_year,
     original_method,collection_method,lifecycle,issued_on,frozen_amount,frozen_line_items,frozen_at,amount_basis)
     values(1,1,1,'confirmed','already-issued',2100,'invoice','invoice','issued','2100-01-01',82500,
       '[{"name":"保守料","amount":82500}]',now(),'source_record')`)
   const withIssued=await snapshot()
-  await assert.rejects(save(key(),withIssued,reduced,[target(1,1)]),/発行済み等がある年度/)
+  const remainingTargets=[target(newRound.id,1),target(1,2)]
+  await assert.rejects(save(key(),withIssued,schedule.configuration,remainingTargets),/発行済み等がある年度/)
   assert.deepEqual(await snapshot(),withIssued)
   await db.exec('insert into annual_records values(1,1)')
   const withLegacy=await snapshot()
-  await assert.rejects(save(key(),withLegacy,reduced,[target(1,1)]),/旧年度記録/)
+  await assert.rejects(save(key(),withLegacy,schedule.configuration,remainingTargets),/旧年度記録/)
   assert.deepEqual(await snapshot(),withLegacy)
   for(const sql of ["update invoice_schedule_changes set schema_version=2","delete from invoice_schedule_changes","truncate invoice_schedule_changes"]){
     await assert.rejects(db.exec(sql),/append-only/)
@@ -147,6 +186,7 @@ try{
   assert.equal((await db.query("select has_function_privilege('public','write_invoice_schedule(uuid,bigint,bigint,jsonb,bigint,integer,jsonb,jsonb,jsonb,jsonb,text)','execute') allowed")).rows[0].allowed,false)
   console.log('PASS: atomic schedule/contract/add/retire/audit, stable payer and occurrence, explicit overrides, full rollback, retry and stale guards')
   console.log(`PASS: complete-year coverage, leap dates, duplicate/unknown targets, immutable history, issued-year/legacy/auth guards; ${scheduleStorage} schedule conversion`)
+  console.log('PASS: combined ownership/schedule/field choices, new next-round A/following B, whole-operation final-failure rollback and stable retry')
   console.log('Scope: isolated whole unissued invoice years only. No production, UI, cutover, same-year issued restructuring or multi-session verification.')
 }finally{await db.close()}
 }

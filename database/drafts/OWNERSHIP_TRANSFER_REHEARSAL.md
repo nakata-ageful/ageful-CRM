@@ -1,8 +1,10 @@
 # 所有者変更の一括保存・隔離検証
 
+**現在の仕様は末尾「最新：請求予定の構成変更との原子的統合」を優先。以下の構成変更未接続は旧段階の説明。**
+
 最新拡張：請求方法・回数・予定日を維持した金額／手数料フラグ／請求対象／回別上書き変更を追加検証。予定日の形式、回数との一致、対象外の回キー、非負整数・計算上限、発行手数料の必須額を検証する。方式・回数・予定日自体の変更はまだ拒否する。2月29日のような年度依存の予定を実際の年へ展開する検証は予定生成側で必要。税込・税抜を自動換算する変更はしていない。
 
-`20260907_transfer_ownership_inherit_rpc.sql`は、foundation・invoice_write_rpc・invoice_recipient_plan_rpc・transfer_detail_choicesの後に適用する。明示トランザクションとdraft設定が必要。PUBLIC実行不可・SECURITY INVOKER・auth.uid必須。通常アプリ未接続・本番未適用。
+`20260907_transfer_ownership_inherit_rpc.sql`は、foundation・invoice_write_rpc・invoice_recipient_plan_rpc・transfer_detail_choices・invoice_schedule_rpcの後に適用する。明示トランザクションとdraft設定が必要。PUBLIC実行不可・SECURITY INVOKER・auth.uid必須。通常アプリ未接続・本番未適用。
 
 最新拡張：末尾の任意引数p_field_choicesで、購入日・購入額・販売経路・各備考等の限定された変更／空欄化に対応。省略は全保持。関数名のinheritは既定動作を示し、変更を全て拒否する意味ではない。旧11引数の既適用環境に上書きする本番マイグレーションではなく、隔離DBへ最初から適用するドラフト。
 
@@ -37,3 +39,20 @@
 - 既定保持と明示選択は移転履歴のfield_decisionsへ、実際の旧値・新値は全JSONスナップショットへ残す。失敗時は選択項目の更新も所有者・請求先と一緒に戻す。
 - 金額変更のうち対応するのは設備代などの購入金額であり、毎回の請求金額ではない。過去請求の固定額は変えない。
 - 型にあってもDB側にないoptional項目は選択を拒否する。全実DB列の対応確認、UIの選択可能項目との同期、未接続キーの表示制御は残る。
+# 最新：請求予定の構成変更との原子的統合
+
+transfer_ownership_inheritに13番目の任意引数p_schedule_change（SQL NULL既定）を追加。従来の11/12引数呼出は既定値で動く。draft適用順はfoundation→invoice_write→recipient_plan→detail_choices→invoice_schedule→transfer。本番に旧署名が存在する場合の置換手順は別途必要であり、このCREATEを本番アップグレード手順として使用しない。
+
+構成変更はconfiguration／targets／retire／reason／new_recipient_overridesの5キーを明示。金額上書きはconfiguration側だけで指定し、field_choices側との二重指定はkeepでも拒否。既存回の請求先例外は従来のp_overridesに確認済みIDで指定。新規回はDB採番前なのでnew_recipient_overridesの「年度:回番号」で指定し、子RPCの作成結果からIDへ変換する。既存回・不在回を新規回キーで指定した場合、取りやめた回への例外を残した場合は拒否する。
+
+親RPC内で、構成変更→結果の契約に対する個別選択検証→今後の請求先指定→所有者・選択項目・全移転履歴を保存。子操作キーは親から決定的に作り、親終端失敗で構成変更監査を含む全変更を取り消す。所有者変更の最終スナップショットは元契約から全処理後までを保存する。構成変更用監査はその子処理時点の前後であり、移転後の個別項目変更を含む最終スナップショットではない。
+
+invoice-schedule-postgres.mjsで、新規次回A／残す後続回B、備考・年額変更併用、既入金全値保持、不正新規先・存在しない顧客、終端失敗で全表不変、再送をtext[]/jsonb両fixtureで検証。予定変更なしの旧試験も維持。
+
+既存の暫定ゲート（旧年度行なし・全回未発行年度・現指定あり等）は解除しない。構成変更処理は個別金額変更前の契約も検証するため、既存不正値を同時修復する組合せまで対応済みではない。実UI全項目・移行・振替・本番権限・トリガー・複数接続・復元は残る。
+
+## ブラウザ内の架空データ確認
+
+http://localhost:5177/ownership-db-preview.html （開発サーバーが必要）。通常App／Supabaseに接続せず、PGliteメモリDBで上記のSQLを実行。再読み込みで初期化。A→B、次回A/B・後続B、年2→3回の代表例、契約備考keep/change/clear、設定→最終確認→保存後履歴を確認できる。全項目・任意構成・二度目の移転を扱う製品UIではない。
+
+ブラウザで次回A＋年3回＋備考clearを保存し、翌年3月A・6月/12月Bが各55,000円、過去入金A82,500円のまま、旧備考が移転履歴に残ることを確認した。画像だけのモックではないが、実DB保存E2E試験でもない。

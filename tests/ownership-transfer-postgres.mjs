@@ -39,7 +39,7 @@ try{
   await db.transaction(async tx=>{
     await tx.exec("set local ageful.allow_draft_migration='yes'")
     for(const name of ['20260907_billing_ownership_foundation.sql','20260907_invoice_write_rpc.sql',
-      '20260907_invoice_recipient_plan_rpc.sql','20260907_transfer_detail_choices.sql','20260907_transfer_ownership_inherit_rpc.sql']){
+      '20260907_invoice_recipient_plan_rpc.sql','20260907_transfer_detail_choices.sql','20260907_invoice_schedule_rpc.sql','20260907_transfer_ownership_inherit_rpc.sql']){
       await tx.exec(readFileSync(new URL('../database/drafts/'+name,import.meta.url),'utf8'))
     }
   })
@@ -141,7 +141,7 @@ try{
   assert.deepEqual(await snapshot(),second)
   await db.exec("set test.actor=''")
   await assert.rejects(transfer(key(),second,1),/ログイン/)
-  assert.equal((await db.query("select has_function_privilege('public','transfer_ownership_inherit(uuid,bigint,bigint,date,jsonb,jsonb,bigint,integer,jsonb,bigint,jsonb,jsonb)','execute') as allowed")).rows[0].allowed,false)
+  assert.equal((await db.query("select has_function_privilege('public','transfer_ownership_inherit(uuid,bigint,bigint,date,jsonb,jsonb,bigint,integer,jsonb,bigint,jsonb,jsonb,jsonb)','execute') as allowed")).rows[0].allowed,false)
   console.log('PASS: inherit-all atomic A→B→C, next A/later B and immediate C, full snapshots, frozen past, unchanged prospect, retry/stale/legacy/access guards')
   console.log('PASS: limited detail changes/clear, original snapshots, strict server allowlist, date/fallback/type/system guards and atomic failure rollback')
   console.log('PASS: unchanged-schedule amount/override edits, count/date/key/flag/fee/overflow validation and frozen past amount preservation')

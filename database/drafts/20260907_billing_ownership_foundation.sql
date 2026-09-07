@@ -98,7 +98,8 @@ CREATE TABLE public.billing_units (
   CHECK (collection_state <> 'succeeded' OR received_on IS NOT NULL),
   CHECK (received_on IS NULL OR collection_state = 'succeeded'),
   CHECK (received_on IS NULL OR lifecycle IN ('received', 'review_required')),
-  CHECK (collection_state <> 'failed' OR (original_method = 'direct_debit' AND received_on IS NULL)),
+  -- original_method is provenance, not the current collection method after a manual switch.
+  CHECK (collection_state <> 'failed' OR received_on IS NULL),
   CHECK (collection_state <> 'not_applicable' OR lifecycle IN ('cancelled', 'review_required')),
   CHECK (lifecycle <> 'cancelled' OR (issued_on IS NULL AND received_on IS NULL AND frozen_amount IS NULL AND collection_state = 'not_applicable')),
   CHECK (lifecycle <> 'review_required' OR (recipient_source = 'unconfirmed' OR amount_basis = 'unconfirmed')),

@@ -9,10 +9,10 @@ DECLARE actor uuid:=auth.uid(); old_unit public.billing_units%ROWTYPE; new_unit 
 BEGIN
   IF actor IS NULL THEN RAISE EXCEPTION 'ログインが必要です'; END IF;
   IF p_operation_key IS NULL OR p_unit_id IS NULL OR p_revision IS NULL OR p_revision<0
-    OR p_kind IS NULL OR p_kind NOT IN ('received','invoice_switch') OR jsonb_typeof(p_value) IS DISTINCT FROM 'object'
+    OR p_kind IS NULL OR p_kind NOT IN ('received','invoice_switch','correction') OR jsonb_typeof(p_value) IS DISTINCT FROM 'object'
     OR p_reason IS NULL OR length(trim(p_reason))=0 THEN RAISE EXCEPTION '対象回・操作・確認内容を入力してください'; END IF;
   IF p_kind='invoice_switch' AND p_value<>'{}'::jsonb THEN RAISE EXCEPTION '切替時は元の請求先・予定額を維持します'; END IF;
-  IF p_kind='received' THEN
+  IF p_kind IN ('received','correction') THEN
     IF NOT(p_value ?& ARRAY['received_on','amount','line_items'])
       OR (SELECT count(*) FROM jsonb_object_keys(p_value))<>3
       OR jsonb_typeof(p_value->'received_on') IS DISTINCT FROM 'string'
@@ -25,7 +25,7 @@ BEGIN
   fingerprint:=encode(sha256(convert_to(jsonb_build_object('action','manual_debit_result','unit',p_unit_id,'revision',p_revision,
     'kind',p_kind,'value',p_value,'reason',p_reason,'actor',actor)::text,'UTF8')),'hex');
   INSERT INTO public.billing_operations(operation_key,operation_kind,project_id,request_hash,actor_user_id)
-    VALUES(p_operation_key,CASE WHEN p_kind='received' THEN 'collection' ELSE 'plan' END,project_key,fingerprint,actor) ON CONFLICT DO NOTHING;
+    VALUES(p_operation_key,CASE WHEN p_kind='received' THEN 'collection' WHEN p_kind='correction' THEN 'correction' ELSE 'plan' END,project_key,fingerprint,actor) ON CONFLICT DO NOTHING;
   SELECT * INTO STRICT op FROM public.billing_operations WHERE operation_key=p_operation_key FOR UPDATE;
   IF op.request_hash IS DISTINCT FROM fingerprint OR op.actor_user_id IS DISTINCT FROM actor THEN RAISE EXCEPTION '同じ操作IDで別の内容は保存できません'; END IF;
   IF op.completed_at IS NOT NULL THEN
@@ -36,11 +36,15 @@ BEGIN
   PERFORM 1 FROM public.billing_recipient_plans WHERE project_id=project_key ORDER BY id FOR UPDATE;
   SELECT * INTO STRICT old_unit FROM public.billing_units WHERE id=p_unit_id FOR UPDATE;
   IF old_unit.revision<>p_revision THEN RAISE EXCEPTION '情報が更新されています'; END IF;
-  IF old_unit.original_method<>'direct_debit' OR old_unit.collection_method<>'direct_debit'
-    OR old_unit.lifecycle<>'planned' OR old_unit.received_on IS NOT NULL OR old_unit.frozen_amount IS NOT NULL THEN
+  IF old_unit.collection_method<>'direct_debit' THEN RAISE EXCEPTION '口座振替の記録だけが対象です'; END IF;
+  IF p_kind='correction' THEN
+    IF old_unit.lifecycle<>'received' OR old_unit.collection_state<>'succeeded' OR old_unit.received_on IS NULL
+      OR old_unit.frozen_amount IS NULL THEN RAISE EXCEPTION '入金済みの振替記録だけ訂正できます'; END IF;
+  ELSIF old_unit.collection_state<>'pending' OR old_unit.lifecycle<>'planned'
+    OR old_unit.received_on IS NOT NULL OR old_unit.frozen_amount IS NOT NULL THEN
     RAISE EXCEPTION '未確認の振替予定だけが対象です'; END IF;
   IF old_unit.recipient_customer_id IS NULL THEN RAISE EXCEPTION '元の請求先を確認してください'; END IF;
-  IF p_kind='received' THEN
+  IF p_kind IN ('received','correction') THEN
     UPDATE public.billing_units SET lifecycle='received',collection_state='succeeded',received_on=(p_value->>'received_on')::date,
       frozen_amount=(p_value->>'amount')::bigint,frozen_line_items=p_value->'line_items',frozen_at=clock_timestamp(),
       amount_basis='operator_confirmed',revision=revision+1 WHERE id=p_unit_id RETURNING * INTO new_unit;
@@ -49,7 +53,7 @@ BEGIN
       WHERE id=p_unit_id RETURNING * INTO new_unit;
   END IF;
   INSERT INTO public.billing_unit_events(project_id,billing_unit_id,operation_key,event_type,before_value,after_value,actor_user_id,reason)
-    VALUES(project_key,p_unit_id,p_operation_key,CASE WHEN p_kind='received' THEN 'collection_recorded' ELSE 'plan_changed' END,
+    VALUES(project_key,p_unit_id,p_operation_key,CASE WHEN p_kind='received' THEN 'collection_recorded' WHEN p_kind='correction' THEN 'corrected' ELSE 'plan_changed' END,
       to_jsonb(old_unit),to_jsonb(new_unit),actor,p_reason);
   UPDATE public.billing_operations SET completed_at=clock_timestamp() WHERE operation_key=p_operation_key;
   RETURN to_jsonb(new_unit);

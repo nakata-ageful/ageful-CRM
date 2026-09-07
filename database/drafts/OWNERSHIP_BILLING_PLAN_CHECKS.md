@@ -1,5 +1,13 @@
 # 所有者変更時の回別指定チェック
 
+## 最新：混在予定＋所有者の原子的移転RPC
+
+transfer_ownership_manualを追加。project/contract全snapshot版確認、A/B先限定、detail_choicesの既存allowlist、manual plan子操作を同txnで実行、所有者/旧名/移転日/選択項目を更新し全snapshot保存。A→B→C/契約備考clear/最終snapshot失敗rollback/古い再送でCを戻さない試験成功。旧年度/既存recipientplans制限は維持。契約の全54項目変更や契約請求方法・回数構成変更を解禁したものではない。新RPCは画面未接続（画面の保存は依然予定のみ）。
+
+振替結果RPCはoriginal_methodを由来として維持し、現在method=debit/pendingで受領/不能を許可。foundationのfailed制約からoriginal_method依存を外した（受領日null制約維持）。invoice由来→debit受領、不能→invoice発行→入金を同IDで試験。received debitのcorrection追加：実額/明細/日付、理由必須、前後監査・再送。請求先訂正や入金取消は未対応。既存draft適用DBへのALTER/CREATE OR REPLACE移行はまだなく、新規隔離DB用のみ。
+
+①②残り：新移転RPCへのUI接続、既存recipientplan/移行済みとの統合、全契約項目と請求方法構成の検証、振替予定の明示追加、訂正UI、4通り各ケースの移転から結果記録までを一つの試験で検証。今回の各層試験だけで①②完了としない。本番なし。
+
 ## 最新：隔離DBで請求予定を保存
 
 20260907_manual_billing_plan.sqlでperiod_start/end/plan_noteを追加、write_manual_billing_planで全plannedのID/版・厳密入力・失敗回元先をDB再検証し、回更新/全snapshot監査/操作完了を同一txn化。original_method・実績は保持。再送同IDは完了receipt、別内容/古い版は拒否。PUBLIC実行不可。既存recipient planまたは移行元参照ありは統合未完のため拒否。所有者を更新するRPCではなく、A/B所属制限はまだ純粋関数側のみ（DBは顧客FK検証）。通常App/本番接続不可。

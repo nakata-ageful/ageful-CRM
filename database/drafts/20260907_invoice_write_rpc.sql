@@ -22,32 +22,40 @@ DECLARE
   target_project bigint;
   result jsonb;
   k text;
+  editable_keys text[];
 BEGIN
   IF actor IS NULL THEN RAISE EXCEPTION 'ログインが必要です'; END IF;
   IF p_operation_key IS NULL OR p_unit_id IS NULL OR p_expected_revision IS NULL
-     OR p_expected_revision < 0 OR p_kind IS NULL OR p_kind NOT IN ('issue', 'correction') THEN
+     OR p_expected_revision < 0 OR p_kind IS NULL OR p_kind NOT IN ('plan', 'issue', 'collection', 'correction') THEN
     RAISE EXCEPTION '操作・対象・版を確認してください';
   END IF;
   IF p_kind = 'correction' AND (p_reason IS NULL OR length(trim(p_reason)) = 0) THEN
     RAISE EXCEPTION '訂正理由を入力してください';
   END IF;
   IF jsonb_typeof(p_value) IS DISTINCT FROM 'object' THEN RAISE EXCEPTION '変更内容が不正です'; END IF;
-  -- Full editable-field form, not a partially specified destructive overwrite.
-  IF NOT (p_value ?& ARRAY['recipient_customer_id','frozen_amount','frozen_line_items',
-      'scheduled_date','issued_on','received_on','payment_due_on']) THEN
+  editable_keys := CASE p_kind
+    WHEN 'plan' THEN ARRAY['recipient_customer_id','scheduled_date']
+    WHEN 'collection' THEN ARRAY['received_on']
+    ELSE ARRAY['recipient_customer_id','frozen_amount','frozen_line_items',
+      'scheduled_date','issued_on','received_on','payment_due_on'] END;
+  -- Each operation accepts only the fields it owns; omission cannot clear other data.
+  IF NOT (p_value ?& editable_keys) THEN
     RAISE EXCEPTION '変更項目が不足しています';
   END IF;
   FOR k IN SELECT jsonb_object_keys(p_value) LOOP
-    IF k NOT IN ('recipient_customer_id','frozen_amount','frozen_line_items',
-        'scheduled_date','issued_on','received_on','payment_due_on') THEN
+    IF NOT (k = ANY(editable_keys)) THEN
       RAISE EXCEPTION '変更できない項目です: %', k;
     END IF;
   END LOOP;
-  IF jsonb_typeof(p_value->'recipient_customer_id') IS DISTINCT FROM 'number'
+  IF p_kind IN ('issue','correction') AND (jsonb_typeof(p_value->'recipient_customer_id') IS DISTINCT FROM 'number'
      OR (p_value->>'recipient_customer_id') !~ '^[1-9][0-9]*$'
      OR jsonb_typeof(p_value->'frozen_amount') IS DISTINCT FROM 'number'
-     OR (p_value->>'frozen_amount') !~ '^[0-9]+$' THEN
+     OR (p_value->>'frozen_amount') !~ '^[0-9]+$') THEN
     RAISE EXCEPTION '請求先・確定金額を確認してください';
+  END IF;
+  IF p_kind = 'plan' AND p_value->'recipient_customer_id' <> 'null'::jsonb AND
+    (jsonb_typeof(p_value->'recipient_customer_id') <> 'number' OR (p_value->>'recipient_customer_id') !~ '^[1-9][0-9]*$') THEN
+    RAISE EXCEPTION '請求先を確認してください';
   END IF;
   FOR k IN SELECT unnest(ARRAY['scheduled_date','issued_on','received_on','payment_due_on']) LOOP
     IF p_value->k <> 'null'::jsonb AND
@@ -74,17 +82,29 @@ BEGIN
   IF old_unit.original_method <> 'invoice' OR old_unit.collection_method <> 'invoice' THEN
     RAISE EXCEPTION '今回は請求書のみ対象です';
   END IF;
-  IF (p_kind = 'issue' AND old_unit.lifecycle <> 'planned') OR
+  IF (p_kind IN ('plan','issue') AND old_unit.lifecycle <> 'planned') OR
+     (p_kind = 'collection' AND (old_unit.lifecycle <> 'issued' OR old_unit.received_on IS NOT NULL)) OR
      (p_kind = 'correction' AND old_unit.lifecycle NOT IN ('issued','received')) THEN
     RAISE EXCEPTION 'この状態では実行できません';
   END IF;
   IF p_kind = 'issue' AND (p_value->>'issued_on' IS NULL OR p_value->>'received_on' IS NOT NULL) THEN
     RAISE EXCEPTION '発行日を入力してください。入金は別途記録してください';
   END IF;
-  IF p_value->>'issued_on' IS NULL AND p_value->>'received_on' IS NULL THEN
+  IF p_kind IN ('issue','correction') AND p_value->>'issued_on' IS NULL AND p_value->>'received_on' IS NULL THEN
     RAISE EXCEPTION '発行・入金実績を空にする操作は取消で行ってください';
   END IF;
-  UPDATE public.billing_units SET
+  IF p_kind = 'collection' THEN
+    IF p_value->>'received_on' IS NULL THEN RAISE EXCEPTION '入金日を入力してください'; END IF;
+    UPDATE public.billing_units SET received_on = (p_value->>'received_on')::date,
+      lifecycle = 'received', collection_state = 'succeeded', revision = revision + 1
+      WHERE id = p_unit_id RETURNING * INTO new_unit;
+  ELSIF p_kind = 'plan' THEN
+    UPDATE public.billing_units SET recipient_customer_id = (p_value->>'recipient_customer_id')::bigint,
+      recipient_source = CASE WHEN p_value->>'recipient_customer_id' IS NULL THEN 'unconfirmed' ELSE 'confirmed' END,
+      scheduled_date = (p_value->>'scheduled_date')::date, revision = revision + 1
+      WHERE id = p_unit_id RETURNING * INTO new_unit;
+  ELSE
+    UPDATE public.billing_units SET
     recipient_customer_id = (p_value->>'recipient_customer_id')::bigint,
     recipient_source = 'confirmed', frozen_amount = (p_value->>'frozen_amount')::bigint,
     frozen_line_items = p_value->'frozen_line_items', frozen_at = clock_timestamp(),
@@ -95,10 +115,12 @@ BEGIN
     collection_state = CASE WHEN p_value->>'received_on' IS NOT NULL THEN 'succeeded' ELSE 'pending' END,
     revision = revision + 1
     WHERE id = p_unit_id RETURNING * INTO new_unit;
+  END IF;
   INSERT INTO public.billing_unit_events(project_id,billing_unit_id,operation_key,event_type,reason,
       before_value,after_value,actor_user_id)
     VALUES (new_unit.project_id,new_unit.id,p_operation_key,
-      CASE WHEN p_kind = 'issue' THEN 'issued' ELSE 'corrected' END,
+      CASE p_kind WHEN 'plan' THEN 'plan_changed' WHEN 'issue' THEN 'issued'
+        WHEN 'collection' THEN 'collection_recorded' ELSE 'corrected' END,
       p_reason,to_jsonb(old_unit),to_jsonb(new_unit),actor);
   UPDATE public.billing_operations SET completed_at = clock_timestamp() WHERE operation_key = p_operation_key;
   RETURN to_jsonb(new_unit);

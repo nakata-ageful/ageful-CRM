@@ -8,6 +8,7 @@ export type BillingHistoryData = {
   recipientName: (id: number) => string
   projectName: (id: number) => string
   plannedAmount: (unit: BillingUnit) => number | null
+  recipients?: readonly {id:number;name:string}[]
 }
 
 export function BillingHistorySection({ data, customerId, projectId, onViewDetail }: {

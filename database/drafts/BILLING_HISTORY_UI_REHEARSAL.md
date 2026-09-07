@@ -37,3 +37,6 @@ invoice-write-session.ts追加。操作ID/対象回/版/入力の値コピーを
 InvoiceLedgerDetail/InvoiceUnitEditor追加。BillingDetailの新データ経路で任意onSaveInvoiceがある場合のみ発行/入金ボタンを表示。未接続は読取のみ。編集開始時の回/版を値コピーし、発行は保存先/日付/入力明細・合計、入金は入金日のみをwrite requestへ渡す。既発行金額を入金で再計算しない。明細金額は空欄開始で現契約から推定しない。
 
 invoice-db-previewにも同部品を接続しwriteSession→RPC→reloadを使用。通常AppはonSaveInvoiceをまだ渡さない。本番書込なし。新フォームの実クリック送信・ブラウザE2Eは未実施、既存SQL/共通処理テストと型buildのみ。予定変更/訂正フォームの本体共通化は別工程。保存結果不明時は同内容再試行が必要で、ページ跨ぎ回復はまだない。
+# 追加：共通予定編集
+
+InvoicePlanEditorをInvoiceLedgerDetailへ追加。保存callbackと認可済みrecipients候補がある時だけ予定編集を表示。開始時の回/版を固定し、先/予定日のみplan RPC requestへ渡す。金額・他回は変更しない。null先/日付は要確認のまま許可（既存RPC仕様）。DEVへ架空A/B候補を接続。型/buildと既存DB/移行回帰テスト、フォームの実送信ブラウザ検証は別途。

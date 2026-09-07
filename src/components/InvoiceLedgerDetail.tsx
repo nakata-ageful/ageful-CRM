@@ -3,16 +3,21 @@ import { BillingHistorySection,type BillingHistoryData } from './BillingHistoryS
 import { InvoiceUnitEditor } from './InvoiceUnitEditor'
 import { isEditableInvoicePlan } from '../lib/billing-unit'
 import type { InvoiceWriteRequest } from '../lib/invoice-write-session'
+import { InvoicePlanEditor } from './InvoicePlanEditor'
 
 export function InvoiceLedgerDetail({data,projectId,onSave}:{data:BillingHistoryData;projectId:number;onSave?:(request:InvoiceWriteRequest)=>Promise<unknown>}) {
   const [selected,setSelected]=useState<string|null>(null)
+  const [editingPlan,setEditingPlan]=useState(false)
   const units=data.units.filter(u=>u.projectId===projectId)
   const unit=units.find(u=>u.id===selected)
   return <><BillingHistorySection data={data} projectId={projectId}/>
+    {onSave&&data.recipients&&units.filter(isEditableInvoicePlan).map(u=><button type="button" className="btn" key={`plan-${u.id}`} disabled={selected!==null}
+      onClick={()=>{setEditingPlan(true);setSelected(u.id)}}>{u.serviceYear}年 {u.roundLabel}：予定を編集</button>)}
     {onSave&&units.filter(u=>isEditableInvoicePlan(u)||(u.method==='請求書'&&u.lifecycle==='issued'&&!u.receivedOn)).map(u=>
-      <button key={u.id} type="button" className="btn" disabled={selected!==null} onClick={()=>setSelected(u.id)}>
+      <button key={u.id} type="button" className="btn" disabled={selected!==null} onClick={()=>{setEditingPlan(false);setSelected(u.id)}}>
         {u.serviceYear}年 {u.roundLabel}：{u.lifecycle==='planned'?'発行':'入金確認'}
       </button>)}
-    {unit&&onSave&&<InvoiceUnitEditor key={unit.id} unit={unit} recipientName={data.recipientName} onSave={onSave} onClose={()=>setSelected(null)}/>}
+    {unit&&onSave&&(editingPlan&&data.recipients?<InvoicePlanEditor key={`plan-${unit.id}`} unit={unit} recipients={data.recipients} onSave={onSave} onClose={()=>setSelected(null)}/>
+      :<InvoiceUnitEditor key={unit.id} unit={unit} recipientName={data.recipientName} onSave={onSave} onClose={()=>setSelected(null)}/>)}
   </>
 }

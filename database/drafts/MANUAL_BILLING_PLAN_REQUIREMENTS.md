@@ -1,5 +1,11 @@
 # 手動記録と保存予定：最新合意
 
+## 最新：手動振替の共通画面接続
+
+ManualDebitEditor追加、InvoiceLedgerDetailで未確認振替回＋保存callbackあり時に表示。入金日/実額/複数明細/確認理由、または不能確認→請求書切替を選択。予定額は参考表示のみで実額へ自動入力しない。開始snapshot/版固定、二重送信抑止、writeSessionで再試行IDを保持。
+
+DEV DBへ架空振替1回とRPCを追加、mode別にinvoice/debit RPCへルーティング。旧DEV請求書フォーム一覧には振替を混ぜず、共通詳細のみで扱う。新フォームの実クリック送信E2Eは未実施。通常App・本番は未接続。振替の訂正/予定編集生成/移転4通りは未完。
+
 ## 最新：手動振替結果の隔離RPC
 
 record_manual_debit_result(op,unit,revision,kind,value,reason)追加。未確認planned/direct_debitに限定しreceivedは明示実額/明細/入金日を確定、invoice_switchは元先・予定額・回IDを保ったままcollection_method=invoice/collection_state=failedへ変更。原方法direct_debitは維持。全before/after/確認内容/実行者/操作を原子的記録。自動日付判定/銀行操作なし。

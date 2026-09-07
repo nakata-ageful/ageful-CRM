@@ -9,7 +9,7 @@ import type { BillingUnit } from '../lib/billing-unit'
 import { createInvoiceWriteSession } from '../lib/invoice-write-session'
 
 type Mode = 'plan' | 'issue' | 'collection' | 'correction'
-type Unit = { id: number; service_year: number; revision: number; lifecycle: string;
+type Unit = { id: number; service_year: number; revision: number; lifecycle: string; collection_method:string;
   recipient_customer_id: number | null; scheduled_date: string | null; issued_on: string | null;
   received_on: string | null; payment_due_on: string | null; frozen_amount: number | null;
   frozen_line_items: { name: string; amount: number }[] | null }
@@ -45,7 +45,7 @@ function InvoiceDbPreview() {
     // JSON dates use YYYY-MM-DD consistently with the RPC payload and audit snapshots.
     const rows = await client.query<{ unit: Unit }>('select to_jsonb(u) as unit from billing_units u order by scheduled_date nulls last,id')
     const history = await client.query<Event>('select * from billing_unit_events order by id desc')
-    const current = rows.rows.map(r => r.unit)
+    const current = rows.rows.map(r => r.unit).filter(unit=>unit.collection_method==='invoice')
     const display = rows.rows.map(r => billingUnitFromStorage(r.unit as unknown as Record<string, unknown>))
     if (alive.current) { setUnits(current); setDisplayUnits(display); setEvents(history.rows) }
     return current
@@ -58,7 +58,8 @@ function InvoiceDbPreview() {
       if (!alive.current) { await client.close(); return }
       await reload(client)
       writeSession.current = createInvoiceWriteSession({operationId:()=>crypto.randomUUID(),
-        write:(operationId,request)=>client.query('select public.write_invoice_unit($1,$2,$3,$4,$5::jsonb,$6)',
+        write:(operationId,request)=>request.mode.startsWith('debit_')?client.query('select public.record_manual_debit_result($1,$2,$3,$4,$5::jsonb,$6)',
+          [operationId,request.unitId,request.revision,request.mode==='debit_received'?'received':'invoice_switch',JSON.stringify(request.value),request.reason]):client.query('select public.write_invoice_unit($1,$2,$3,$4,$5::jsonb,$6)',
           [operationId,request.unitId,request.revision,request.mode,JSON.stringify(request.value),request.reason]),
         reload:()=>reload(client),
         definitelyRejected:error=>typeof error==='object'&&error!==null&&'code' in error

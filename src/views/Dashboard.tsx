@@ -2,6 +2,9 @@ import type { DashboardStats, MaintenanceResponse, BillingRow } from '../types'
 import { StatusBadge } from '../components/StatusBadge'
 import { fmtYen } from '../lib/utils'
 import { computeUnpaidUnits, unpaidUnitAmount, computeUpcomingInvoices } from '../lib/billing'
+import { BillingOverviewPanel } from '../components/BillingOverviewPanel'
+import type { BillingHistoryData } from '../components/BillingHistorySection'
+import { buildBillingOverview } from '../lib/billing-overview'
 
 type Props = {
   stats: DashboardStats
@@ -10,6 +13,8 @@ type Props = {
   onNavigate: (view: string) => void
   onViewMaintenance: (id: number) => void
   onViewBilling: (projectId: number) => void
+  billingHistory?: BillingHistoryData
+  billingToday?: string
 }
 
 
@@ -22,18 +27,20 @@ function dueDayToDate(dueDayStr: string | null | undefined): string | null {
   return `${year}-${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')}`
 }
 
-export function Dashboard({ stats, maintenanceList, billingRows, onNavigate, onViewMaintenance, onViewBilling }: Props) {
-  const today = new Date().toISOString().slice(0, 10)
+export function Dashboard({ stats, maintenanceList, billingRows, onNavigate, onViewMaintenance, onViewBilling, billingHistory, billingToday }: Props) {
+  const now = new Date()
+  const today = billingToday ?? `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
+  const overview = billingHistory ? buildBillingOverview(billingHistory.units, today) : null
   const currentYear = new Date().getFullYear()
   const activeList = maintenanceList.filter(m => m.status === '対応中')
 
   // 未入金アラート: 請求タブと同一ロジック（回ごと・今年度＋昨年度）で算出
-  const unpaidUnits = computeUnpaidUnits(billingRows, currentYear)
+  const unpaidUnits = (billingHistory ? [] : computeUnpaidUnits(billingRows, currentYear))
     .sort((a, b) => (a.payment?.billing_date ?? a.record.billing_date ?? '').localeCompare(b.payment?.billing_date ?? b.record.billing_date ?? ''))
-  const unpaidTotal = unpaidUnits.reduce((sum, u) => sum + (unpaidUnitAmount(u) ?? 0), 0)
+  const unpaidTotal = overview?.totals.unpaidAmount ?? unpaidUnits.reduce((sum, u) => sum + (unpaidUnitAmount(u) ?? 0), 0)
 
   // 口座振替で振替日を過ぎているが入金確認がない案件（今年度＋昨年度の全記録を対象）
-  const transferOverdueRows = billingRows.filter(r => {
+  const transferOverdueRows = (billingHistory ? [] : billingRows).filter(r => {
     if (r.contract?.billing_method !== '口座振替') return false
     const dueDate = dueDayToDate(r.contract?.billing_due_day)
     if (!dueDate || dueDate > today) return false
@@ -43,7 +50,7 @@ export function Dashboard({ stats, maintenanceList, billingRows, onNavigate, onV
   })
 
   // 請求予定: 請求タブと同じ「今月・来月・再来月の請求予定」を共有ロジックで算出
-  const scheduledItems = computeUpcomingInvoices(billingRows)
+  const scheduledItems = billingHistory ? [] : computeUpcomingInvoices(billingRows)
 
   return (
     <>
@@ -65,7 +72,8 @@ export function Dashboard({ stats, maintenanceList, billingRows, onNavigate, onV
         </div>
         <div className="kpi-card kpi-card--info">
           <div className="kpi-label">未入金アラート</div>
-          <div className="kpi-value">{unpaidUnits.length}</div>
+          <div className="kpi-value">{overview?.unpaid.length ?? unpaidUnits.length}</div>
+          {!!overview?.totals.unknownActualCount && <div>金額要確認：{overview.totals.unknownActualCount}件</div>}
           {unpaidTotal > 0 && (
             <div style={{ fontSize: 12, color: '#dc2626', fontWeight: 700, marginBottom: 4 }}>{fmtYen(unpaidTotal)}</div>
           )}
@@ -110,7 +118,7 @@ export function Dashboard({ stats, maintenanceList, billingRows, onNavigate, onV
         </div>
 
         {/* 未入金アラート */}
-        <div className="card">
+        {!billingHistory && <div className="card">
           <div className="card-header-row">
             <h3 className="section-title" style={{ margin: 0 }}>未入金アラート</h3>
             <button className="kpi-link" style={{ fontSize: 12 }} onClick={() => onNavigate('billing')}>すべて見る →</button>
@@ -150,10 +158,9 @@ export function Dashboard({ stats, maintenanceList, billingRows, onNavigate, onV
               })}
             </tbody>
           </table>
-        </div>
-
+        </div>}
         {/* 請求予定 */}
-        <div className="card" style={{ gridColumn: '1 / -1' }}>
+        {!billingHistory && <div className="card" style={{ gridColumn: '1 / -1' }}>
           <div className="card-header-row">
             <h3 className="section-title" style={{ margin: 0 }}>請求予定</h3>
             <button className="kpi-link" style={{ fontSize: 12 }} onClick={() => onNavigate('billing')}>すべて見る →</button>
@@ -192,7 +199,8 @@ export function Dashboard({ stats, maintenanceList, billingRows, onNavigate, onV
               })}
             </tbody>
           </table>
-        </div>
+        </div>}
+        {billingHistory && <div style={{gridColumn:'1 / -1'}}><BillingOverviewPanel data={billingHistory} today={today} /></div>}
       </div>
     </>
   )

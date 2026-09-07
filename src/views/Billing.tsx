@@ -5,16 +5,31 @@ import { invoiceAmount, withdrawalAmount, toIsoDate, computeUnpaidUnits, compute
 import { fmtYen, dateInputRange } from '../lib/utils'
 import { hasSavedInvoicePlanAt } from '../lib/billing-plan-status'
 import { useToast } from '../components/Toast'
+import { BillingOverviewPanel } from '../components/BillingOverviewPanel'
+import type { BillingHistoryData } from '../components/BillingHistorySection'
 
 type Props = {
   rows: BillingRow[]
   onReload: () => void
   onViewDetail: (projectId: number) => void
+  billingHistory?: BillingHistoryData
+  billingToday?: string
 }
 
 // 日付ヘルパー・金額計算・未入金判定は lib/billing.ts に共通化（ダッシュボードと共有）
 
-export function Billing({ rows, onReload, onViewDetail }: Props) {
+export function Billing(props: Props) {
+  if (props.billingHistory) {
+    const now = new Date()
+    const today = props.billingToday ?? `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
+    return <><p role="status">回別請求の表示確認中です。旧方式の編集操作は使用しません。</p>
+      <BillingOverviewPanel data={props.billingHistory} today={today} />
+    </>
+  }
+  return <LegacyBilling {...props} />
+}
+
+function LegacyBilling({ rows, onReload, onViewDetail }: Props) {
   const toast = useToast()
   const today = new Date()
   const currentYear = today.getFullYear()

@@ -5,7 +5,9 @@ import { annualBillableTotalInc, invoiceAmount, withdrawalAmount } from '../lib/
 import { fmtYen, fmtDate, dateInputRange } from '../lib/utils'
 import { useToast } from '../components/Toast'
 import { statusFromBillingDates } from '../lib/annual-record-status'
-import { BillingHistorySection, type BillingHistoryData } from '../components/BillingHistorySection'
+import type { BillingHistoryData } from '../components/BillingHistorySection'
+import { InvoiceLedgerDetail } from '../components/InvoiceLedgerDetail'
+import type { InvoiceWriteRequest } from '../lib/invoice-write-session'
 
 type LineItemForm = { name: string; amount: string }
 
@@ -27,10 +29,11 @@ type Props = {
   /** 発電所詳細の「請求詳細」タブに埋め込む場合 true。独自ヘッダー（戻る/発電所名）を出さない */
   embedded?: boolean
   billingHistory?: BillingHistoryData
+  onSaveInvoice?:(request:InvoiceWriteRequest)=>Promise<unknown>
 }
 
 
-export function BillingDetailView({ detail, onBack, onReload, onViewProject, embedded = false, billingHistory }: Props) {
+export function BillingDetailView({ detail, onBack, onReload, onViewProject, embedded = false, billingHistory, onSaveInvoice }: Props) {
   const toast = useToast()
   const { project, customer, contract, annualRecords, maintenanceResponses, periodicMaintenance } = detail
   const currentYear = new Date().getFullYear()
@@ -308,8 +311,8 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject, emb
   // Explicit read-only new-ledger input: never show legacy write controls alongside it.
   if (billingHistory) return <div>
     {!embedded && <button className="btn" onClick={onBack}>戻る</button>}
-    <p role="status">新しい請求記録の表示確認中です。この画面ではまだ編集できません。</p>
-    <BillingHistorySection data={billingHistory} projectId={project.id} />
+    {!onSaveInvoice&&<p role="status">新しい請求記録の表示確認中です。この画面ではまだ編集できません。</p>}
+    <InvoiceLedgerDetail data={billingHistory} projectId={project.id} onSave={onSaveInvoice}/>
   </div>
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

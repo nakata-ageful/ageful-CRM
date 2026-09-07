@@ -32,3 +32,8 @@ DEV履歴ページで両View本体を架空入力からレンダリング。ブ�
 invoice-write-session.ts追加。操作ID/対象回/版/入力の値コピーを1編集セッションで保持し、書込→reload完了まで同じIDを再利用。結果不明中の別入力は拒否。DBが明確に取消したエラーだけは依存側判定でpending解除し修正可能にする。invoice-db-previewの直接randomUUID呼出をこの処理へ置換。
 
 入力拒否と保存成功後reload失敗を分離する試験追加。本番アダプタはまだなく、判定は隔離PGliteの限定SQLSTATEのみ。ページを閉じた後の永続的な再試行、通常BillingDetailの編集フォーム接続は未対応。操作IDだけでネットワーク結果を推測しない。
+# 追加：共通詳細の発行・入金フォーム
+
+InvoiceLedgerDetail/InvoiceUnitEditor追加。BillingDetailの新データ経路で任意onSaveInvoiceがある場合のみ発行/入金ボタンを表示。未接続は読取のみ。編集開始時の回/版を値コピーし、発行は保存先/日付/入力明細・合計、入金は入金日のみをwrite requestへ渡す。既発行金額を入金で再計算しない。明細金額は空欄開始で現契約から推定しない。
+
+invoice-db-previewにも同部品を接続しwriteSession→RPC→reloadを使用。通常AppはonSaveInvoiceをまだ渡さない。本番書込なし。新フォームの実クリック送信・ブラウザE2Eは未実施、既存SQL/共通処理テストと型buildのみ。予定変更/訂正フォームの本体共通化は別工程。保存結果不明時は同内容再試行が必要で、ページ跨ぎ回復はまだない。

@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import type { PGlite } from '@electric-sql/pglite'
 import { createInvoiceTestDb } from './invoice-test-db'
 import '../styles.css'
-import { BillingHistorySection } from '../components/BillingHistorySection'
+import { InvoiceLedgerDetail } from '../components/InvoiceLedgerDetail'
 import { billingUnitFromStorage } from '../lib/billing-unit-storage'
 import type { BillingUnit } from '../lib/billing-unit'
 import { createInvoiceWriteSession } from '../lib/invoice-write-session'
@@ -110,7 +110,8 @@ function InvoiceDbPreview() {
     <div className="notice">架空データ専用の確認画面です。本番の請求や顧客は変更しません。保存先はこの画面内の検証用DBで、再読み込みすると初期状態に戻ります。</div>
     <h1 style={{ fontSize: 24, margin: 0 }}>サンプル発電所 ― 請求詳細</h1>
     <p role="status" style={{ margin: 0 }}>{message}</p>
-    <BillingHistorySection data={{ units: displayUnits, recipientName: names, projectName: () => 'サンプル発電所', plannedAmount: () => null }} projectId={1} />
+    <InvoiceLedgerDetail data={{ units: displayUnits, recipientName: names, projectName: () => 'サンプル発電所', plannedAmount: () => null }} projectId={1}
+      onSave={db?async request=>{if(!writeSession.current)throw Error('準備中です');return writeSession.current.save(request)}:undefined}/>
     {error && <div role="alert" style={{ color: '#b91c1c', background: '#fef2f2', padding: 12 }}>{error}</div>}
     {([['planned', '請求予定'], ['issued', '未入金'], ['received', '入金済']] as const).map(([state, label]) =>
       <section className="card" key={state} style={{ padding: 18 }}>

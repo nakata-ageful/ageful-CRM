@@ -150,6 +150,18 @@ try {
   await assert.rejects(create(key(),3,'wrong-method'), /契約/)
   await db.exec("update contracts set billing_method='請求書' where id=1")
   assert.equal((await db.query("select has_function_privilege('public','create_invoice_plan(uuid,bigint,bigint,bigint,integer,text,integer,integer,date)','execute') as allowed")).rows[0].allowed,false)
+  const createdId=created.rows[0].unit.id, preRetire=await snapshot()
+  const retire=()=>db.query("select write_invoice_unit($1,$2,0,'cancel','{}'::jsonb,'請求回数変更')",[key(),createdId])
+  await db.exec(`create function test_fail_plan_cancel() returns trigger language plpgsql as $$ begin
+    if NEW.event_type='cancelled' then raise exception 'synthetic plan cancel failure'; end if; return NEW; end $$;
+    create trigger fail_plan_cancel before insert on billing_unit_events for each row execute function test_fail_plan_cancel();`)
+  await assert.rejects(retire(),/synthetic plan cancel failure/)
+  assert.deepEqual(await snapshot(),preRetire,'Plan revision also rolls back with failed cancellation audit')
+  await db.exec('drop trigger fail_plan_cancel on billing_unit_events')
+  await retire()
+  const retired=await snapshot()
+  assert.equal(retired.plans.find(p=>p.id===active.id).revision,4)
+  assert.equal(retired.units.find(u=>u.id===createdId).lifecycle,'cancelled')
   console.log('PASS: next A / next-year B, paid preservation, atomic plan+overrides+audit, stale/retry/failure protection')
   console.log('PASS: single edit synchronizes active exception, nullable payer, plan revision, retries and full failure rollback')
   console.log('PASS: new explicit future invoice uses active default, no frozen amount, stale/early/duplicate/method guards and atomic creation audit')

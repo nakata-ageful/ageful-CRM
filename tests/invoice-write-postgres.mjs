@@ -155,11 +155,37 @@ try {
   assert.equal((await row(3)).revision, 5)
   await assert.rejects(write(key(),3,5,'collection',{ received_on: '2027-07-02' }), /この状態/)
   assert.equal((await db.query("select count(*)::int as n from billing_unit_events where billing_unit_id=3 and event_type='collection_recorded'")).rows[0].n, 1)
+  const fresh = (await db.query(`insert into billing_units(project_id,contract_id,occurrence_key,service_year,
+    original_method,collection_method,scheduled_date,recipient_customer_id)
+    values(1,1,'cancel-plan',2028,'invoice','invoice','2028-06-01',1) returning id`)).rows[0].id
+  const beforeCancel = await row(fresh), cancelCounts=await counts(), cancelKey=key()
+  await assert.rejects(write(key(),fresh,0,'cancel',{}), /理由/)
+  await assert.rejects(write(key(),fresh,0,'cancel',{recipient_customer_id:2},'予定整理'), /変更できない/)
+  await db.exec(`create function test_fail_cancellation() returns trigger language plpgsql as $$ begin
+    if NEW.event_type='cancelled' then raise exception 'synthetic cancel failure'; end if; return NEW; end $$;
+    create trigger fail_cancel before insert on billing_unit_events for each row execute function test_fail_cancellation();`)
+  await assert.rejects(write(key(),fresh,0,'cancel',{},'請求回数変更'), /synthetic cancel failure/)
+  assert.deepEqual(await row(fresh),beforeCancel)
+  assert.deepEqual(await counts(),cancelCounts)
+  await db.exec('drop trigger fail_cancel on billing_unit_events')
+  await write(cancelKey,fresh,0,'cancel',{},'請求回数変更')
+  const cancelled=await row(fresh)
+  assert.equal(cancelled.lifecycle,'cancelled')
+  assert.equal(cancelled.collection_state,'not_applicable')
+  assert.equal(cancelled.scheduled_date.getTime(),beforeCancel.scheduled_date.getTime())
+  assert.equal(cancelled.recipient_customer_id,1)
+  await write(cancelKey,fresh,0,'cancel',{},'請求回数変更')
+  assert.equal((await row(fresh)).revision,1)
+  await assert.rejects(write(key(),fresh,1,'issue',value()), /この状態/)
+  await assert.rejects(write(key(),3,5,'cancel',{},'入金済を消す'), /この状態/)
+  assert.deepEqual(await row(3),received)
+  assert.equal((await db.query("select count(*)::int as n from billing_unit_events where billing_unit_id=$1 and event_type='cancelled'",[fresh])).rows[0].n,1)
   // Neither public execution nor public table access is enabled by these drafts.
   await db.exec('create role test_anon; set role test_anon')
   await assert.rejects(write(key(),1,3,'correction',correctedValue,'権限なし'), /permission denied/)
   await assert.rejects(db.exec('select * from billing_units'), /permission denied/)
   await db.exec('reset role')
   console.log('PASS: PostgreSQL planned save, issuance, receipt, audited correction, strict line items, retry, stale revision, rollback, direct-update rejection, audit immutability and no public access.')
+  console.log('PASS: unissued plan retirement keeps source date/payer, requires reason, is atomic/idempotent and cannot cancel paid history')
   console.log('Scope: synthetic in-memory PGlite; Supabase Auth/RLS, multi-session locks, migration and durable restore are NOT tested.')
 } finally { await db.close() }

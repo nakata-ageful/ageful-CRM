@@ -27,14 +27,16 @@ DECLARE
 BEGIN
   IF actor IS NULL THEN RAISE EXCEPTION 'ログインが必要です'; END IF;
   IF p_operation_key IS NULL OR p_unit_id IS NULL OR p_expected_revision IS NULL
-     OR p_expected_revision < 0 OR p_kind IS NULL OR p_kind NOT IN ('plan', 'issue', 'collection', 'correction') THEN
+     OR p_expected_revision < 0 OR p_kind IS NULL OR p_kind NOT IN ('plan', 'issue', 'collection', 'correction', 'cancel') THEN
     RAISE EXCEPTION '操作・対象・版を確認してください';
   END IF;
-  IF p_kind = 'correction' AND (p_reason IS NULL OR length(trim(p_reason)) = 0) THEN
+  IF p_kind IN ('correction','cancel') AND (p_reason IS NULL OR length(trim(p_reason)) = 0) THEN
+    IF p_kind='cancel' THEN RAISE EXCEPTION '取りやめの理由を入力してください'; END IF;
     RAISE EXCEPTION '訂正理由を入力してください';
   END IF;
   IF jsonb_typeof(p_value) IS DISTINCT FROM 'object' THEN RAISE EXCEPTION '変更内容が不正です'; END IF;
   editable_keys := CASE p_kind
+    WHEN 'cancel' THEN ARRAY[]::text[]
     WHEN 'plan' THEN ARRAY['recipient_customer_id','scheduled_date']
     WHEN 'collection' THEN ARRAY['received_on']
     ELSE ARRAY['recipient_customer_id','frozen_amount','frozen_line_items',
@@ -87,7 +89,7 @@ BEGIN
   IF old_unit.original_method <> 'invoice' OR old_unit.collection_method <> 'invoice' THEN
     RAISE EXCEPTION '今回は請求書のみ対象です';
   END IF;
-  IF (p_kind IN ('plan','issue') AND old_unit.lifecycle <> 'planned') OR
+  IF (p_kind IN ('plan','issue','cancel') AND old_unit.lifecycle <> 'planned') OR
      (p_kind = 'collection' AND (old_unit.lifecycle <> 'issued' OR old_unit.received_on IS NOT NULL)) OR
      (p_kind = 'correction' AND old_unit.lifecycle NOT IN ('issued','received')) THEN
     RAISE EXCEPTION 'この状態では実行できません';
@@ -98,7 +100,13 @@ BEGIN
   IF p_kind IN ('issue','correction') AND p_value->>'issued_on' IS NULL AND p_value->>'received_on' IS NULL THEN
     RAISE EXCEPTION '発行・入金実績を空にする操作は取消で行ってください';
   END IF;
-  IF p_kind = 'collection' THEN
+  IF p_kind = 'cancel' THEN
+    UPDATE public.billing_units SET lifecycle='cancelled',collection_state='not_applicable',revision=revision+1
+      WHERE id=p_unit_id RETURNING * INTO new_unit;
+    IF active_plan.id IS NOT NULL THEN
+      UPDATE public.billing_recipient_plans SET revision=revision+1 WHERE id=active_plan.id;
+    END IF;
+  ELSIF p_kind = 'collection' THEN
     IF p_value->>'received_on' IS NULL THEN RAISE EXCEPTION '入金日を入力してください'; END IF;
     UPDATE public.billing_units SET received_on = (p_value->>'received_on')::date,
       lifecycle = 'received', collection_state = 'succeeded', revision = revision + 1
@@ -140,7 +148,7 @@ BEGIN
   INSERT INTO public.billing_unit_events(project_id,billing_unit_id,operation_key,event_type,reason,
       before_value,after_value,actor_user_id)
     VALUES (new_unit.project_id,new_unit.id,p_operation_key,
-      CASE p_kind WHEN 'plan' THEN 'plan_changed' WHEN 'issue' THEN 'issued'
+      CASE p_kind WHEN 'cancel' THEN 'cancelled' WHEN 'plan' THEN 'plan_changed' WHEN 'issue' THEN 'issued'
         WHEN 'collection' THEN 'collection_recorded' ELSE 'corrected' END,
       p_reason,to_jsonb(old_unit),to_jsonb(new_unit),actor);
   UPDATE public.billing_operations SET completed_at = clock_timestamp() WHERE operation_key = p_operation_key;

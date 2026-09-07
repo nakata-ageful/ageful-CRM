@@ -1,5 +1,11 @@
 # 手動記録と保存予定：最新合意
 
+## 最新進捗：単回予定額の保存を接続
+
+foundationにplanned_amount安全整数列を追加（既存draft用ALTERはIF NOT EXISTS）。write_invoice_unitのplanで任意planned_amountを受理し、欠落時は旧額保持、明示nullは未設定、0円は有効。負数/小数/文字列/安全整数超過を拒否。既存plan_changed監査に前後額を保存し、他の操作では予定額を変更しない。
+
+InvoicePlanEditorに予定額入力を追加、共通詳細→既存writeSession/RPCへ接続。実績は依然明細/確定額別で、予定額を実績へ自動流用しない。新規生成時の明示予定額、振替の全操作、予定明細/期間、契約/移転全経路のD-027検証は残る。本番未適用。
+
 ## 実装進捗：保存欄と表示（部分対応）
 
 20260907_saved_planned_amount.sqlで予定額専用nullable bigint列を追加する隔離draft。既存行はnullで、現契約によるbackfillなし。BillingUnit.plannedAmountとstorage adapterへ接続。resolveUnitAmountは旧callbackを呼ばず保存予定額だけを表示し、未保存は要確認、0円は有効値。実績は従来どおりfrozen_amount優先。

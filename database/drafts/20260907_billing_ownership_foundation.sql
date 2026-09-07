@@ -70,6 +70,7 @@ CREATE TABLE public.billing_units (
   issued_on                  date,
   payment_due_on             date,
   received_on                date,
+  planned_amount             bigint CHECK (planned_amount IS NULL OR planned_amount BETWEEN 0 AND 9007199254740991),
   frozen_amount              bigint CHECK (frozen_amount >= 0),
   frozen_line_items          jsonb,
   amount_basis               text NOT NULL DEFAULT 'unconfirmed'

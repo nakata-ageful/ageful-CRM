@@ -45,6 +45,12 @@ BEGIN
   IF NOT (p_value ?& editable_keys) THEN
     RAISE EXCEPTION '変更項目が不足しています';
   END IF;
+  IF p_kind='plan' THEN editable_keys:=array_append(editable_keys,'planned_amount'); END IF;
+  IF p_kind='plan' AND p_value ? 'planned_amount' AND p_value->'planned_amount'<>'null'::jsonb THEN
+    IF jsonb_typeof(p_value->'planned_amount') IS DISTINCT FROM 'number'
+      OR (p_value->>'planned_amount') !~ '^[0-9]+$'
+      OR (p_value->>'planned_amount')::numeric>9007199254740991 THEN RAISE EXCEPTION '予定額を確認してください'; END IF;
+  END IF;
   FOR k IN SELECT jsonb_object_keys(p_value) LOOP
     IF NOT (k = ANY(editable_keys)) THEN
       RAISE EXCEPTION '変更できない項目です: %', k;
@@ -130,7 +136,9 @@ BEGIN
         WHEN active_plan.id IS NULL THEN 'confirmed'
         WHEN (p_value->>'recipient_customer_id')::bigint = active_plan.default_recipient_customer_id THEN 'default'
         ELSE 'override' END,
-      scheduled_date = (p_value->>'scheduled_date')::date, revision = revision + 1
+      scheduled_date = (p_value->>'scheduled_date')::date,
+      planned_amount = CASE WHEN p_value ? 'planned_amount' THEN (p_value->>'planned_amount')::bigint ELSE old_unit.planned_amount END,
+      revision = revision + 1
       WHERE id = p_unit_id RETURNING * INTO new_unit;
   ELSE
     UPDATE public.billing_units SET

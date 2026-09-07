@@ -260,6 +260,24 @@ async function main(){
     await importDb.exec("insert into annual_records(id,contract_id,year) values(99,1,2100);update annual_records set billing_date='2100-01-01' where id=99")
     assert.equal((await inspectInit()).unimported_sources,1,'New legacy rows remain detectable, not silently accepted')
     await importDb.exec('delete from annual_records where id=99')
+    await importDb.transaction(async tx=>{
+      await tx.exec("set local ageful.allow_draft_migration='yes'")
+      await tx.exec(fs.readFileSync(path.join(root,'database/drafts/20260907_legacy_invoice_creation_guard.sql'),'utf8'))
+    })
+    await importDb.exec("insert into annual_records(id,contract_id,year,status,payments,line_items,transfer_failed) values(100,1,2100,'未入金','[]','[]',false)")
+    for(const column of ['billing_scheduled_date','billing_date','payment_due_date','received_date']) {
+      await assert.rejects(importDb.exec(`insert into annual_records(id,contract_id,year,${column}) values(101,1,2100,'2100-01-01')`),/新しい請求画面/)
+      await assert.rejects(importDb.exec(`update annual_records set ${column}='2100-01-01' where id=100`),/新しい請求画面/)
+    }
+    for(const assignment of ["payments='[{\"seq\":1}]'", "line_items='[{\"name\":\"保守\",\"amount\":100}]'", "status='請求済'",'transfer_failed=true'])
+      await assert.rejects(importDb.exec(`update annual_records set ${assignment} where id=100`),/新しい請求画面/)
+    await importDb.exec('insert into projects values(3,1);insert into contracts values(3,3)')
+    await assert.rejects(importDb.exec('update annual_records set contract_id=3 where id=100'),/別契約/)
+    await importDb.exec("insert into annual_records(id,contract_id,year,billing_date) values(102,3,2100,'2100-01-01')")
+    await assert.rejects(importDb.exec('update annual_records set contract_id=1 where id=102'),/別契約/)
+    await importDb.exec('grant insert on annual_records to legacy_writer;set role legacy_writer')
+    await assert.rejects(importDb.exec("insert into annual_records(id,contract_id,year,status) values(103,1,2100,'入金済')"),/新しい請求画面/)
+    await importDb.exec('reset role')
     await importDb.exec("alter table annual_records add column maintenance_record text;update annual_records set maintenance_record='保守メモ更新' where id=1")
     assert.equal((await importDb.query('select maintenance_record from annual_records where id=1')).rows[0].maintenance_record,'保守メモ更新')
     for(const sql of ['update invoice_recipient_initializations set schema_version=1','delete from invoice_recipient_initializations','truncate invoice_recipient_initializations'])
@@ -277,6 +295,7 @@ async function main(){
     console.log('PASS: project-level unimported/changed-source inspection; clean checks explicitly do not authorize cutover')
     console.log('PASS: atomic initial recipient plan, imported exception preservation, immutable past, stale/retry/failure guards and no-plan future default')
     console.log('PASS: checkpoint-aware pre-cutover inspection; imported legacy billing mutation/delete/truncate blocked, maintenance notes remain editable')
+    console.log('PASS: initialized projects reject legacy billing insert, maintenance-to-billing update and contract reassignment; blank maintenance and uninitialized projects remain writable')
   }finally{await importDb.close()}
   console.log('PASS: complete invoice migration payload accepted by PostgreSQL, received-only and planned states, exact amounts, source identity, year/date preservation and strict evidence guards')
   console.log('Scope: synthetic invoice-source import only; no real method confirmation, whole-project cutover, concurrent legacy writers, durable restore or production writes')

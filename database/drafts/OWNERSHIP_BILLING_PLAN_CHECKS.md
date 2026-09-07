@@ -1,5 +1,15 @@
 # 所有者変更時の回別指定チェック
 
+## 最新：隔離DBで請求予定を保存
+
+20260907_manual_billing_plan.sqlでperiod_start/end/plan_noteを追加、write_manual_billing_planで全plannedのID/版・厳密入力・失敗回元先をDB再検証し、回更新/全snapshot監査/操作完了を同一txn化。original_method・実績は保持。再送同IDは完了receipt、別内容/古い版は拒否。PUBLIC実行不可。既存recipient planまたは移行元参照ありは統合未完のため拒否。所有者を更新するRPCではなく、A/B所属制限はまだ純粋関数側のみ（DBは顧客FK検証）。通常App/本番接続不可。
+
+OwnershipBillingDbPreviewは架空PGliteのみ。確認後に理由と保存ボタン、成功後全件再取得/フォーム再生成。期間/備考の保存値を初期表示へ渡す。結果不明は同内容/同ID再試行（メモリのみ、ページを閉じた復旧未実装）。ブラウザーでA請求書/B振替・予定額82500保存と履歴3件/再取得を確認。無変更の回も全件確認対象としてrevisionと監査を記録する。
+
+manual-billing-plan-postgresをtest:billing-dbへ追加。混在方法/期間備考/実績不変/不能先保護/対象全件/重複/不正日付/途中監査失敗rollback/再送/版/未認証/既存計画拒否を検証。DB suite/build成功。
+
+重要な未接続：invoice由来からdirect_debitへ変えた回をmanual_debit_resultがoriginal_method制約で拒否する。不能時のfoundation制約もoriginal_methodに依存するため、単にガードを削除しない。4通りの「予定保存」は検証済みだが、その後の全運用完成ではない。所有者/契約同時更新・既存計画統合・権限・移行・復元は別途必要。
+
 ## 確認画面の追加
 
 表示を整理：現在/変更後所有者の見出し、回別4項目（先/方法/予定日/額）の横並び、期間/備考はdetailsへ折りたたみ。入力あり表示を付け、狭い画面では2列/1列へ変更する専用CSS。ブラウザーの初期折りたたみ状態とスクリーンショットを確認。機能・保存範囲は変更なし。

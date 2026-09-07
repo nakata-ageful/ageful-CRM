@@ -1,19 +1,29 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import './OwnershipBillingPlanEditor.css'
 import { prepareOwnershipBillingPlan, type TransferBillingChoice, type TransferBillingUnit } from '../lib/ownership-billing-plan'
 
 type Owner = { id: number; name: string }
-export function OwnershipBillingPlanEditor({projectId,oldOwner,newOwner,units:initialUnits}:{
-  projectId:number;oldOwner:Owner;newOwner:Owner;units:readonly TransferBillingUnit[]
+export function OwnershipBillingPlanEditor({projectId,oldOwner,newOwner,units:initialUnits,onSave}:{
+  projectId:number;oldOwner:Owner;newOwner:Owner;units:readonly TransferBillingUnit[];
+  onSave?:(choices:TransferBillingChoice[],reason:string)=>Promise<void>
 }) {
   // Keep the reviewed revision fixed for this editor session.
   const [units]=useState(()=>structuredClone(initialUnits))
   const [drafts,setDrafts]=useState(()=>units.filter(u=>u.lifecycle==='planned').map(u=>({
     unitId:u.id,expectedRevision:u.revision,recipientId:u.recipientId?.toString()??'',method:u.collectionState==='failed'?'請求書' as const:u.method,
-    scheduledDate:u.scheduledDate??'',amount:u.plannedAmount?.toString()??'',periodStart:'',periodEnd:'',note:'',
+    scheduledDate:u.scheduledDate??'',amount:u.plannedAmount?.toString()??'',periodStart:u.periodStart??'',periodEnd:u.periodEnd??'',note:u.planNote??'',
   })))
   const [result,setResult]=useState<ReturnType<typeof prepareOwnershipBillingPlan>|null>(null)
   const [error,setError]=useState('')
+  const [reason,setReason]=useState(''),[busy,setBusy]=useState(false);const saving=useRef(false)
+  async function save(){
+    if(!onSave||!result||saving.current)return
+    if(!reason.trim()){setError('確認内容・理由を入力してください');return}
+    saving.current=true;setBusy(true);setError('')
+    try{await onSave(result.changes.map(c=>({...c})),reason.trim())}
+    catch(e){setError(e instanceof Error?e.message:String(e))}
+    finally{saving.current=false;setBusy(false)}
+  }
   const ownerName=(id:number)=>[oldOwner,newOwner].find(o=>o.id===id)?.name??'請求先要確認'
   function patch(index:number,key:string,value:string){
     setDrafts(drafts.map((d,i)=>i===index?{...d,[key]:value}:d));setResult(null);setError('')
@@ -36,7 +46,7 @@ export function OwnershipBillingPlanEditor({projectId,oldOwner,newOwner,units:in
     <p>今の予定を表示しています。変更する回だけ、請求先や方法を選び直してください。</p>
     <div className="ownership-billing-notice">発行済み・入金済みなど {units.filter(u=>u.lifecycle!=='planned').length} 件は変更対象外です。自動の日割り計算・請求追加・銀行への振替手配は行いません。</div>
     {error&&<p role="alert" style={{color:'#b91c1c'}}>{error}</p>}
-    <form onSubmit={review}>
+    <form onSubmit={review}><fieldset disabled={busy} style={{border:0,padding:0,minWidth:0}}>
       {drafts.map((d,i)=>{const unit=units.find(u=>u.id===d.unitId)!;const failed=unit.collectionState==='failed'
         return <fieldset key={d.unitId} className="ownership-billing-row">
           <legend>{unit.serviceYear}年 {unit.roundLabel}</legend>
@@ -61,7 +71,7 @@ export function OwnershipBillingPlanEditor({projectId,oldOwner,newOwner,units:in
         </fieldset>})}
       {!drafts.length&&<p>変更する予定はありません。新しい請求は自動作成しません。</p>}
       <div className="ownership-billing-footer"><span>予定額の空欄は「金額要確認」です。0円とは区別します。</span><button className="btn btn-main" type="submit">変更内容を確認（保存はしません）</button></div>
-    </form>
+    </fieldset></form>
     {result&&<section aria-label="請求予定の確認結果" style={{marginTop:20}}>
       <h3>変更内容の確認</h3><p role="status">入力チェック完了。DBには保存していません。</p>
       {result.changes.map(c=>{const u=units.find(u=>u.id===c.unitId)!;return <div key={c.unitId} style={{padding:'12px 0',borderBottom:'1px solid #e2e8f0'}}>
@@ -71,6 +81,9 @@ export function OwnershipBillingPlanEditor({projectId,oldOwner,newOwner,units:in
         <p>対象期間：{c.periodStart?`${c.periodStart} ～ ${c.periodEnd}`:'未指定'} ／ 備考：{c.note||'なし'}</p>
       </div>})}
       <p>変更しない記録：{result.preservedUnitIds.length}件</p>
+      {onSave&&<div><label>確認内容・理由<textarea className="form-input" disabled={busy} value={reason} onChange={e=>setReason(e.target.value)}/></label>
+        <p>この検証では請求予定だけを保存します。所有者・契約情報は変更しません。</p>
+        <button className="btn btn-main" type="button" disabled={busy} onClick={()=>void save()}>{busy?'保存中…':'検証用DBに予定と履歴を保存'}</button></div>}
     </section>}
   </section>
 }

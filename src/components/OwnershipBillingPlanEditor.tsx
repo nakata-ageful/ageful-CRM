@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import './OwnershipBillingPlanEditor.css'
 import { prepareOwnershipBillingPlan, type TransferBillingChoice, type TransferBillingUnit } from '../lib/ownership-billing-plan'
 
 type Owner = { id: number; name: string }
@@ -29,18 +30,18 @@ export function OwnershipBillingPlanEditor({projectId,oldOwner,newOwner,units:in
       setResult(prepareOwnershipBillingPlan({projectId,oldOwnerId:oldOwner.id,newOwnerId:newOwner.id,units,choices}))
     }catch(e){setError(e instanceof Error?e.message:String(e))}
   }
-  return <section className="card" style={{padding:20}}>
+  return <section className="card ownership-billing-editor">
     <h2>所有者変更後の請求予定</h2>
-    <p>{oldOwner.name} → {newOwner.name}</p>
-    <p>各回の請求先・方法・時期を指定してください。初期値は今の予定のままです。日割り計算や請求の追加は自動では行いません。</p>
-    <p>発行済み・入金済みなどの記録は変更対象外です。銀行への振替手配は行いません。</p>
+    <div className="ownership-billing-owners"><span>現在の所有者<br/><strong>{oldOwner.name}</strong></span><span aria-hidden="true">→</span><span>変更後の所有者<br/><strong>{newOwner.name}</strong></span></div>
+    <p>今の予定を表示しています。変更する回だけ、請求先や方法を選び直してください。</p>
+    <div className="ownership-billing-notice">発行済み・入金済みなど {units.filter(u=>u.lifecycle!=='planned').length} 件は変更対象外です。自動の日割り計算・請求追加・銀行への振替手配は行いません。</div>
     {error&&<p role="alert" style={{color:'#b91c1c'}}>{error}</p>}
     <form onSubmit={review}>
       {drafts.map((d,i)=>{const unit=units.find(u=>u.id===d.unitId)!;const failed=unit.collectionState==='failed'
-        return <fieldset key={d.unitId} style={{marginBottom:16,padding:16,border:'1px solid #cbd5e1',borderRadius:8}}>
+        return <fieldset key={d.unitId} className="ownership-billing-row">
           <legend>{unit.serviceYear}年 {unit.roundLabel}</legend>
           {failed&&<p>振替不能の回です。元の請求先を維持し、請求書として残します。</p>}
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:12}}>
+          <div className="ownership-billing-fields">
             <label>請求先<select className="form-input" value={d.recipientId} disabled={failed} onChange={e=>patch(i,'recipientId',e.target.value)}>
               <option value="">選択してください</option>{[oldOwner,newOwner].map(o=><option key={o.id} value={o.id}>{o.name}</option>)}
             </select></label>
@@ -49,14 +50,17 @@ export function OwnershipBillingPlanEditor({projectId,oldOwner,newOwner,units:in
             </select></label>
             <label>請求・振替予定日<input className="form-input" type="date" required value={d.scheduledDate} onChange={e=>patch(i,'scheduledDate',e.target.value)}/></label>
             <label>予定額（税込）<input className="form-input" inputMode="numeric" value={d.amount} onChange={e=>patch(i,'amount',e.target.value)}/></label>
+          </div>
+          <details className="ownership-billing-extra"><summary>詳細設定：対象期間・備考{(d.periodStart||d.periodEnd||d.note)?'（入力あり）':''}</summary>
+          <div className="ownership-billing-fields">
             <label>対象期間の開始（任意）<input className="form-input" type="date" value={d.periodStart} onChange={e=>patch(i,'periodStart',e.target.value)}/></label>
             <label>対象期間の終了（任意）<input className="form-input" type="date" value={d.periodEnd} onChange={e=>patch(i,'periodEnd',e.target.value)}/></label>
           </div>
           <label>備考<textarea className="form-input" value={d.note} onChange={e=>patch(i,'note',e.target.value)}/></label>
-          <p>予定額の空欄は「金額要確認」です。0円とは区別します。</p>
+          </details>
         </fieldset>})}
       {!drafts.length&&<p>変更する予定はありません。新しい請求は自動作成しません。</p>}
-      <button className="btn btn-main" type="submit">変更内容を確認（保存はしません）</button>
+      <div className="ownership-billing-footer"><span>予定額の空欄は「金額要確認」です。0円とは区別します。</span><button className="btn btn-main" type="submit">変更内容を確認（保存はしません）</button></div>
     </form>
     {result&&<section aria-label="請求予定の確認結果" style={{marginTop:20}}>
       <h3>変更内容の確認</h3><p role="status">入力チェック完了。DBには保存していません。</p>

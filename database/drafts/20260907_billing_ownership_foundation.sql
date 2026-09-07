@@ -90,12 +90,13 @@ CREATE TABLE public.billing_units (
   CHECK (lifecycle <> 'planned' OR (issued_on IS NULL AND received_on IS NULL AND frozen_amount IS NULL)),
   CHECK (lifecycle NOT IN ('fixed', 'issued', 'received')
          OR (recipient_customer_id IS NOT NULL AND frozen_amount IS NOT NULL AND frozen_at IS NOT NULL)),
-  CHECK (lifecycle <> 'issued' OR issued_on IS NOT NULL),
+  CHECK (lifecycle <> 'issued' OR (issued_on IS NOT NULL AND received_on IS NULL)),
   CHECK (lifecycle <> 'fixed' OR original_method = 'direct_debit'),
   CHECK (lifecycle <> 'received' OR (received_on IS NOT NULL AND collection_state = 'succeeded')),
   CHECK (issued_on IS NULL OR (collection_method = 'invoice' AND lifecycle IN ('issued', 'received', 'review_required'))),
   CHECK (collection_state <> 'succeeded' OR received_on IS NOT NULL),
   CHECK (received_on IS NULL OR collection_state = 'succeeded'),
+  CHECK (received_on IS NULL OR lifecycle IN ('received', 'review_required')),
   CHECK (collection_state <> 'failed' OR (original_method = 'direct_debit' AND received_on IS NULL)),
   CHECK (collection_state <> 'not_applicable' OR lifecycle IN ('cancelled', 'review_required')),
   CHECK (lifecycle <> 'cancelled' OR (issued_on IS NULL AND received_on IS NULL AND frozen_amount IS NULL AND collection_state = 'not_applicable')),
@@ -135,10 +136,10 @@ BEGIN
   END IF;
   FOR item IN SELECT value FROM jsonb_array_elements(NEW.frozen_line_items)
   LOOP
-    IF jsonb_typeof(item) <> 'object'
-       OR jsonb_typeof(item->'name') <> 'string'
+    IF jsonb_typeof(item) IS DISTINCT FROM 'object'
+       OR jsonb_typeof(item->'name') IS DISTINCT FROM 'string'
        OR length(trim(item->>'name')) = 0
-       OR jsonb_typeof(item->'amount') <> 'number'
+       OR jsonb_typeof(item->'amount') IS DISTINCT FROM 'number'
        OR (item->>'amount') !~ '^[0-9]+$' THEN
       RAISE EXCEPTION 'Invalid frozen line item';
     END IF;

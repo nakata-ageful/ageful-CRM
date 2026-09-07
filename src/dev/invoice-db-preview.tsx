@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client'
 import type { PGlite } from '@electric-sql/pglite'
 import { createInvoiceTestDb } from './invoice-test-db'
 import '../styles.css'
+import { BillingHistorySection } from '../components/BillingHistorySection'
+import { billingUnitFromStorage } from '../lib/billing-unit-storage'
+import type { BillingUnit } from '../lib/billing-unit'
 
 type Mode = 'plan' | 'issue' | 'collection' | 'correction'
 type Unit = { id: number; service_year: number; revision: number; lifecycle: string;
@@ -19,6 +22,7 @@ const eventLabels: Record<string, string> = { plan_changed: '予定を保存', i
 function InvoiceDbPreview() {
   const [db, setDb] = useState<PGlite | null>(null)
   const [units, setUnits] = useState<Unit[]>([])
+  const [displayUnits, setDisplayUnits] = useState<BillingUnit[]>([])
   const [events, setEvents] = useState<Event[]>([])
   const [selected, setSelected] = useState<Unit | null>(null)
   const [mode, setMode] = useState<Mode>('plan')
@@ -40,7 +44,8 @@ function InvoiceDbPreview() {
     const rows = await client.query<{ unit: Unit }>('select to_jsonb(u) as unit from billing_units u order by scheduled_date nulls last,id')
     const history = await client.query<Event>('select * from billing_unit_events order by id desc')
     const current = rows.rows.map(r => r.unit)
-    if (alive.current) { setUnits(current); setEvents(history.rows) }
+    const display = rows.rows.map(r => billingUnitFromStorage(r.unit as unknown as Record<string, unknown>))
+    if (alive.current) { setUnits(current); setDisplayUnits(display); setEvents(history.rows) }
     return current
   }
   useEffect(() => {
@@ -98,6 +103,7 @@ function InvoiceDbPreview() {
     <div className="notice">架空データ専用の確認画面です。本番の請求や顧客は変更しません。保存先はこの画面内の検証用DBで、再読み込みすると初期状態に戻ります。</div>
     <h1 style={{ fontSize: 24, margin: 0 }}>サンプル発電所 ― 請求詳細</h1>
     <p role="status" style={{ margin: 0 }}>{message}</p>
+    <BillingHistorySection data={{ units: displayUnits, recipientName: names, projectName: () => 'サンプル発電所', plannedAmount: () => null }} projectId={1} />
     {error && <div role="alert" style={{ color: '#b91c1c', background: '#fef2f2', padding: 12 }}>{error}</div>}
     {([['planned', '請求予定'], ['issued', '未入金'], ['received', '入金済']] as const).map(([state, label]) =>
       <section className="card" key={state} style={{ padding: 18 }}>

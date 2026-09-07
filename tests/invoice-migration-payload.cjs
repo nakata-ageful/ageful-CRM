@@ -15,6 +15,7 @@ const {reviewBillingMigration:review}=load('src/lib/billing-migration-review.ts'
 const {identifyBillingMigrationSource:identify}=load('src/lib/billing-migration-source.ts')
 const {prepareInvoiceMigrationPayload:prepare}=load('src/lib/invoice-migration-payload.ts')
 const plain=x=>JSON.parse(JSON.stringify(x))
+const {billingUnitFromStorage:fromStorage}=load('src/lib/billing-unit-storage.ts')
 const single={id:1,contract_id:1,year:2025,status:'入金済',payments:null,billing_scheduled_date:null,
   billing_date:null,received_date:'2025-06-10',payment_due_date:null,transfer_failed:false,line_items:[{name:'保守料',amount:100}]}
 const split={...single,id:2,year:2026,status:'未入金',received_date:null,payments:[
@@ -191,6 +192,18 @@ async function main(){
     assert.deepEqual(await snapshot(),finished,'Initial plan, exceptions, units, events and operation all roll back')
     await importDb.exec('drop trigger fail_init on invoice_recipient_initializations')
     const initOp=operation(),initReceipt=(await initialize(initOp,finished)).rows,initialized=await snapshot()
+    const displayed=initialized.billing_units.map(fromStorage)
+    assert.equal(displayed.length,initialized.billing_units.length)
+    for(const [index,unit] of displayed.entries()) {
+      assert.equal(unit.recipientId,initialized.billing_units[index].recipient_customer_id)
+      assert.equal(unit.frozenAmount,initialized.billing_units[index].frozen_amount)
+      assert.equal(unit.scheduledDate,initialized.billing_units[index].scheduled_date)
+    }
+    const storedActual=initialized.billing_units.find(u=>u.frozen_amount!==null)
+    for(const change of [{collection_method:'unknown'},{id:'1'},{scheduled_date:'2026-02-30'},
+      {frozen_line_items:[]},{frozen_amount:999999},{recipient_customer_id:-1},{lifecycle:'unknown'}])
+      assert.throws(()=>fromStorage({...storedActual,...change}))
+    assert.equal(fromStorage({...storedActual,round_number:null,service_month:null}).roundLabel,'保存済み単回記録')
     const inspectInit=async(project=1)=>(await importDb.query('select inspect_invoice_initialization($1) report',[project])).rows[0].report
     assert.equal((await inspectInit()).initialization_checks_passed,true)
     assert.equal((await inspectInit()).cutover_ready,false)

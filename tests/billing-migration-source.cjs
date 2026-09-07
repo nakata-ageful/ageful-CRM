@@ -33,6 +33,47 @@ const split = { ...single, id: 2, payments: [
   { seq: 2, scheduled_date: '2025-12-01', billing_date: null, received_date: null },
 ] }
 async function main() {
+  const { prepareOwnershipBillingPlan: prepareTransfer } = load('src/lib/ownership-billing-plan.ts')
+  const transferUnit={id:'t1',projectId:1,serviceYear:2026,roundLabel:'11月分',method:'請求書',
+    scheduledDate:'2026-11-27',recipientId:1,lifecycle:'planned',issuedOn:null,receivedOn:null,
+    frozenAmount:null,frozenLineItems:null,frozenAt:null,plannedAmount:82500,revision:0,collectionState:'pending'}
+  const choice={unitId:'t1',expectedRevision:0,recipientId:2,method:'請求書',scheduledDate:'2027-06-01',
+    plannedAmount:82500,periodStart:null,periodEnd:null,note:'年払い済みにつき次年度から'}
+  const transferInput={projectId:1,oldOwnerId:1,newOwnerId:2,units:[transferUnit],choices:[choice]}
+  for (const from of ['請求書','口座振替']) for (const to of ['請求書','口座振替']) {
+    const result=prepareTransfer({...transferInput,units:[{...transferUnit,method:from}],choices:[{...choice,method:to}]})
+    assert.equal(result.changes[0].method,to)
+    assert.equal(result.changes[0].scheduledDate,'2027-06-01','No automatic immediate B billing')
+    assert.equal(result.changes[0].plannedAmount,82500,'No automatic proration')
+  }
+  const paid={...transferUnit,id:'paid',lifecycle:'received',collectionState:'succeeded',receivedOn:'2026-06-01',
+    frozenAmount:82500,frozenLineItems:[{name:'保守料',amount:82500}],frozenAt:'2026-06-01T00:00:00Z'}
+  assert.equal(prepareTransfer({...transferInput,units:[transferUnit,paid]}).preservedUnitIds[0],'paid')
+  assert.throws(()=>prepareTransfer({...transferInput,units:[paid],choices:[{...choice,unitId:'paid'}]}),/発行済み/)
+  assert.throws(()=>prepareTransfer({...transferInput,choices:[]}),/すべて/)
+  assert.throws(()=>prepareTransfer({...transferInput,choices:[choice,choice]}),/重複/)
+  assert.throws(()=>prepareTransfer({...transferInput,choices:[{...choice,expectedRevision:1}]}),/更新/)
+  assert.throws(()=>prepareTransfer({...transferInput,choices:[{...choice,recipientId:3}]}),/所有者/)
+  assert.throws(()=>prepareTransfer({...transferInput,choices:[{...choice,scheduledDate:'2027-02-30'}]}),/予定日/)
+  assert.throws(()=>prepareTransfer({...transferInput,choices:[{...choice,plannedAmount:-1}]}),/予定額/)
+  assert.throws(()=>prepareTransfer({...transferInput,choices:[{...choice,periodStart:'2027-01-01'}]}),/対象期間/)
+  assert.throws(()=>prepareTransfer({...transferInput,units:[{...transferUnit,collectionState:'failed'}]}),/元の請求先/)
+  assert.equal(prepareTransfer({...transferInput,units:[{...transferUnit,collectionState:'failed'}],
+    choices:[{...choice,recipientId:1}]}).changes[0].recipientId,1)
+  assert.equal(prepareTransfer({...transferInput,choices:[{...choice,plannedAmount:0}]}).changes[0].plannedAmount,0)
+  assert.equal(prepareTransfer({...transferInput,choices:[{...choice,plannedAmount:null}]}).changes[0].plannedAmount,null)
+  const copy=prepareTransfer(transferInput); copy.changes[0].note='changed'
+  assert.equal(choice.note,'年払い済みにつき次年度から')
+  const nextThenLater=prepareTransfer({...transferInput,units:[transferUnit,{...transferUnit,id:'t2'}],
+    choices:[{...choice,recipientId:1},{...choice,unitId:'t2',periodStart:'2027-06-01',periodEnd:'2028-05-31'}]})
+  assert.equal(nextThenLater.changes[0].recipientId,1)
+  assert.equal(nextThenLater.changes[1].recipientId,2)
+  assert.equal(nextThenLater.changes[1].periodEnd,'2028-05-31')
+  assert.equal(prepareTransfer({...transferInput,units:[paid],choices:[]}).changes.length,0,'No invented bill after a paid year')
+  assert.throws(()=>prepareTransfer({...transferInput,units:[{...transferUnit,projectId:2}]}),/別の発電所/)
+  assert.throws(()=>prepareTransfer({...transferInput,units:[{...transferUnit,lifecycle:'review_required'}]}),/記録要確認/)
+  assert.throws(()=>prepareTransfer({...transferInput,units:[{...transferUnit,collectionState:'failed'}],
+    choices:[{...choice,recipientId:1,method:'口座振替'}]}),/元の請求先/)
   const { previewUnitLabel, previewAmountLabel, previewEventLabel } = load('src/dev/invoice-preview-labels.ts')
   const displayRow={id:1,project_id:1,service_year:2026,service_month:11,round_number:null,
     lifecycle:'planned',collection_method:'invoice',scheduled_date:'2026-11-27',issued_on:null,received_on:null,

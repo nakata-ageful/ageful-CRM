@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "test:billing-db": "node tests/invoice-write-postgres.mjs && node tests/invoice-recipient-plan-postgres.mjs && node tests/ownership-transfer-postgres.mjs"
+    "test:billing-db": "node tests/invoice-write-postgres.mjs && node tests/invoice-recipient-plan-postgres.mjs && node tests/ownership-transfer-postgres.mjs && node tests/invoice-schedule-postgres.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

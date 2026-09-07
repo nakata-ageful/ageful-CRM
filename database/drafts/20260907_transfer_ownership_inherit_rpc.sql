@@ -1,4 +1,4 @@
--- ISOLATED INHERIT-ALL REHEARSAL ONLY. No field editing, legacy cutover or public access.
+-- ISOLATED REHEARSAL. Inherit by default; limited non-billing choices. No legacy cutover/public access.
 DO $$ BEGIN
   IF current_setting('ageful.allow_draft_migration',true) IS DISTINCT FROM 'yes' THEN
     RAISE EXCEPTION 'Draft migration blocked';
@@ -8,7 +8,7 @@ CREATE FUNCTION public.transfer_ownership_inherit(
   p_operation_key uuid,p_project_id bigint,p_new_owner_id bigint,p_transfer_date date,
   p_expected_project jsonb,p_expected_contract jsonb,
   p_expected_plan_id bigint,p_expected_plan_revision integer,p_expected_units jsonb,
-  p_default_recipient_id bigint,p_overrides jsonb
+  p_default_recipient_id bigint,p_overrides jsonb,p_field_choices jsonb DEFAULT '{}'::jsonb
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $$
 DECLARE
   actor uuid:=auth.uid();
@@ -23,6 +23,10 @@ DECLARE
   fingerprint text;
   child_operation uuid;
   last_transfer_date date;
+  patches jsonb;
+  project_patch jsonb;
+  contract_patch jsonb;
+  assignments text;
 BEGIN
   IF actor IS NULL THEN RAISE EXCEPTION 'ログインが必要です'; END IF;
   IF p_operation_key IS NULL OR p_project_id IS NULL OR p_new_owner_id IS NULL
@@ -35,7 +39,7 @@ BEGIN
     'project',p_project_id,'owner',p_new_owner_id,'date',p_transfer_date,
     'expected_project',p_expected_project,'expected_contract',p_expected_contract,
     'plan',p_expected_plan_id,'plan_revision',p_expected_plan_revision,'units',p_expected_units,
-    'default',p_default_recipient_id,'overrides',p_overrides,'actor',actor)::text,'UTF8')),'hex');
+    'default',p_default_recipient_id,'overrides',p_overrides,'field_choices',p_field_choices,'actor',actor)::text,'UTF8')),'hex');
   INSERT INTO public.billing_operations(operation_key,operation_kind,project_id,request_hash,actor_user_id)
     VALUES(p_operation_key,'ownership_transfer',p_project_id,fingerprint,actor) ON CONFLICT DO NOTHING;
   SELECT * INTO STRICT op FROM public.billing_operations WHERE operation_key=p_operation_key FOR UPDATE;
@@ -59,6 +63,7 @@ BEGIN
     RAISE EXCEPTION '発電所・契約が更新されています。確認し直してください';
   END IF;
   IF old_project.customer_id=p_new_owner_id THEN RAISE EXCEPTION '現在と同じ所有者です'; END IF;
+  patches:=public.prepare_transfer_detail_choices(to_jsonb(old_project),to_jsonb(old_contract),p_field_choices);
   PERFORM id FROM public.customers WHERE id IN(old_project.customer_id,p_new_owner_id) ORDER BY id FOR KEY SHARE;
   IF NOT EXISTS(SELECT 1 FROM public.customers WHERE id=p_new_owner_id) THEN RAISE EXCEPTION '新所有者が存在しません'; END IF;
   SELECT name INTO STRICT old_owner_name FROM public.customers WHERE id=old_project.customer_id;
@@ -76,21 +81,26 @@ BEGIN
   child_operation:=substr(encode(sha256(convert_to(p_operation_key::text||':recipient-plan','UTF8')),'hex'),1,32)::uuid;
   PERFORM public.write_invoice_recipient_plan(child_operation,p_project_id,p_expected_plan_id,
     p_expected_plan_revision,p_expected_units,p_default_recipient_id,p_overrides);
-  UPDATE public.projects SET customer_id=p_new_owner_id,old_owner=old_owner_name
-    WHERE id=p_project_id RETURNING * INTO new_project;
-  UPDATE public.contracts SET ownership_transfer_date=p_transfer_date
-    WHERE id=old_contract.id RETURNING * INTO new_contract;
+  project_patch:=(patches->'project')||jsonb_build_object('customer_id',p_new_owner_id,'old_owner',old_owner_name);
+  contract_patch:=(patches->'contract')||jsonb_build_object('ownership_transfer_date',p_transfer_date);
+  -- Column names come only from the server-validated allowlist or the 3 protected system updates.
+  SELECT string_agg(format('%I = r.%I',k,k),',') INTO assignments FROM jsonb_object_keys(project_patch) k;
+  EXECUTE format('UPDATE public.projects target SET %s FROM jsonb_populate_record(NULL::public.projects,$1) r WHERE target.id=$2 RETURNING target.*',assignments)
+    INTO new_project USING project_patch,p_project_id;
+  SELECT string_agg(format('%I = r.%I',k,k),',') INTO assignments FROM jsonb_object_keys(contract_patch) k;
+  EXECUTE format('UPDATE public.contracts target SET %s FROM jsonb_populate_record(NULL::public.contracts,$1) r WHERE target.id=$2 RETURNING target.*',assignments)
+    INTO new_contract USING contract_patch,old_contract.id;
   -- Full value snapshots, never used as the source of invoice calculations.
   INSERT INTO public.ownership_transfers(operation_key,project_id,from_customer_id,to_customer_id,transfer_date,
     contract_before,contract_after,project_fields_before,project_fields_after,field_decisions,validation_result,actor_user_id)
     VALUES(p_operation_key,p_project_id,old_project.customer_id,p_new_owner_id,p_transfer_date,
       to_jsonb(old_contract),to_jsonb(new_contract),to_jsonb(old_project),to_jsonb(new_project),
-      jsonb_build_object('mode','inherit_all','policy','D-026','system_updated',
+      jsonb_build_object('mode','inherit_with_choices','default','keep','choices',p_field_choices,'policy','D-026','system_updated',
         jsonb_build_array('projects.customer_id','projects.old_owner','contracts.ownership_transfer_date')),
       jsonb_build_object('scope','isolated_invoice_without_legacy_records','source_rows_matched',true,
-        'recipient_operation_key',child_operation,'field_edits_applied',false),actor)
+        'recipient_operation_key',child_operation,'field_edits_applied',patches<>'{"project":{},"contract":{}}'::jsonb),actor)
     RETURNING * INTO transfer_row;
   UPDATE public.billing_operations SET completed_at=clock_timestamp() WHERE operation_key=p_operation_key;
   RETURN jsonb_build_object('transfer_id',transfer_row.id,'operation_key',p_operation_key,'completed',true);
 END $$;
-REVOKE ALL ON FUNCTION public.transfer_ownership_inherit(uuid,bigint,bigint,date,jsonb,jsonb,bigint,integer,jsonb,bigint,jsonb) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.transfer_ownership_inherit(uuid,bigint,bigint,date,jsonb,jsonb,bigint,integer,jsonb,bigint,jsonb,jsonb) FROM PUBLIC;

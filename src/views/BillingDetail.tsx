@@ -4,6 +4,7 @@ import { updateAnnualRecord, createAnnualRecord, deleteAnnualRecord, updateContr
 import { annualBillableTotalInc, invoiceAmount, withdrawalAmount } from '../lib/billing'
 import { fmtYen, fmtDate, dateInputRange } from '../lib/utils'
 import { useToast } from '../components/Toast'
+import { statusFromBillingDates } from '../lib/annual-record-status'
 
 type LineItemForm = { name: string; amount: string }
 
@@ -110,9 +111,7 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject, emb
       toast('履歴を保存しました')
       return
     }
-    const newStatus = historyEdit.billing_date
-      ? (historyEdit.received_date ? '入金済' : '請求済')
-      : ''
+    const newStatus = statusFromBillingDates(historyEdit)
     await updateAnnualRecord(id, {
       billing_date: historyEdit.billing_date || null,
       received_date: historyEdit.received_date || null,
@@ -221,9 +220,10 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject, emb
         effectiveReceivedDate = [...payments].reverse().find(p => p.received_date)?.received_date ?? ''
         newStatus = allReceived ? '入金済' : (someBilled ? '請求済' : '')
       } else {
-        newStatus = isTransfer && !transferFailed
-          ? (receivedDate ? '入金済' : '')
-          : (billingDate ? (receivedDate ? '入金済' : '請求済') : '')
+        newStatus = statusFromBillingDates({
+          billing_date: isTransfer && !transferFailed ? null : billingDate,
+          received_date: receivedDate,
+        })
       }
       const payload = {
         billing_scheduled_date: isTransfer ? null : (scheduledDate || null),

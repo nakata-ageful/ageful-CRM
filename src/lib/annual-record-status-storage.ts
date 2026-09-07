@@ -1,7 +1,7 @@
 /**
  * Storage-boundary adapter for the verified production CHECK constraint.
- * Not wired into actions yet: every write path must be reviewed before rollout.
- * This does not infer issuance from status or normalize historical read values.
+ * Used by actions and the main read paths. Blank UI status maps to 未入金 in storage.
+ * This adapter does not infer issuance; date-based classification is separate.
  */
 export type StoredAnnualRecordStatus = '未入金' | '請求済' | '入金済'
 

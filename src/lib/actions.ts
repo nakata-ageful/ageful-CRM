@@ -14,6 +14,7 @@ import type {
 import { buildTaskMap, buildSubTaskMap } from './prospect-tasks'
 import { annualRecordFromStorage, annualRecordPayloadForStorage, singleAnnualRecordId, toStoredAnnualRecordStatus } from './annual-record-status-storage'
 import { ensureLegacyRestoreAllowed } from './restore-safety'
+import { statusFromBillingDates } from './annual-record-status'
 
 function db() {
   if (!supabase) throw new Error('Supabase not configured')
@@ -433,9 +434,7 @@ export async function upsertAnnualRecord(input: AnnualRecordInput): Promise<Annu
     transfer_failed: null,
     payments: null,
     // ステータスは常に請求日・入金日から自動算出（手動設定による不整合を防ぐ）
-    status: (input.billing_date
-      ? (input.received_date ? '入金済' : '請求済')
-      : '') as AnnualRecordStatus,
+    status: statusFromBillingDates(input),
   }
   if (!hasSupabaseEnv) {
     const existing = annualRecordStore.getByContractId(input.contract_id).find(r => r.year === input.year)
@@ -467,10 +466,8 @@ export async function createAnnualRecord(
   year: number,
   input: Partial<Pick<AnnualRecord, 'billing_scheduled_date' | 'billing_date' | 'payment_due_date' | 'received_date' | 'line_items' | 'payments' | 'transfer_failed'>>
 ): Promise<AnnualRecord> {
-  const status = (input.billing_date
-    ? (input.received_date ? '入金済' : '請求済')
-    : '') as AnnualRecordStatus
-  const payload = { contract_id: contractId, year, status, ...input }
+  const status = statusFromBillingDates(input)
+  const payload = { contract_id: contractId, year, ...input, status }
   if (!hasSupabaseEnv) return annualRecordStore.create(payload as Omit<AnnualRecord, 'id'>)
   const { data, error } = await db().from('annual_records').insert(annualRecordPayloadForStorage(payload)).select().single()
   if (error) throw error
@@ -490,9 +487,7 @@ export async function deleteAnnualRecord(id: number): Promise<void> {
 export async function saveAnnualRecord(
   input: AnnualRecordInput & { id?: number | null }
 ): Promise<AnnualRecord> {
-  const status = (input.billing_date
-    ? (input.received_date ? '入金済' : '請求済')
-    : '') as AnnualRecordStatus
+  const status = statusFromBillingDates(input)
   const payload = {
     contract_id: input.contract_id,
     year: input.year,

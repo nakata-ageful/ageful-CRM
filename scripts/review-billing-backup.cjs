@@ -23,7 +23,7 @@ const { reviewBillingMigration } = load('src/lib/billing-migration-review.ts')
 const { identifyBillingMigrationSource } = load('src/lib/billing-migration-source.ts')
 const hash = value => createHash('sha256').update(canonicalJson(value)).digest('hex')
 
-async function auditBillingBackup(data, approvals = []) {
+async function auditBillingBackup(data, approvals = [], recipientApproval) {
   const tables = {}
   for (const key of ['customers', 'projects', 'contracts', 'annual_records']) {
     if (!Array.isArray(data[key])) throw Error('Missing backup table: ' + key)
@@ -32,7 +32,8 @@ async function auditBillingBackup(data, approvals = []) {
       || new Set(rows.map(r => r.id)).size !== rows.length) throw Error('Invalid/duplicate IDs: ' + key)
     tables[key] = new Map(rows.map(r => [r.id, r]))
   }
-  const datasetId = 'backup-sha256-' + hash(data)
+  const datasetHash = hash(data)
+  const datasetId = 'backup-sha256-' + datasetHash
   const raw = reviewBillingMigration(datasetId, data.annual_records)
   const confirmations = approvals.map(a => {
     if (!Number.isSafeInteger(a.amount) || a.amount < 0 || typeof a.basis !== 'string' || !a.basis.trim()
@@ -50,7 +51,24 @@ async function auditBillingBackup(data, approvals = []) {
     return { sourceKey: c.sourceKey, sourceSignature: c.sourceSignature, amount: a.amount,
       lineItems: a.lineItems, amountBasis: a.basis }
   })
-  const review = reviewBillingMigration(datasetId, data.annual_records, confirmations)
+  if (new Set(confirmations.map(c=>c.sourceKey)).size!==confirmations.length) throw Error('同じ回の確認値が複数あります')
+  let resolvedConfirmations=confirmations
+  if (recipientApproval !== undefined) {
+    if (!recipientApproval || recipientApproval.datasetHash!==datasetHash
+      || recipientApproval.mode!=='existing_current_customer'
+      || typeof recipientApproval.basis!=='string' || !recipientApproval.basis.trim()) {
+      throw Error('Recipient approval dataset/basis mismatch')
+    }
+    resolvedConfirmations=raw.candidates.map(c=>{
+      const contract=tables.contracts.get(c.contractId)
+      const project=contract && tables.projects.get(contract.project_id)
+      const owner=project && tables.customers.get(project.customer_id)
+      if (!owner) throw Error('Recipient approval has broken source links: '+c.recordId)
+      return { ...confirmations.find(a=>a.sourceKey===c.sourceKey), sourceKey:c.sourceKey,
+        sourceSignature:c.sourceSignature, recipientId:owner.id, recipientBasis:recipientApproval.basis }
+    })
+  }
+  const review = reviewBillingMigration(datasetId, data.annual_records, resolvedConfirmations)
   const rows = []
   for (const c of review.candidates) {
     const contract = tables.contracts.get(c.contractId)
@@ -66,7 +84,8 @@ async function auditBillingBackup(data, approvals = []) {
       currentOwnerReferenceId: owner?.id ?? null, currentMethodReference: contract?.billing_method ?? null,
       hasOldOwnerReference: !!project?.old_owner, transferDateReference: contract?.ownership_transfer_date ?? null,
       sourceLinksValid: !!(contract && project && owner),
-      recipientConfirmed: c.recipientId !== null, issues: c.issues })
+      recipientConfirmed: c.recipientId !== null, confirmedRecipientId:c.recipientId,
+      recipientBasis:c.recipientBasis, issues: c.issues })
   }
   return {
     scope: 'Saved backup only; no live DB, no writes, no inferred historical payer/method',
@@ -85,10 +104,11 @@ async function auditBillingBackup(data, approvals = []) {
 }
 module.exports = { auditBillingBackup, hash }
 if (require.main === module) {
-  const [backupPath, approvalPath] = process.argv.slice(2)
-  if (!backupPath) { console.error('Usage: node scripts/review-billing-backup.cjs BACKUP.json [AMOUNT_APPROVALS.json]'); process.exitCode = 1 }
+  const [backupPath, approvalPath, recipientApprovalPath] = process.argv.slice(2)
+  if (!backupPath) { console.error('Usage: node scripts/review-billing-backup.cjs BACKUP.json [AMOUNT_APPROVALS.json] [RECIPIENT_APPROVAL.json]'); process.exitCode = 1 }
   else auditBillingBackup(JSON.parse(fs.readFileSync(backupPath, 'utf8')),
-    approvalPath ? JSON.parse(fs.readFileSync(approvalPath, 'utf8')) : [])
+    approvalPath ? JSON.parse(fs.readFileSync(approvalPath, 'utf8')) : [],
+    recipientApprovalPath ? JSON.parse(fs.readFileSync(recipientApprovalPath, 'utf8')) : undefined)
     .then(result => console.log(JSON.stringify(result, null, 2)))
     .catch(error => { console.error(error.message); process.exitCode = 1 })
 }

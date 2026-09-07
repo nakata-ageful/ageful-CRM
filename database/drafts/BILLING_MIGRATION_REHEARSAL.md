@@ -1,5 +1,7 @@
 # 請求移行の読み取り専用検証
 
+最新：D-025の既存請求先確認を適用する場合は、第3ファイル引数としてRECIPIENT_APPROVAL.jsonを渡す。`datasetHash`（バックアップ全体のcanonical SHA-256）、`mode: "existing_current_customer"`、`basis`を必須とし、対象内容が変われば拒否する。承認なしでは従来どおり請求先を推定しない。承認を適用してもreadyToWrite=false。本番の移行・将来所有者への自動付替えではない。
+
 ## 実行
 
 ```sh

@@ -1,4 +1,4 @@
--- ISOLATED DRAFT. Server validation for a limited, non-billing subset of D-026 choices.
+-- ISOLATED DRAFT. Detail choices and amounts with unchanged billing method/schedule.
 DO $$ BEGIN
   IF current_setting('ageful.allow_draft_migration',true) IS DISTINCT FROM 'yes' THEN
     RAISE EXCEPTION 'Draft migration blocked';
@@ -16,6 +16,16 @@ DECLARE
   mode text;
   val jsonb;
   allowed text[];
+  money_keys text[]:=ARRAY['annual_maintenance_ex','annual_maintenance_inc','land_cost_monthly','insurance_fee',
+    'other_fee','communication_fee','local_association_fee','issuance_fee_ex','issuance_fee_inc',
+    'transfer_fee_ex','transfer_fee_inc','subcontract_fee_ex','subcontract_fee_inc'];
+  billing_changed boolean:=false;
+  candidate jsonb;
+  item record;
+  rounds integer;
+  total numeric:=0;
+  fee numeric:=0;
+  date_parts text[];
 BEGIN
   IF jsonb_typeof(p_project) IS DISTINCT FROM 'object' OR jsonb_typeof(p_contract) IS DISTINCT FROM 'object'
     OR jsonb_typeof(p_choices) IS DISTINCT FROM 'object' THEN RAISE EXCEPTION '項目選択の形式が不正です'; END IF;
@@ -34,7 +44,8 @@ BEGIN
       ELSE ARRAY['sale_contract_date','equipment_contract_date','land_contract_date','maintenance_contract_date',
         'maintenance_start_date','subcontract_start_date','sales_to_neosys','neosys_to_referrer',
         'notes','equipment_contract_notes','land_contract_notes','maintenance_contract_notes',
-        'maintenance_content_notes','subcontract_notes'] END;
+        'maintenance_content_notes','subcontract_notes','has_issuance_fee','has_transfer_fee',
+        'billing_amount_overrides','billing_item_flags']||money_keys END;
     FOR entry IN SELECT * FROM jsonb_each(choices) LOOP
       IF NOT(base ? entry.key) OR entry.key IN('id','project_id','customer_id','old_owner','created_at','ownership_transfer_date') THEN
         RAISE EXCEPTION '選択できない項目です: %',entry.key;
@@ -48,9 +59,13 @@ BEGIN
       IF NOT(entry.key=ANY(allowed)) THEN RAISE EXCEPTION 'この項目の変更は追加検証後に対応します: %',entry.key; END IF;
       val:=CASE mode WHEN 'clear' THEN 'null'::jsonb ELSE entry.value->'value' END;
       IF val<>'null'::jsonb THEN
-        IF entry.key IN('sales_price','reference_price','land_cost') THEN
+        IF entry.key IN('sales_price','reference_price','land_cost') OR entry.key=ANY(money_keys) THEN
           IF jsonb_typeof(val) IS DISTINCT FROM 'number' OR val::text !~ '^[0-9]+$'
             OR (val::text)::numeric>9007199254740991 THEN RAISE EXCEPTION '金額の形式が不正です: %',entry.key; END IF;
+        ELSIF entry.key IN('has_issuance_fee','has_transfer_fee') THEN
+          IF jsonb_typeof(val) IS DISTINCT FROM 'boolean' THEN RAISE EXCEPTION '手数料の有無を確認してください'; END IF;
+        ELSIF entry.key IN('billing_amount_overrides','billing_item_flags') THEN
+          IF jsonb_typeof(val) IS DISTINCT FROM 'object' THEN RAISE EXCEPTION '請求設定の形式が不正です'; END IF;
         ELSIF right(entry.key,5)='_date' THEN
           IF jsonb_typeof(val) IS DISTINCT FROM 'string' OR (val#>>'{}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN
             RAISE EXCEPTION '日付の形式が不正です: %',entry.key;
@@ -60,6 +75,8 @@ BEGIN
         END IF;
       END IF;
       patch:=patch||jsonb_build_object(entry.key,val);
+      IF scope_name='contract' AND (entry.key=ANY(money_keys) OR entry.key IN(
+        'has_issuance_fee','has_transfer_fee','billing_amount_overrides','billing_item_flags')) THEN billing_changed:=true; END IF;
     END LOOP;
     result:=result||jsonb_build_object(scope_name,patch);
   END LOOP;
@@ -67,6 +84,56 @@ BEGIN
     AND result->'contract'->'equipment_contract_date'='null'::jsonb
     AND (p_contract||(result->'contract'))->>'sale_contract_date' IS NOT NULL THEN
     RAISE EXCEPTION '旧売買契約日も引き継がない指定が必要です';
+  END IF;
+  IF billing_changed THEN
+    candidate:=p_contract||(result->'contract');
+    IF candidate->>'billing_method' IS DISTINCT FROM '請求書'
+      OR jsonb_typeof(candidate->'billing_schedule_days') IS DISTINCT FROM 'array' THEN
+      RAISE EXCEPTION '請求方法・請求予定日を先に確認してください';
+    END IF;
+    rounds:=jsonb_array_length(candidate->'billing_schedule_days');
+    IF rounds=0 OR (candidate->>'billing_count' IS NOT NULL AND
+      (jsonb_typeof(candidate->'billing_count') IS DISTINCT FROM 'number'
+       OR candidate->>'billing_count' !~ '^[1-9][0-9]*$' OR (candidate->>'billing_count')::numeric<>rounds)) THEN
+      RAISE EXCEPTION '請求回数と予定日の数が一致しません';
+    END IF;
+    FOR val IN SELECT value FROM jsonb_array_elements(candidate->'billing_schedule_days') LOOP
+      IF jsonb_typeof(val) IS DISTINCT FROM 'string' THEN RAISE EXCEPTION '請求予定日の形式が不正です'; END IF;
+      date_parts:=regexp_match(val#>>'{}','^([0-9]{1,2})月([0-9]{1,2})日$');
+      IF date_parts IS NULL THEN RAISE EXCEPTION '請求予定日の形式が不正です'; END IF;
+      PERFORM make_date(2000,date_parts[1]::integer,date_parts[2]::integer);
+    END LOOP;
+    IF (candidate->'has_issuance_fee' IS NOT NULL AND candidate->'has_issuance_fee'<>'null'::jsonb
+      AND jsonb_typeof(candidate->'has_issuance_fee') IS DISTINCT FROM 'boolean') THEN
+      RAISE EXCEPTION '発行手数料の有無を確認してください';
+    END IF;
+    FOR item IN SELECT key,value FROM jsonb_each(coalesce(nullif(candidate->'billing_item_flags','null'::jsonb),'{}'::jsonb)) LOOP
+      IF item.key NOT IN('annual_maintenance','land_cost','insurance','local_association','communication','other')
+        OR jsonb_typeof(item.value) IS DISTINCT FROM 'boolean' THEN RAISE EXCEPTION '請求対象フラグが不正です'; END IF;
+    END LOOP;
+    -- Preserve existing floor division and null/missing = included semantics; no tax inference.
+    FOR item IN SELECT * FROM (VALUES
+      ('annual_maintenance','annual_maintenance_inc'),('land_cost','land_cost_monthly'),('insurance','insurance_fee'),
+      ('local_association','local_association_fee'),('communication','communication_fee'),('other','other_fee')) AS x(flag,field) LOOP
+      val:=candidate->item.field;
+      IF val IS NOT NULL AND val<>'null'::jsonb THEN
+        IF jsonb_typeof(val) IS DISTINCT FROM 'number' OR val::text !~ '^[0-9]+$' THEN RAISE EXCEPTION '既存の請求金額も確認してください'; END IF;
+        IF (candidate->'billing_item_flags'->item.flag) IS DISTINCT FROM 'false'::jsonb THEN total:=total+(val::text)::numeric; END IF;
+      END IF;
+    END LOOP;
+    IF candidate->'has_issuance_fee'='true'::jsonb THEN
+      val:=candidate->'issuance_fee_inc';
+      IF jsonb_typeof(val) IS DISTINCT FROM 'number' OR val::text !~ '^[0-9]+$' THEN RAISE EXCEPTION '発行手数料の金額を確認してください'; END IF;
+      fee:=(val::text)::numeric;
+    END IF;
+    IF total>9007199254740991 OR floor(total/rounds)+fee>9007199254740991 THEN RAISE EXCEPTION '請求金額が計算可能な範囲を超えています'; END IF;
+    FOR item IN SELECT key,value FROM jsonb_each(coalesce(nullif(candidate->'billing_amount_overrides','null'::jsonb),'{}'::jsonb)) LOOP
+      IF item.key !~ '^[1-9][0-9]*$' OR length(item.key)>10 THEN RAISE EXCEPTION '個別金額の対象回が不正です'; END IF;
+      IF item.key::numeric>rounds OR jsonb_typeof(item.value) IS DISTINCT FROM 'number'
+        OR item.value::text !~ '^[0-9]+$' OR (item.value::text)::numeric+fee>9007199254740991 THEN
+        RAISE EXCEPTION '個別金額と対象回を確認してください';
+      END IF;
+    END LOOP;
   END IF;
   RETURN result;
 END $$;

@@ -17,6 +17,18 @@ async function main() {
   assert.equal(result.rows[0].currentOwnerReferenceId, 1)
   assert.equal(result.rows[0].recipientConfirmed, false)
   assert.equal(result.readyToWrite, false)
+  const recipientApproval={datasetHash:hash(data),mode:'existing_current_customer',basis:'Synthetic explicit user approval'}
+  const withRecipient=await audit(data,[approval],recipientApproval)
+  assert.equal(withRecipient.rows[0].confirmedRecipientId,1)
+  assert.equal(withRecipient.counts.unconfirmedRecipients,0)
+  assert.equal(withRecipient.knownActualAmount,100)
+  assert.equal(withRecipient.counts.amountApprovalsApplied,1)
+  assert.equal(withRecipient.readyToWrite,false)
+  const changedOwner={...data,projects:[{...data.projects[0],customer_id:2}],customers:[{id:1},{id:2}]}
+  await assert.rejects(audit(changedOwner,[approval],recipientApproval),/Recipient approval/)
+  await assert.rejects(audit(data,[],{...recipientApproval,basis:''}),/Recipient approval/)
+  const broken={...data,customers:[]}
+  await assert.rejects(audit(broken,[],{...recipientApproval,datasetHash:hash(broken)}),/broken source/)
   assert.equal(JSON.stringify(data), original)
   await assert.rejects(audit(data, [{ ...approval, sourceRecordHash: '0'.repeat(64) }]), /source mismatch/)
   await assert.rejects(audit(data, [{ ...approval, seq: 2 }]), /matching actual/)

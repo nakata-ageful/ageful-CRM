@@ -24,7 +24,9 @@ try{
     create table projects(id bigint primary key,customer_id bigint references customers(id),old_owner text,notes text,extra jsonb,sales_price bigint default 100000);
     create table contracts(id bigint primary key,project_id bigint references projects(id),billing_method text,
       ownership_transfer_date date,equipment_contract_date date,annual_maintenance_inc bigint,notes text,extra jsonb,
-      sale_contract_date date default '2020-01-01');
+      sale_contract_date date default '2020-01-01',billing_count integer default 2,
+      billing_schedule_days jsonb default '["6月1日","12月1日"]',billing_amount_overrides jsonb,
+      billing_item_flags jsonb,has_issuance_fee boolean,issuance_fee_inc bigint);
     create table annual_records(id bigint primary key,contract_id bigint references contracts(id));
     create table prospects(id bigint primary key,converted_customer_id bigint,notes text);
     create schema auth;
@@ -59,10 +61,16 @@ try{
   await assert.rejects(transfer(key(),before,2,2,{'3':2}),/未発行/)
   await assert.rejects(transfer(key(),before,2,2,{},'2023-01-01'),/前の日付/)
   const choices={project:{notes:{mode:'change',value:'C向けの現場情報'},sales_price:{mode:'change',value:200000}},contract:{notes:{mode:'clear'},
+    annual_maintenance_inc:{mode:'change',value:90000},
+    billing_amount_overrides:{mode:'change',value:{'2':50000}},
     equipment_contract_date:{mode:'clear'},sale_contract_date:{mode:'clear'}}}
   const invalidChoices=[
     [{project:{customer_id:{mode:'change',value:999}}},/選択できない/],
-    [{contract:{annual_maintenance_inc:{mode:'change',value:1}}},/追加検証/],
+    [{contract:{billing_method:{mode:'change',value:'口座振替'}}},/追加検証/],
+    [{contract:{billing_amount_overrides:{mode:'change',value:{'3':100}}}},/個別金額/],
+    [{contract:{billing_amount_overrides:{mode:'change',value:{'2':-1}}}},/個別金額/],
+    [{contract:{billing_item_flags:{mode:'change',value:{unknown:true}}}},/フラグ/],
+    [{contract:{has_issuance_fee:{mode:'change',value:true}}},/発行手数料/],
     [{contract:{equipment_contract_date:{mode:'clear'}}},/旧売買契約日/],
     [{contract:{equipment_contract_date:{mode:'change',value:'2025-02-30'}}},/out of range/],
     [{project:{notes:{mode:'change',value:123}}},/文字列/],
@@ -73,6 +81,14 @@ try{
     [{other:{}},/対象が不正/],
   ]
   for(const [selection,message] of invalidChoices)await assert.rejects(transfer(key(),before,2,2,{},'2025-09-01',selection),message)
+  const validate=(c,selection)=>db.query('select prepare_transfer_detail_choices($1::jsonb,$2::jsonb,$3::jsonb)',
+    [JSON.stringify(before.projects[0]),JSON.stringify(c),JSON.stringify({contract:selection})])
+  await assert.rejects(validate({...before.contracts[0],billing_count:3},{annual_maintenance_inc:{mode:'change',value:90000}}),/回数/)
+  await assert.rejects(validate({...before.contracts[0],billing_schedule_days:['2月30日','12月1日']},{annual_maintenance_inc:{mode:'change',value:90000}}),/out of range/)
+  await assert.rejects(validate({...before.contracts[0],issuance_fee_inc:9007199254740991,has_issuance_fee:true},
+    {annual_maintenance_inc:{mode:'change',value:90000}}),/範囲/)
+  await validate(before.contracts[0],{annual_maintenance_inc:{mode:'change',value:0},
+    billing_item_flags:{mode:'change',value:{annual_maintenance:false}},billing_amount_overrides:{mode:'clear'}})
   assert.deepEqual(await snapshot(),before)
   // Final history insert fails after both owner and contract update + entire child plan operation.
   await db.exec(`create function test_fail_transfer() returns trigger language plpgsql as $$begin
@@ -107,7 +123,9 @@ try{
   assert.equal(second.contracts[0].notes,null)
   assert.equal(second.contracts[0].equipment_contract_date,null)
   assert.equal(second.contracts[0].sale_contract_date,null)
-  assert.equal(second.contracts[0].annual_maintenance_inc,82500)
+  assert.equal(second.contracts[0].annual_maintenance_inc,90000)
+  assert.deepEqual(second.contracts[0].billing_amount_overrides,{'2':50000})
+  assert.equal(second.billing_units.find(u=>u.id===3).frozen_amount,82500,'Contract changes never recalculate paid history')
   const chosenTransfer=second.ownership_transfers.find(t=>t.to_customer_id===3)
   assert.deepEqual(chosenTransfer.contract_before,first.contracts[0])
   assert.deepEqual(chosenTransfer.contract_after,second.contracts[0])
@@ -126,5 +144,6 @@ try{
   assert.equal((await db.query("select has_function_privilege('public','transfer_ownership_inherit(uuid,bigint,bigint,date,jsonb,jsonb,bigint,integer,jsonb,bigint,jsonb,jsonb)','execute') as allowed")).rows[0].allowed,false)
   console.log('PASS: inherit-all atomic A→B→C, next A/later B and immediate C, full snapshots, frozen past, unchanged prospect, retry/stale/legacy/access guards')
   console.log('PASS: limited detail changes/clear, original snapshots, strict server allowlist, date/fallback/type/system guards and atomic failure rollback')
-  console.log('Scope: isolated invoice-only with no legacy records. Billing-condition edits, real triggers/RLS, migration and concurrent sessions not verified.')
+  console.log('PASS: unchanged-schedule amount/override edits, count/date/key/flag/fee/overflow validation and frozen past amount preservation')
+  console.log('Scope: isolated invoice-only with no legacy records. Method/count/schedule changes, real triggers/RLS, migration and concurrent sessions not verified.')
 }finally{await db.close()}

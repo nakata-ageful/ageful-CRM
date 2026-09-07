@@ -9,7 +9,7 @@ const base: BillingUnit = { id: 'past', projectId: 1, serviceYear: 2025, roundLa
   scheduledDate: '2025-06-01', recipientId: 1, lifecycle: 'received', issuedOn: '2025-06-01', receivedOn: '2025-06-10',
   frozenAmount: 82500, frozenLineItems: [{ name: '保守料', amount: 82500 }], frozenAt: '2025-06-01T00:00:00Z', revision: 1 }
 const units: BillingUnit[] = [base, { ...base, id: 'next', serviceYear: 2027, scheduledDate: '2027-06-01', recipientId: 2,
-  lifecycle: 'planned', issuedOn: null, receivedOn: null, frozenAt: null, frozenAmount: null, frozenLineItems: null }]
+  lifecycle: 'planned', issuedOn: null, receivedOn: null, frozenAt: null, frozenAmount: null, frozenLineItems: null, plannedAmount:82500 }]
 function Preview() {
   const [customer, setCustomer] = useState(1)
   const [selectedProject, setSelectedProject] = useState<number|null>(null)

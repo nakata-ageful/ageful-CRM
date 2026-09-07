@@ -98,7 +98,7 @@ async function main(){
     for(const r of records)await importDb.query('insert into annual_records select * from jsonb_populate_record(null::annual_records,$1::jsonb)',[JSON.stringify(r)])
     await importDb.transaction(async tx=>{
       await tx.exec("set local ageful.allow_draft_migration='yes'")
-      for(const name of ['20260907_billing_ownership_foundation.sql','20260907_invoice_write_rpc.sql','20260907_invoice_import_rpc.sql',
+      for(const name of ['20260907_billing_ownership_foundation.sql','20260907_saved_planned_amount.sql','20260907_invoice_write_rpc.sql','20260907_invoice_import_rpc.sql',
         '20260907_invoice_recipient_initialization.sql','20260907_invoice_initialization_inspection.sql','20260907_create_invoice_plan_rpc.sql'])
         await tx.exec(fs.readFileSync(path.join(root,'database/drafts',name),'utf8'))
     })

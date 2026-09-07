@@ -1,5 +1,11 @@
 # 手動記録と保存予定：最新合意
 
+## 実装進捗：保存欄と表示（部分対応）
+
+20260907_saved_planned_amount.sqlで予定額専用nullable bigint列を追加する隔離draft。既存行はnullで、現契約によるbackfillなし。BillingUnit.plannedAmountとstorage adapterへ接続。resolveUnitAmountは旧callbackを呼ばず保存予定額だけを表示し、未保存は要確認、0円は有効値。実績は従来どおりfrozen_amount優先。
+
+予定額書込RPC・フォーム・予定生成・移転/契約編集の全経路・確認明細との対応は未実装。既存local-billing-ledgerの古い試作も現契約相当の予定額を使うため、本方針対応済みとは扱わない。金額欄追加だけで保存可能になったとは説明しない。本番未適用。
+
 銀行の処理とは独立し、結果は担当者が確認する。予定日を過ぎただけで成功/不能を判定しない。
 
 ## 予定と実績を分ける

@@ -94,9 +94,10 @@ for (const amount of [0, 82500, 82830, 165000, 182500]) {
 }
 assert.equal(domain.resolveUnitAmount(unit({ lifecycle: 'fixed' }), () => { throw Error('No inferred past amount') }).basis, '金額要確認')
 assert.equal(domain.issueInvoiceUnit(unit(), 1, { issuedOn: '2027-06-01', amount: 100, lineItems: [{ name: '保守料', amount: 100 }], frozenAt: '2027-06-01T00:00:00Z' }).lifecycle, 'issued')
-assert.equal(domain.resolveUnitAmount(next, () => 120000).amount, 120000)
-assert.throws(() => domain.resolveUnitAmount(next, () => -1), /不正/)
-assert.throws(() => domain.resolveUnitAmount(next, () => 1.5), /不正/)
+assert.equal(domain.resolveUnitAmount(next, () => 120000).amount, null)
+assert.equal(domain.resolveUnitAmount({...next,plannedAmount:120000}, () => 999999).amount, 120000)
+assert.throws(() => domain.resolveUnitAmount({...next,plannedAmount:-1}), /不正/)
+assert.throws(() => domain.resolveUnitAmount({...next,plannedAmount:1.5}), /不正/)
 
 const later = unit({ id: 'unit-later', serviceYear: 2028, scheduledDate: '2028-06-01' })
 const pastDebit = unit({ id: 'august', method: '口座振替', serviceYear: 2026, scheduledDate: '2026-08-25', lifecycle: 'fixed', frozenAmount: 10000 })
@@ -118,7 +119,7 @@ assert.equal(domain.recipientForUnit(unit({ method: '口座振替' }), plan), 1,
 const React = require('react'), { renderToStaticMarkup } = require('react-dom/server')
 const Table = load('src/components/BillingUnitTable.tsx').BillingUnitTable
 const html = renderToStaticMarkup(React.createElement(Table, {
-  units: [historical, next, unit({ id: 'unknown', lifecycle: 'fixed', recipientId: null })],
+  units: [historical, {...next,plannedAmount:120000}, unit({ id: 'unknown', lifecycle: 'fixed', recipientId: null })],
   recipientName: id => id === 2 ? '顧客B<script>' : '顧客A', plannedAmount: () => 120000,
 }))
 for (const label of ['請求先', '確定額', '予定額', '金額要確認', '請求先要確認', '発行済・未入金', '未発行', '82,830']) assert.ok(html.includes(label), label)
@@ -152,7 +153,10 @@ async function testLegacyBillingButtons() {
         createAnnualRecord: async (...args) => calls.push(args),
         updateAnnualRecord: () => { throw Error('Unexpected update') }, deleteAnnualRecord: () => { throw Error('Unexpected delete') },
       }
-      if (name.startsWith('.')) return load(path.resolve(root, 'src/views', name) + '.ts')
+      if (name.startsWith('.')) {
+        const base=path.resolve(root,'src/views',name)
+        return load(base+(fs.existsSync(base+'.ts')?'.ts':'.tsx'))
+      }
       throw Error('Forbidden dependency: ' + name)
     },
   })
@@ -164,7 +168,8 @@ async function testLegacyBillingButtons() {
   }
   const render = records => {
     stateIndex = 0
-    return module.exports.Billing({ rows: [{ ...target, records }], onReload() {}, onViewDetail: id => links.push(id) })
+    const view=module.exports.Billing({ rows: [{ ...target, records }], onReload() {}, onViewDetail: id => links.push(id) })
+    return typeof view.type==='function'?view.type(view.props):view
   }
   const issue = buttons(render([])).find(b => b.props.children === '発行')
   assert.ok(issue)

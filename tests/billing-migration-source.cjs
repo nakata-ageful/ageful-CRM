@@ -71,6 +71,10 @@ async function main() {
   assert.equal(review('fixture',[{...maintenance,payment_due_date:'2025-06-10'}]).recordIssues.length,1)
   assert.equal(review('fixture',[maintenance]).candidates.length,0)
   const display={method:'口座振替',lifecycle:'planned',issuedOn:null,receivedOn:null,frozenAt:null,frozenAmount:null}
+  assert.equal(resolveUnitAmount(display,()=>999999).amount,null,'No current-contract fallback for unrecorded plan')
+  assert.equal(resolveUnitAmount({...display,plannedAmount:0},()=>999999).amount,0)
+  assert.equal(resolveUnitAmount({...display,plannedAmount:82500},()=>999999).amount,82500)
+  assert.throws(()=>resolveUnitAmount({...display,plannedAmount:-1}),/不正/)
   assert.equal(statusLabel(display),'振替予定')
   assert.equal(statusLabel({...display,lifecycle:'fixed'}),'入金確認待ち')
   assert.equal(statusLabel({...display,lifecycle:'cancelled'}),'取りやめ')

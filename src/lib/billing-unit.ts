@@ -15,6 +15,8 @@ export type BillingUnit = {
   frozenAmount: number | null
   frozenLineItems: BillingLineItem[] | null
   frozenAt: string | null
+  /** Saved estimate, distinct from issued/received actuals. Missing means not yet recorded. */
+  plannedAmount?: number | null
   revision: number
 }
 
@@ -39,7 +41,7 @@ export function isBillingDate(value: string): boolean {
 }
 
 /** 凍結額0も正しい値。過去の額が不明なら現契約で埋めない。 */
-export function resolveUnitAmount(unit: BillingUnit, plannedAmount: () => number | null): UnitAmount {
+export function resolveUnitAmount(unit: BillingUnit, _legacyEstimate?: () => number | null): UnitAmount {
   if (unit.frozenAmount != null) {
     if (!isYen(unit.frozenAmount)) throw new Error('確定額が不正です')
     return { amount: unit.frozenAmount, basis: '確定額' }
@@ -47,7 +49,8 @@ export function resolveUnitAmount(unit: BillingUnit, plannedAmount: () => number
   if (unit.lifecycle !== 'planned' || unit.issuedOn || unit.receivedOn || unit.frozenAt) {
     return { amount: null, basis: '金額要確認' }
   }
-  const amount = plannedAmount()
+  // D-027: never recompute a saved occurrence from the current contract.
+  const amount = unit.plannedAmount ?? null
   if (amount != null && !isYen(amount)) throw new Error('予定額が不正です')
   return { amount, basis: amount == null ? '金額要確認' : '予定額' }
 }

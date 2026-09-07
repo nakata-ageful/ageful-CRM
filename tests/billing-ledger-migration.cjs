@@ -146,7 +146,8 @@ const notesOnly = { ...record(99, 88, 2026, null), billing_scheduled_date: null,
 assert.equal(review('notes', [notesOnly]).candidates.length, 0)
 assert.deepEqual(plain(review('notes', [notesOnly]).retainedOnlyIds), [99])
 const paidWithoutDate = { ...notesOnly, status: '入金済' }
-assert.equal(review('notes', [paidWithoutDate]).recordIssues.length, 1)
+assert.ok(review('notes', [paidWithoutDate]).recordIssues.some(i=>i.message.includes('入金済の状態と入金日')))
+assert.ok(review('notes', [paidWithoutDate]).recordIssues.some(i=>i.message.includes('保守専用とは確定せず')))
 const parentOnly = { ...records[0], billing_date: '2025-08-01' }
 assert.equal(review('parents', [parentOnly]).candidates.length, 2, 'Parent never creates an extra third charge')
 assert.equal(review('parents', [parentOnly]).recordIssues.length, 1)

@@ -40,5 +40,6 @@ export function billingUnitFromStorage(row: Record<string, unknown>): BillingUni
     method: row.collection_method === 'invoice' ? '請求書' : '口座振替',
     scheduledDate: date('scheduled_date'), issuedOn: date('issued_on'), receivedOn: date('received_on'),
     recipientId: row.recipient_customer_id === null ? null : integer('recipient_customer_id',1),
-    lifecycle: lifecycle as BillingUnit['lifecycle'], frozenAmount: amount, frozenLineItems: items, frozenAt, revision: integer('revision',0) }
+    lifecycle: lifecycle as BillingUnit['lifecycle'], frozenAmount: amount, frozenLineItems: items, frozenAt,
+    plannedAmount: row.planned_amount == null ? null : integer('planned_amount',0), revision: integer('revision',0) }
 }

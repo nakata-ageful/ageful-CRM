@@ -125,3 +125,10 @@ verifyMaintenancePreservationはmanifest自身を再検証し、取り出した�
 回別UIモデルにcancelled/review_requiredを追加し、共通表で取りやめ/記録要確認、口座振替plannedを振替予定と表示。fixedは入金確認待ち。編集対象や過去額のフォールバックを広げない。通常画面のDB読取接続や振替確定タイミングは未変更。
 
 合成データで全メモ保持、請求情報混入拒否、hash/不変性、照合差分、状態表示、取りやめ/要確認の編集拒否・現契約計算拒否を試験。監査CLIの許可依存に純粋保全モジュールだけ追加。実データ/本番/公開変更なし。
+# 最新：保守専用記録のDB保全
+
+20260907_preserve_maintenance_source.sql追加（invoice_import_rpc依存）。preserve_maintenance_sourceは元年度全JSON・確認済み親全JSONをproject→plan→contract→annualでロック再照合し、invoice_import_evidenceへsource_kind=maintenance_only、unit_ids=[]、confirmed_payloads=[]の証跡を操作完了と同一トランザクションで保存する。請求回も0円実績も作らず元年度を変更しない。初期設定前のみ。金額/請求先根拠のない請求行をこの入口で保全済みにすることは禁止し、入金予定日・状態・明細等をSQLでも拒否する。
+
+既存の取込/初期化点検は空unit_idsの保全証跡を扱えるため、保守専用だけの発電所も元記録点検→今後の先の初期設定へ進める。メモ変更は許可し、旧証跡不変・点検再確認とする。全件照合CLIへの保守証跡統合、初期設定後に追加した保守行の再保全、実切替はまだ未対応。請求sourceと保守sourceの区別はreceipt.source_kindであり、既存請求証跡は従来どおり。権限はINVОKER/RLS/PUBLIC不可、本番未適用。
+
+合成SQL試験：請求情報混入/古い確認を拒否、証跡保存失敗で全取消、再送安定、別操作再保全拒否、元/請求回不変、保守専用発電所の両点検成功、後日メモ更新可能・元メモ証跡保持、未認証/PUBLIC拒否。

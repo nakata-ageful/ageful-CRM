@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { BillingHistorySection } from '../components/BillingHistorySection'
 import type { BillingUnit } from '../lib/billing-unit'
 import '../styles.css'
+import { BillingOverviewPanel } from '../components/BillingOverviewPanel'
 const base: BillingUnit = { id: 'past', projectId: 1, serviceYear: 2025, roundLabel: '第1回', method: '請求書',
   scheduledDate: '2025-06-01', recipientId: 1, lifecycle: 'received', issuedOn: '2025-06-01', receivedOn: '2025-06-10',
   frozenAmount: 82500, frozenLineItems: [{ name: '保守料', amount: 82500 }], frozenAt: '2025-06-01T00:00:00Z', revision: 1 }
@@ -16,6 +17,7 @@ function Preview() {
     <label>顧客詳細：<select value={customer} onChange={e => setCustomer(Number(e.target.value))}><option value={1}>顧客A</option><option value={2}>顧客B</option></select></label>
     <BillingHistorySection data={data} customerId={customer} />
     <h2>請求詳細（発電所単位）</h2><BillingHistorySection data={data} projectId={1} />
+    <BillingOverviewPanel data={data} today="2027-06-01" />
   </main>
 }
 if (import.meta.env.DEV) createRoot(document.getElementById('root')!).render(<Preview />)

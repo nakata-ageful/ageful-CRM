@@ -23,6 +23,7 @@ const { identifyBillingMigrationSource: identify } = load('src/lib/billing-migra
 const { prepareMaintenancePreservation: preserve, verifyMaintenancePreservation: verifyPreserved } = load('src/lib/maintenance-migration.ts')
 const { billingUnitStatusLabel: statusLabel, isEditableInvoicePlan, resolveUnitAmount } = load('src/lib/billing-unit.ts')
 const { customerBillingHistory, summarizeBillingHistory } = load('src/lib/billing-history.ts')
+const { buildBillingOverview } = load('src/lib/billing-overview.ts')
 const single = { id: 1, contract_id: 1, year: 2025, payments: null, status: '請求済',
   billing_scheduled_date: '2025-06-01', billing_date: '2025-06-01', received_date: null,
   payment_due_date: null, transfer_failed: false, line_items: [{ name: '保守料', amount: 100 }] }
@@ -75,6 +76,20 @@ async function main() {
   assert.equal(summarizeBillingHistory([{...history[0],frozenAmount:null}]).unknownActualCount,1)
   assert.equal(summarizeBillingHistory([{...history[0],lifecycle:'cancelled'}]).receivedAmount,0)
   assert.throws(()=>customerBillingHistory([...history,history[0]],1),/重複/)
+  const scheduled={...history[1],method:'請求書',scheduledDate:'2027-01-01'}
+  const overview=buildBillingOverview([scheduled,...history.filter(u=>u.id!=='next-B')],'2026-12-01')
+  assert.equal(overview.months.join(','),'2026-12,2027-01,2027-02')
+  assert.equal(overview.upcoming[0].recipientId,2)
+  assert.equal(buildBillingOverview([{...scheduled,revision:99}],'2026-12-01').upcoming.length,1,'Saving a plan must not hide it')
+  const issued={...scheduled,lifecycle:'issued',issuedOn:'2026-12-01',frozenAmount:82500,serviceYear:2026}
+  const afterIssue=buildBillingOverview([issued],'2026-12-01')
+  assert.equal(afterIssue.upcoming.length,0)
+  assert.equal(afterIssue.unpaid.length,1)
+  assert.equal(afterIssue.totals.unpaidAmount,82500)
+  assert.equal(buildBillingOverview([{...issued,receivedOn:'2026-12-10',lifecycle:'received'}],'2026-12-01').received.length,1)
+  assert.equal(buildBillingOverview([{...scheduled,scheduledDate:'2027-06-01'}],'2026-12-01').laterPlans.length,1)
+  assert.equal(buildBillingOverview([{...scheduled,scheduledDate:null}],'2026-12-01').undatedPlans.length,1)
+  assert.equal(buildBillingOverview([{...scheduled,lifecycle:'cancelled'}],'2026-12-01').upcoming.length,0)
   const candidates = review('fixture', [single, split]).candidates
   const mapped = await Promise.all(candidates.map(c => identify('fixture', c, c.recordId === 1 ? single : split)))
   assert.deepEqual(mapped.map(x => x.columns.source_payment_index), [0, 1, 2])

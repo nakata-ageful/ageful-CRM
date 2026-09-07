@@ -5,6 +5,7 @@ import { Modal } from '../components/Modal'
 import { createProject, updateCustomer, uploadAttachment, deleteAttachment } from '../lib/actions'
 import { fmtDate, dateInputRange } from '../lib/utils'
 import { useToast } from '../components/Toast'
+import { BillingHistorySection, type BillingHistoryData } from '../components/BillingHistorySection'
 
 /** 郵便番号を「〒xxx-xxxx」形式で表示。値が空なら「-」を返す。 */
 function fmtPostalDisplay(v: string | null | undefined): string {
@@ -19,6 +20,7 @@ type Props = {
   onBack: () => void
   onReload: () => void
   onViewProject: (projectId: number) => void
+  billingHistory?: BillingHistoryData
 }
 
 const emptyProject: Omit<ProjectInput, 'customer_id'> = {
@@ -35,7 +37,7 @@ const emptyProject: Omit<ProjectInput, 'customer_id'> = {
   reference_price: '', land_cost: '', amuras_member_no: '', notes: '',
 }
 
-export function CustomerDetailView({ detail, onBack, onReload, onViewProject }: Props) {
+export function CustomerDetailView({ detail, onBack, onReload, onViewProject, billingHistory }: Props) {
   const toast = useToast()
   const { customer, projects, attachments } = detail
 
@@ -207,6 +209,7 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject }: 
         )}
       </div>
 
+      {billingHistory && <BillingHistorySection data={billingHistory} customerId={customer.id} />}
       {/* ── 添付ファイル ── */}
       <div className="card">
         <div className="card-header-row">

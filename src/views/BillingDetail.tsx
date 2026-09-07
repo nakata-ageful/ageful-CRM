@@ -5,6 +5,7 @@ import { annualBillableTotalInc, invoiceAmount, withdrawalAmount } from '../lib/
 import { fmtYen, fmtDate, dateInputRange } from '../lib/utils'
 import { useToast } from '../components/Toast'
 import { statusFromBillingDates } from '../lib/annual-record-status'
+import { BillingHistorySection, type BillingHistoryData } from '../components/BillingHistorySection'
 
 type LineItemForm = { name: string; amount: string }
 
@@ -25,10 +26,11 @@ type Props = {
   onViewProject: (projectId: number) => void
   /** 発電所詳細の「請求詳細」タブに埋め込む場合 true。独自ヘッダー（戻る/発電所名）を出さない */
   embedded?: boolean
+  billingHistory?: BillingHistoryData
 }
 
 
-export function BillingDetailView({ detail, onBack, onReload, onViewProject, embedded = false }: Props) {
+export function BillingDetailView({ detail, onBack, onReload, onViewProject, embedded = false, billingHistory }: Props) {
   const toast = useToast()
   const { project, customer, contract, annualRecords, maintenanceResponses, periodicMaintenance } = detail
   const currentYear = new Date().getFullYear()
@@ -303,6 +305,12 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject, emb
 
   const custName = customer.company_name ?? customer.name
 
+  // Explicit read-only new-ledger input: never show legacy write controls alongside it.
+  if (billingHistory) return <div>
+    {!embedded && <button className="btn" onClick={onBack}>戻る</button>}
+    <p role="status">新しい請求記録の表示確認中です。この画面ではまだ編集できません。</p>
+    <BillingHistorySection data={billingHistory} projectId={project.id} />
+  </div>
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Header（埋め込み時は発電所詳細側にヘッダーがあるので出さない） */}

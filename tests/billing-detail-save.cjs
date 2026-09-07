@@ -31,5 +31,5 @@ async function test({ fail = false, payments = [], currentRecord = { id: 1 } } =
   assert.ok(failed.messages[0].includes('保存に失敗'))
   assert.ok(!failed.messages.includes('保存しました'))
   console.log('PASS: actual BillingDetail save classifies planned/issued/paid/empty and resets saving on rejected write. No DB calls.')
-  console.log('Legacy empty status vs production DB constraint remains unresolved; not deployment-ready.')
+  console.log('The save handler keeps UI draft semantics; actions.ts applies the tested DB storage adapter separately.')
 })().catch(error => { console.error(error); process.exitCode = 1 })

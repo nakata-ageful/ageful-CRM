@@ -19,3 +19,12 @@ export function annualRecordPayloadForStorage<T extends object>(payload: T): Omi
   }
   return result
 }
+
+/** The current UI uses blank for a record that has not been issued. */
+export function annualRecordFromStorage<T extends object>(row: T): T {
+  if (!Object.hasOwn(row, 'status')) return { ...row }
+  const status = (row as { status: unknown }).status
+  if (status === '未入金') return { ...row, status: '' }
+  if (status === '' || status === '請求済' || status === '入金済') return { ...row }
+  throw new Error('Unsupported stored annual record status')
+}

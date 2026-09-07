@@ -9,6 +9,7 @@ import type {
   CustomerDetailData, MaintenanceResponse, BillingRow, BillingDetail,
   Prospect, PeriodicMaintenance,
 } from '../types'
+import { annualRecordFromStorage } from './annual-record-status-storage'
 
 function db() {
   if (!supabase) throw new Error('Supabase not configured')
@@ -267,7 +268,7 @@ export async function getProjectDetail(projectId: number): Promise<ProjectDetail
   const { data: conArr } = await client.from('contracts').select('*').eq('project_id', projectId).limit(1)
   const contract = conArr?.[0] ?? null
   const annualRecords = contract
-    ? ((await client.from('annual_records').select('*').eq('contract_id', contract.id).order('year', { ascending: false })).data ?? [])
+    ? ((await client.from('annual_records').select('*').eq('contract_id', contract.id).order('year', { ascending: false })).data ?? []).map(annualRecordFromStorage)
     : []
   const { data: mrData } = await client.from('maintenance_responses').select('*').eq('project_id', projectId).order('inquiry_date', { ascending: false })
   const { data: pmData } = await client.from('periodic_maintenance').select('*').eq('project_id', projectId).order('record_date', { ascending: false })
@@ -404,7 +405,7 @@ export async function getBillingRows(): Promise<BillingRow[]> {
     const cust = row.customers as Record<string, unknown> | null
     const conArr = row.contracts as Record<string, unknown>[] | null
     const con = conArr?.[0] ?? null
-    const records = (con?.annual_records as Record<string, unknown>[] | null) ?? []
+    const records = ((con?.annual_records as Record<string, unknown>[] | null) ?? []).map(annualRecordFromStorage)
     const currentYearRecords = records.filter(r => (r.year as number) === currentYear) as import('../types').AnnualRecord[]
     const currentYearRecord = currentYearRecords[0] ?? null
     return {
@@ -472,7 +473,7 @@ export async function getBillingDetail(projectId: number): Promise<BillingDetail
     project: project as import('../types').Project,
     customer: customer as Customer,
     contract: contract as import('../types').Contract,
-    annualRecords: (arData ?? []) as import('../types').AnnualRecord[],
+    annualRecords: (arData ?? []).map(annualRecordFromStorage) as import('../types').AnnualRecord[],
     maintenanceResponses: (mrData ?? []) as import('../types').MaintenanceResponse[],
     periodicMaintenance: (pmData ?? []) as import('../types').PeriodicMaintenance[],
   }

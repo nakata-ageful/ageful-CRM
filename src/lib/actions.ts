@@ -12,6 +12,7 @@ import type {
   AnnualRecordInput, AnnualRecordStatus, CsvImportRow, BillingImportRow, Prospect, ProspectInput,
 } from '../types'
 import { buildTaskMap, buildSubTaskMap } from './prospect-tasks'
+import { annualRecordFromStorage, annualRecordPayloadForStorage, toStoredAnnualRecordStatus } from './annual-record-status-storage'
 
 function db() {
   if (!supabase) throw new Error('Supabase not configured')
@@ -429,16 +430,16 @@ export async function upsertAnnualRecord(input: AnnualRecordInput): Promise<Annu
   }
   const { data, error } = await db()
     .from('annual_records')
-    .upsert(payload, { onConflict: 'contract_id,year' })
+    .upsert(annualRecordPayloadForStorage(payload), { onConflict: 'contract_id,year' })
     .select()
     .single()
   if (error) throw error
-  return data as AnnualRecord
+  return annualRecordFromStorage(data) as AnnualRecord
 }
 
 export async function updateAnnualRecordStatus(id: number, status: AnnualRecordStatus): Promise<void> {
   if (!hasSupabaseEnv) { annualRecordStore.update(id, { status }); return }
-  const { error } = await db().from('annual_records').update({ status }).eq('id', id)
+  const { error } = await db().from('annual_records').update({ status: toStoredAnnualRecordStatus(status) }).eq('id', id)
   if (error) throw error
 }
 
@@ -447,7 +448,7 @@ export async function updateAnnualRecord(
   input: Partial<Pick<AnnualRecord, 'billing_scheduled_date' | 'billing_date' | 'payment_due_date' | 'received_date' | 'line_items' | 'payments' | 'transfer_failed' | 'status'>>
 ): Promise<void> {
   if (!hasSupabaseEnv) { annualRecordStore.update(id, input); return }
-  const { error } = await db().from('annual_records').update(input).eq('id', id)
+  const { error } = await db().from('annual_records').update(annualRecordPayloadForStorage(input)).eq('id', id)
   if (error) throw error
 }
 
@@ -461,9 +462,9 @@ export async function createAnnualRecord(
     : '') as AnnualRecordStatus
   const payload = { contract_id: contractId, year, status, ...input }
   if (!hasSupabaseEnv) return annualRecordStore.create(payload as Omit<AnnualRecord, 'id'>)
-  const { data, error } = await db().from('annual_records').insert(payload).select().single()
+  const { data, error } = await db().from('annual_records').insert(annualRecordPayloadForStorage(payload)).select().single()
   if (error) throw error
-  return data as AnnualRecord
+  return annualRecordFromStorage(data) as AnnualRecord
 }
 
 export async function deleteAnnualRecord(id: number): Promise<void> {
@@ -497,9 +498,9 @@ export async function saveAnnualRecord(
       if (!updated) throw new Error('Not found')
       return updated
     }
-    const { data, error } = await db().from('annual_records').update(payload).eq('id', input.id).select().single()
+    const { data, error } = await db().from('annual_records').update(annualRecordPayloadForStorage(payload)).eq('id', input.id).select().single()
     if (error) throw error
-    return data as AnnualRecord
+    return annualRecordFromStorage(data) as AnnualRecord
   }
   // 新規作成
   if (!hasSupabaseEnv) {
@@ -512,9 +513,9 @@ export async function saveAnnualRecord(
       payments: null,
     } as Omit<AnnualRecord, 'id'>)
   }
-  const { data, error } = await db().from('annual_records').insert(payload).select().single()
+  const { data, error } = await db().from('annual_records').insert(annualRecordPayloadForStorage(payload)).select().single()
   if (error) throw error
-  return data as AnnualRecord
+  return annualRecordFromStorage(data) as AnnualRecord
 }
 
 // ── Contract CRUD ─────────────────────────────────────────
@@ -942,7 +943,7 @@ export async function bulkImportBilling(
         } else {
           const { error: aErr } = await db()
             .from('annual_records')
-            .upsert(annualPayload, { onConflict: 'contract_id,year' })
+            .upsert(annualRecordPayloadForStorage(annualPayload), { onConflict: 'contract_id,year' })
           if (aErr) throw aErr
         }
       }
@@ -1455,7 +1456,7 @@ export async function restoreAllData(
           annualRecordStore.create(payload as Parameters<typeof annualRecordStore.create>[0])
         }
       } else {
-        const { error } = await db().from('annual_records').upsert(payload, { onConflict: 'contract_id,year' })
+        const { error } = await db().from('annual_records').upsert(annualRecordPayloadForStorage(payload), { onConflict: 'contract_id,year' })
         if (error) throw error
       }
     } catch (e) {

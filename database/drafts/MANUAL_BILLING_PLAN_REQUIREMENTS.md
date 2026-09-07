@@ -1,5 +1,13 @@
 # 手動記録と保存予定：最新合意
 
+## 最新：手動振替結果の隔離RPC
+
+record_manual_debit_result(op,unit,revision,kind,value,reason)追加。未確認planned/direct_debitに限定しreceivedは明示実額/明細/入金日を確定、invoice_switchは元先・予定額・回IDを保ったままcollection_method=invoice/collection_state=failedへ変更。原方法direct_debitは維持。全before/after/確認内容/実行者/操作を原子的記録。自動日付判定/銀行操作なし。
+
+write_invoice_unitはcollection_method=invoiceなら元方法direct_debitでも受理し、同一回で発行→入金までつなぐ。失敗切替の履歴は後続stateが変わっても残る。実績化後の振替結果の訂正、振替予定の編集/生成、所有者変更4通りの統合、UIは未接続。新RPCはPUBLIC不可/INVОKER、隔離のみ。
+
+試験：先/予定額/元方法保持、0件追加の同回処理、額明細不一致・確認内容空欄拒否、監査失敗全取消、再送/版、入金済再切替拒否、切替後請求発行/入金、無権限拒否。全DB/移行テストとbuild成功。
+
 ## 最新進捗：単回予定額の保存を接続
 
 foundationにplanned_amount安全整数列を追加（既存draft用ALTERはIF NOT EXISTS）。write_invoice_unitのplanで任意planned_amountを受理し、欠落時は旧額保持、明示nullは未設定、0円は有効。負数/小数/文字列/安全整数超過を拒否。既存plan_changed監査に前後額を保存し、他の操作では予定額を変更しない。

@@ -92,7 +92,7 @@ BEGIN
     WHERE project_id = target_project AND retired_at IS NULL FOR UPDATE;
   SELECT * INTO STRICT old_unit FROM public.billing_units WHERE id = p_unit_id FOR UPDATE;
   IF old_unit.revision <> p_expected_revision THEN RAISE EXCEPTION '情報が更新されています。確認し直してください'; END IF;
-  IF old_unit.original_method <> 'invoice' OR old_unit.collection_method <> 'invoice' THEN
+  IF old_unit.collection_method <> 'invoice' THEN
     RAISE EXCEPTION '今回は請求書のみ対象です';
   END IF;
   IF (p_kind IN ('plan','issue','cancel') AND old_unit.lifecycle <> 'planned') OR

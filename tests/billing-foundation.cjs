@@ -86,6 +86,7 @@ for (const amount of [0, 82500, 82830, 165000, 182500]) {
   assert.equal(domain.resolveUnitAmount(unit({ lifecycle: 'fixed', frozenAmount: amount }), () => 999999).amount, amount)
 }
 assert.equal(domain.resolveUnitAmount(unit({ lifecycle: 'fixed' }), () => { throw Error('No inferred past amount') }).basis, '金額要確認')
+assert.equal(domain.issueInvoiceUnit(unit(), 1, { issuedOn: '2027-06-01', amount: 100, lineItems: [{ name: '保守料', amount: 100 }], frozenAt: '2027-06-01T00:00:00Z' }).lifecycle, 'issued')
 assert.equal(domain.resolveUnitAmount(next, () => 120000).amount, 120000)
 assert.throws(() => domain.resolveUnitAmount(next, () => -1), /不正/)
 assert.throws(() => domain.resolveUnitAmount(next, () => 1.5), /不正/)

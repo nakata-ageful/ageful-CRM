@@ -14,7 +14,7 @@ export function BillingUnitTable({ units, recipientName, plannedAmount }: Props)
     <thead><tr>{['対象', '請求予定日', '請求先', '金額（税込）', '状態'].map(label => <th key={label}>{label}</th>)}</tr></thead>
     <tbody>{units.map(unit => {
       const amount = resolveUnitAmount(unit, () => plannedAmount(unit))
-      const status = unit.receivedOn ? '入金済' : unit.issuedOn ? '発行済・未入金'
+      const status = unit.lifecycle === 'received' || unit.receivedOn ? '入金済' : unit.lifecycle === 'issued' || unit.issuedOn ? '発行済・未入金'
         : unit.lifecycle === 'fixed' ? '入金確認待ち' : '未発行'
       return <tr key={unit.id}>
         <td>{unit.serviceYear}年 {unit.roundLabel}</td><td>{unit.scheduledDate ?? '日付要確認'}</td>

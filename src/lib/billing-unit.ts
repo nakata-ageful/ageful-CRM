@@ -9,7 +9,7 @@ export type BillingUnit = {
   method: '請求書' | '口座振替'
   scheduledDate: string | null
   recipientId: number | null
-  lifecycle: 'planned' | 'fixed'
+  lifecycle: 'planned' | 'fixed' | 'issued' | 'received'
   issuedOn: string | null
   receivedOn: string | null
   frozenAmount: number | null
@@ -34,7 +34,7 @@ export function resolveUnitAmount(unit: BillingUnit, plannedAmount: () => number
     if (!isYen(unit.frozenAmount)) throw new Error('確定額が不正です')
     return { amount: unit.frozenAmount, basis: '確定額' }
   }
-  if (unit.lifecycle === 'fixed' || unit.issuedOn || unit.receivedOn || unit.frozenAt) {
+  if (unit.lifecycle !== 'planned' || unit.issuedOn || unit.receivedOn || unit.frozenAt) {
     return { amount: null, basis: '金額要確認' }
   }
   const amount = plannedAmount()
@@ -73,7 +73,7 @@ export function issueInvoiceUnit(
   if (!isBillingDate(input.issuedOn) || !Number.isFinite(Date.parse(input.frozenAt))) throw new Error('発行日・確定日時を確認してください')
   if (!isYen(input.amount) || !input.lineItems.length || input.lineItems.some(i => !i.name.trim() || !isYen(i.amount))
     || input.lineItems.reduce((sum, i) => sum + i.amount, 0) !== input.amount) throw new Error('金額と明細合計が一致しません')
-  return { ...unit, lifecycle: 'fixed', issuedOn: input.issuedOn, frozenAt: input.frozenAt,
+  return { ...unit, lifecycle: 'issued', issuedOn: input.issuedOn, frozenAt: input.frozenAt,
     frozenAmount: input.amount, frozenLineItems: input.lineItems.map(i => ({ ...i })), revision: unit.revision + 1 }
 }
 

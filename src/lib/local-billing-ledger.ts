@@ -56,7 +56,7 @@ export function executeLocalBillingCommand(
     if (!isBillingDate(command.transferDate)) throw new Error('所有者変更日を確認してください')
     if (command.plan.projectId !== current.projectId) throw new Error('別の発電所の請求先指定です')
     if ([command.plan.defaultRecipientId, ...Object.values(command.plan.overrides)].some(id => !current.customerIds.includes(id))) throw new Error('存在しない請求先です')
-    if (current.units.some(u => u.method === '口座振替' && u.lifecycle !== 'fixed')) throw new Error('今後の振替の変更は固定ルール確定後に対応します')
+    if (current.units.some(u => u.method === '口座振替' && u.lifecycle === 'planned')) throw new Error('今後の振替の変更は固定ルール確定後に対応します')
     next.units = copyJson(applyInvoiceRecipientPlan(current.units, command.plan, command.expectedUnits))
     next.plan = copyJson(command.plan)
     next.ownerId = command.newOwnerId
@@ -77,7 +77,6 @@ export function executeLocalBillingCommand(
   } else {
     if (!Number.isSafeInteger(command.amount) || command.amount < 0) throw new Error('予定額を確認してください')
     next.plannedAmount = command.amount
-    next.contract.annual_maintenance_inc = command.amount
   }
   next.revision++
   const event: LocalBillingEvent = { requestId: command.requestId, schemaVersion: 1, recordedAt,
@@ -88,5 +87,5 @@ export function executeLocalBillingCommand(
 
 export function localCustomerBillingHistory(ledger: LocalBillingLedger, recipientId: number): BillingUnit[] {
   return copyJson(ledger.current.units.filter(unit => unit.recipientId === recipientId
-    && (unit.lifecycle === 'fixed' || unit.issuedOn || unit.receivedOn)))
+    && (unit.lifecycle !== 'planned' || unit.issuedOn || unit.receivedOn)))
 }

@@ -12,7 +12,7 @@ const names: Record<number, string> = { 1: '顧客A（旧所有者）', 2: '顧�
 const name = (id: number) => names[id] ?? '請求先要確認'
 const seed = (year: number, fixed = false): BillingUnit => ({
   id: `demo-${year}-annual`, projectId: 1, serviceYear: year, roundLabel: '第1回', method: '請求書',
-  scheduledDate: `${year}-06-01`, recipientId: 1, lifecycle: fixed ? 'fixed' : 'planned',
+  scheduledDate: `${year}-06-01`, recipientId: 1, lifecycle: fixed ? 'issued' : 'planned',
   issuedOn: fixed ? `${year}-06-01` : null, receivedOn: null, frozenAmount: fixed ? 100000 : null,
   frozenLineItems: fixed ? [{ name: '保守料', amount: 100000 }] : null,
   frozenAt: fixed ? `${year}-06-01T00:00:00Z` : null, revision: 1,

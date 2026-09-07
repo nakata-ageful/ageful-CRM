@@ -30,7 +30,7 @@ const unit = (id, changes = {}) => ({ id, projectId: 1, serviceYear: 2027, round
 const ledger = () => ({ current: { projectId: 1, ownerId: 1, revision: 1, customerIds: [1, 2, 3],
   contract: { id: 1, project_id: 1, annual_maintenance_inc: 100000, notes: '元の備考', future_field: { nested: ['全項目コピー'] } },
   plan: { projectId: 1, defaultRecipientId: 1, overrides: {} }, plannedAmount: 100000,
-  units: [unit('past', { serviceYear: 2026, lifecycle: 'fixed', issuedOn: '2026-06-01', frozenAmount: 100000,
+  units: [unit('past', { serviceYear: 2026, lifecycle: 'issued', issuedOn: '2026-06-01', frozenAmount: 100000,
     frozenAt: '2026-06-01T00:00:00Z', frozenLineItems: [{ name: '保守料', amount: 100000 }] }),
     unit('next'), unit('later', { serviceYear: 2028, scheduledDate: '2028-06-01' })],
 }, events: [] })
@@ -55,6 +55,7 @@ assert.throws(() => execute(first, { ...transfer, newOwnerId: 3 }, timestamp), /
 const changed = execute(first, { kind: 'change-estimate', requestId: 'estimate', expectedRevision: 2, amount: 120000 }, timestamp)
 assert.equal(changed.events[0].after.plannedAmount, 100000, 'Old snapshot stays at old amount')
 assert.equal(changed.events[0].after.contract.annual_maintenance_inc, 100000)
+assert.equal(changed.current.contract.annual_maintenance_inc, 100000, 'Estimate preview cannot rewrite the contract snapshot')
 assert.equal(changed.current.units[0].frozenAmount, 100000)
 assert.equal(execute(changed, transfer, timestamp).current.revision, 3, 'Old retry must not rewind newer writes')
 assert.throws(() => execute(changed, { ...transfer, requestId: 'stale', newOwnerId: 3 }, timestamp), /更新/)
@@ -86,6 +87,7 @@ debit.current.units.push(unit('future-debit', { method: '口座振替' }))
 assert.throws(() => execute(debit, transfer, timestamp), /固定ルール/)
 const issued = execute(second, { kind: 'issue', requestId: 'issue', expectedRevision: 4, unitId: 'next', expectedUnitRevision: 3, issuedOn: '2027-06-01' }, timestamp)
 assert.equal(issued.current.units[1].frozenAmount, 120000)
+assert.equal(issued.current.units[1].lifecycle, 'issued')
 assert.equal(issued.current.units[1].recipientId, 1)
 assert.equal(history(issued, 1).length, 2)
 assert.equal(issued.current.plan.overrides.next, undefined)

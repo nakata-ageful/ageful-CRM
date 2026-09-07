@@ -23,6 +23,7 @@ DECLARE
   result jsonb;
   k text;
   editable_keys text[];
+  active_plan public.billing_recipient_plans%ROWTYPE;
 BEGIN
   IF actor IS NULL THEN RAISE EXCEPTION 'ログインが必要です'; END IF;
   IF p_operation_key IS NULL OR p_unit_id IS NULL OR p_expected_revision IS NULL
@@ -77,6 +78,10 @@ BEGIN
       WHERE operation_key = p_operation_key AND billing_unit_id = p_unit_id;
     RETURN result; -- Prior operation result. Caller must reload current state after success.
   END IF;
+  -- Same lock order as bulk recipient changes and future plan generation.
+  PERFORM 1 FROM public.projects WHERE id = target_project FOR UPDATE;
+  SELECT * INTO active_plan FROM public.billing_recipient_plans
+    WHERE project_id = target_project AND retired_at IS NULL FOR UPDATE;
   SELECT * INTO STRICT old_unit FROM public.billing_units WHERE id = p_unit_id FOR UPDATE;
   IF old_unit.revision <> p_expected_revision THEN RAISE EXCEPTION '情報が更新されています。確認し直してください'; END IF;
   IF old_unit.original_method <> 'invoice' OR old_unit.collection_method <> 'invoice' THEN
@@ -99,8 +104,24 @@ BEGIN
       lifecycle = 'received', collection_state = 'succeeded', revision = revision + 1
       WHERE id = p_unit_id RETURNING * INTO new_unit;
   ELSIF p_kind = 'plan' THEN
+    IF active_plan.id IS NOT NULL THEN
+      -- Only the active plan's exception is mutable; retired plans remain historical.
+      DELETE FROM public.billing_recipient_plan_overrides
+        WHERE recipient_plan_id = active_plan.id AND billing_unit_id = p_unit_id;
+      IF p_value->>'recipient_customer_id' IS NOT NULL
+        AND (p_value->>'recipient_customer_id')::bigint <> active_plan.default_recipient_customer_id THEN
+        INSERT INTO public.billing_recipient_plan_overrides
+          (project_id,recipient_plan_id,billing_unit_id,recipient_customer_id)
+          VALUES(target_project,active_plan.id,p_unit_id,(p_value->>'recipient_customer_id')::bigint);
+      END IF;
+      UPDATE public.billing_recipient_plans SET revision = revision + 1 WHERE id = active_plan.id;
+    END IF;
     UPDATE public.billing_units SET recipient_customer_id = (p_value->>'recipient_customer_id')::bigint,
-      recipient_source = CASE WHEN p_value->>'recipient_customer_id' IS NULL THEN 'unconfirmed' ELSE 'confirmed' END,
+      recipient_plan_id = CASE WHEN p_value->>'recipient_customer_id' IS NULL THEN NULL ELSE active_plan.id END,
+      recipient_source = CASE WHEN p_value->>'recipient_customer_id' IS NULL THEN 'unconfirmed'
+        WHEN active_plan.id IS NULL THEN 'confirmed'
+        WHEN (p_value->>'recipient_customer_id')::bigint = active_plan.default_recipient_customer_id THEN 'default'
+        ELSE 'override' END,
       scheduled_date = (p_value->>'scheduled_date')::date, revision = revision + 1
       WHERE id = p_unit_id RETURNING * INTO new_unit;
   ELSE

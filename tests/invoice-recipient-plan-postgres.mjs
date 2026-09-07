@@ -18,7 +18,7 @@ const snapshot = async () => (await db.query(`select jsonb_build_object(
 try {
   await db.exec(`create table customers(id bigint primary key);
     create table projects(id bigint primary key);
-    create table contracts(id bigint primary key,project_id bigint references projects(id));
+    create table contracts(id bigint primary key,project_id bigint references projects(id),billing_method text default '請求書');
     create table annual_records(id bigint primary key);
     create schema auth;
     create function auth.uid() returns uuid language sql as
@@ -28,7 +28,7 @@ try {
     set test.actor='11111111-1111-4111-8111-111111111111';`)
   await db.transaction(async tx => {
     await tx.exec("set local ageful.allow_draft_migration='yes'")
-    for (const name of ['20260907_billing_ownership_foundation.sql','20260907_invoice_write_rpc.sql','20260907_invoice_recipient_plan_rpc.sql']) {
+    for (const name of ['20260907_billing_ownership_foundation.sql','20260907_invoice_write_rpc.sql','20260907_invoice_recipient_plan_rpc.sql','20260907_create_invoice_plan_rpc.sql']) {
       await tx.exec(readFileSync(new URL('../database/drafts/'+name,import.meta.url),'utf8'))
     }
   })
@@ -92,5 +92,65 @@ try {
   const withDebit = await snapshot()
   await assert.rejects(write(key(),active.id,0,{'2':3,'4':0,'5':0},2,{}), /口座振替/)
   assert.deepEqual(await snapshot(),withDebit)
+  const editOne = (op,revision,recipient) => db.query('select write_invoice_unit($1,2,$2,$3,$4::jsonb)',
+    [op,revision,'plan',JSON.stringify({recipient_customer_id:recipient,scheduled_date:'2027-06-01'})])
+  // A single-unit edit updates the active exception and plan revision atomically.
+  await db.exec('create trigger test_fail before insert on billing_unit_events for each row execute function test_fail_event()')
+  await assert.rejects(editOne(key(),3,1), /synthetic audit failure/)
+  assert.deepEqual(await snapshot(),withDebit,'Single edit rolls back plan, override, unit and audit together')
+  await db.exec('drop trigger test_fail on billing_unit_events')
+  const individualOp = key()
+  await editOne(individualOp,3,1)
+  const individual = await snapshot()
+  assert.equal(individual.units[1].recipient_customer_id,1)
+  assert.equal(individual.units[1].recipient_source,'override')
+  assert.equal(individual.plans.find(p=>p.id===active.id).revision,1)
+  assert.equal(individual.overrides.find(o=>o.recipient_plan_id===active.id && o.billing_unit_id===2).recipient_customer_id,1)
+  await editOne(individualOp,3,1)
+  assert.deepEqual(await snapshot(),individual)
+  await assert.rejects(editOne(key(),4,999), /foreign key/)
+  assert.deepEqual(await snapshot(),individual)
+  await editOne(key(),4,null)
+  const cleared = await snapshot()
+  assert.equal(cleared.units[1].recipient_source,'unconfirmed')
+  assert.equal(cleared.units[1].recipient_plan_id,null,'Blank payer is not silently replaced by the default')
+  assert.equal(cleared.overrides.filter(o=>o.recipient_plan_id===active.id).length,0)
+  await editOne(key(),5,2)
+  const restoredDefault = await snapshot()
+  assert.equal(restoredDefault.units[1].recipient_source,'default')
+  assert.equal(restoredDefault.units[1].recipient_plan_id,active.id)
+  assert.equal(restoredDefault.plans.find(p=>p.id===active.id).revision,3)
+  assert.equal(restoredDefault.overrides.filter(o=>o.recipient_plan_id===active.id).length,0)
+  assert.deepEqual(restoredDefault.overrides.filter(o=>o.recipient_plan_id!==active.id),
+    withDebit.overrides ?? [],'Retired plan exceptions are unchanged')
+  assert.deepEqual(restoredDefault.units[0],withDebit.units[0])
+  assert.deepEqual(restoredDefault.units[2],withDebit.units[2])
+  const create = (op,rev,occurrence='future-2030',date='2030-06-01') => db.query(
+    'select create_invoice_plan($1,1,1,$2,$3,$4,2030,1,$5) as unit',[op,active.id,rev,occurrence,date])
+  await assert.rejects(create(key(),0), /更新されています/)
+  await assert.rejects(create(key(),3,'too-early','2026-01-01'), /前の予定/)
+  // Fail after INSERT; no unit or reservation may remain behind.
+  await db.exec(`create function test_fail_create() returns trigger language plpgsql as $$ begin
+    if NEW.event_type='created' then raise exception 'synthetic creation failure'; end if; return NEW; end $$;
+    create trigger test_fail_creation before insert on billing_unit_events for each row execute function test_fail_create();`)
+  await assert.rejects(create(key(),3), /synthetic creation failure/)
+  assert.deepEqual(await snapshot(),restoredDefault)
+  await db.exec('drop trigger test_fail_creation on billing_unit_events')
+  const creationOp=key(), created=await create(creationOp,3)
+  assert.equal(created.rows[0].unit.recipient_customer_id,2,'Future unit uses saved default, not an old one-time override')
+  assert.equal(created.rows[0].unit.frozen_amount,null)
+  assert.equal(created.rows[0].unit.lifecycle,'planned')
+  const afterCreation=await snapshot()
+  assert.deepEqual((await create(creationOp,3)).rows,created.rows)
+  assert.deepEqual(await snapshot(),afterCreation)
+  await assert.rejects(create(key(),3), /billing_units_project_occurrence_uidx/)
+  await assert.rejects(create(creationOp,3,'different'), /同じ操作ID/)
+  assert.deepEqual(await snapshot(),afterCreation)
+  await db.exec("update contracts set billing_method='口座振替' where id=1")
+  await assert.rejects(create(key(),3,'wrong-method'), /契約/)
+  await db.exec("update contracts set billing_method='請求書' where id=1")
+  assert.equal((await db.query("select has_function_privilege('public','create_invoice_plan(uuid,bigint,bigint,bigint,integer,text,integer,integer,date)','execute') as allowed")).rows[0].allowed,false)
   console.log('PASS: next A / next-year B, paid preservation, atomic plan+overrides+audit, stale/retry/failure protection')
+  console.log('PASS: single edit synchronizes active exception, nullable payer, plan revision, retries and full failure rollback')
+  console.log('PASS: new explicit future invoice uses active default, no frozen amount, stale/early/duplicate/method guards and atomic creation audit')
 } finally { await db.close() }

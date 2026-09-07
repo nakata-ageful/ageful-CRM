@@ -33,6 +33,20 @@ const split = { ...single, id: 2, payments: [
   { seq: 2, scheduled_date: '2025-12-01', billing_date: null, received_date: null },
 ] }
 async function main() {
+  const { previewUnitLabel, previewAmountLabel, previewEventLabel } = load('src/dev/invoice-preview-labels.ts')
+  const displayRow={id:1,project_id:1,service_year:2026,service_month:11,round_number:null,
+    lifecycle:'planned',collection_method:'invoice',scheduled_date:'2026-11-27',issued_on:null,received_on:null,
+    recipient_customer_id:1,frozen_amount:null,frozen_line_items:null,frozen_at:null,planned_amount:82500,revision:1}
+  assert.equal(previewUnitLabel(displayRow),'2026年 11月分')
+  assert.equal(previewUnitLabel({...displayRow,service_month:null,round_number:2}),'2026年 第2回')
+  assert.equal(previewUnitLabel({...displayRow,service_month:null}),'2026年 保存済み単回記録')
+  assert.equal(previewAmountLabel(displayRow),'82,500円（予定額）')
+  assert.equal(previewAmountLabel({...displayRow,planned_amount:0}),'0円（予定額）')
+  assert.equal(previewAmountLabel({...displayRow,planned_amount:null}),'金額要確認')
+  assert.equal(previewAmountLabel({...displayRow,lifecycle:'received',received_on:'2026-12-05',
+    frozen_amount:83000,frozen_line_items:[{name:'保守料',amount:83000}],frozen_at:'2026-12-05T00:00:00Z'}),'83,000円（確定額）')
+  assert.equal(previewEventLabel('plan_changed',{collection_method:'direct_debit'},displayRow),'振替不能を確認・請求書へ切替')
+  assert.equal(previewEventLabel('plan_changed',displayRow,displayRow),'予定を保存')
   const calls=[],command={unitId:1,revision:0,mode:'collection',value:{received_on:'2026-06-01'},reason:null}
   let ids=0,reads=0
   const writer=createInvoiceWriteSession({operationId:()=>String(++ids),write:async(id,request)=>{calls.push({id,request})},

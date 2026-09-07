@@ -7,6 +7,7 @@ import { InvoiceLedgerDetail } from '../components/InvoiceLedgerDetail'
 import { billingUnitFromStorage } from '../lib/billing-unit-storage'
 import type { BillingUnit } from '../lib/billing-unit'
 import { createInvoiceWriteSession } from '../lib/invoice-write-session'
+import { previewUnitLabel, previewAmountLabel, previewEventLabel } from './invoice-preview-labels'
 
 type Mode = 'plan' | 'issue' | 'collection' | 'correction'
 type Unit = { id: number; service_year: number; revision: number; lifecycle: string; collection_method:string;
@@ -18,7 +19,6 @@ type Event = { id: number; event_type: string; recorded_at: string; reason: stri
 const names = (id: number | null) => id === 1 ? '顧客A' : id === 2 ? '顧客B' : '請求先要確認'
 const yen = (n: number | null) => n == null ? '未確定' : `${n.toLocaleString()}円`
 const labels: Record<Mode, string> = { plan: '予定を保存', issue: '発行', collection: '入金確認', correction: '訂正を保存' }
-const eventLabels: Record<string, string> = { plan_changed: '予定を保存', issued: '発行', collection_recorded: '入金確認', corrected: '訂正' }
 
 function InvoiceDbPreview() {
   const [db, setDb] = useState<PGlite | null>(null)
@@ -121,15 +121,15 @@ function InvoiceDbPreview() {
         {!units.some(u => u.lifecycle === state) ? <p style={{ color: '#64748b' }}>該当する請求はありません。</p> :
           <table style={{ width: '100%', textAlign: 'left' }}><thead><tr>{['年度', '請求予定日', '請求先', '金額（税込）', '入金日', '操作'].map(t => <th key={t}>{t}</th>)}</tr></thead>
             <tbody>{units.filter(u => u.lifecycle === state).map(unit => <tr key={unit.id}>
-              <td>{unit.service_year}年 第1回</td><td>{unit.scheduled_date ?? '未設定'}</td><td>{names(unit.recipient_customer_id)}</td>
-              <td>{yen(unit.frozen_amount)}</td><td>{unit.received_on ?? '—'}</td><td style={{ display: 'flex', gap: 8, padding: 8 }}>
+              <td>{previewUnitLabel(unit)}</td><td>{unit.scheduled_date ?? '未設定'}</td><td>{names(unit.recipient_customer_id)}</td>
+              <td>{previewAmountLabel(unit)}</td><td>{unit.received_on ?? '—'}</td><td style={{ display: 'flex', gap: 8, padding: 8 }}>
                 <button disabled={saving} className="btn btn-main btn-sm" onClick={() => edit(unit, state === 'planned' ? 'plan' : state === 'issued' ? 'collection' : 'correction')}>
                   {state === 'planned' ? '予定を編集' : state === 'issued' ? '入金確認' : '訂正'}</button>
                 {state === 'issued' && <button disabled={saving} className="btn btn-sub btn-sm" onClick={() => edit(unit, 'correction')}>訂正</button>}
               </td></tr>)}</tbody></table>}
       </section>)}
     {selected && <section className="card" style={{ padding: 20 }}>
-      <h2 style={{ fontSize: 18 }}>{selected.service_year}年 第1回：{labels[mode]}</h2>
+      <h2 style={{ fontSize: 18 }}>{previewUnitLabel(selected)}：{labels[mode]}</h2>
       <form onSubmit={save}><fieldset disabled={saving} style={{ border: 0, padding: 0, margin: 0 }}>
         {mode === 'collection' ? <>
           <p>請求先：{names(selected.recipient_customer_id)} ／ 確定額：{yen(selected.frozen_amount)}</p>
@@ -165,10 +165,10 @@ function InvoiceDbPreview() {
     <section className="card" style={{ padding: 20 }}><h2 style={{ fontSize: 18 }}>変更履歴</h2>
       {!events.length && <p>まだ変更はありません。</p>}
       {events.map(event => <details key={event.id} style={{ padding: '10px 0', borderBottom: '1px solid #e2e8f0' }}>
-        <summary>{event.after_value.service_year}年：{eventLabels[event.event_type]} ／ {new Date(event.recorded_at).toLocaleString('ja-JP')}</summary>
-        <p>担当者：確認用ユーザー{event.reason && ` ／ 訂正理由：${event.reason}`}</p>
+        <summary>{previewUnitLabel(event.after_value)}：{previewEventLabel(event.event_type,event.before_value,event.after_value)} ／ {new Date(event.recorded_at).toLocaleString('ja-JP')}</summary>
+        <p>担当者：確認用ユーザー{event.reason && ` ／ 確認内容・理由：${event.reason}`}</p>
         <p>請求先：{names(event.before_value.recipient_customer_id)} → {names(event.after_value.recipient_customer_id)}</p>
-        <p>金額：{yen(event.before_value.frozen_amount)} → {yen(event.after_value.frozen_amount)}</p>
+        <p>金額：{previewAmountLabel(event.before_value)} → {previewAmountLabel(event.after_value)}</p>
         <p>請求予定日：{event.before_value.scheduled_date ?? '未設定'} → {event.after_value.scheduled_date ?? '未設定'} ／ 入金日：{event.before_value.received_on ?? '未登録'} → {event.after_value.received_on ?? '未登録'}</p>
       </details>)}
     </section>

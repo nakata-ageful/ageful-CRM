@@ -88,26 +88,29 @@ async function main(){
   const importDb=new PGlite()
   try{
     await importDb.exec(`create table customers(id bigint primary key);create table projects(id bigint primary key,customer_id bigint default 1);
-      create table contracts(id bigint primary key,project_id bigint references projects(id));
+      create table contracts(id bigint primary key,project_id bigint references projects(id),billing_method text default '請求書');
       create table annual_records(id bigint primary key,contract_id bigint references contracts(id),year integer,status text,
         payments jsonb,billing_scheduled_date date,billing_date date,received_date date,payment_due_date date,transfer_failed boolean,line_items jsonb);
       create schema auth;create function auth.uid() returns uuid language sql as 'select nullif(current_setting(''test.actor'',true),'''')::uuid';
       set test.actor='11111111-1111-4111-8111-111111111111';
-      insert into customers values(1);insert into projects values(1);insert into contracts values(1,1);`)
+      insert into customers values(1),(2);insert into projects values(1);insert into contracts values(1,1);`)
     for(const r of records)await importDb.query('insert into annual_records select * from jsonb_populate_record(null::annual_records,$1::jsonb)',[JSON.stringify(r)])
     await importDb.transaction(async tx=>{
       await tx.exec("set local ageful.allow_draft_migration='yes'")
-      for(const name of ['20260907_billing_ownership_foundation.sql','20260907_invoice_import_rpc.sql'])
+      for(const name of ['20260907_billing_ownership_foundation.sql','20260907_invoice_write_rpc.sql','20260907_invoice_import_rpc.sql',
+        '20260907_invoice_recipient_initialization.sql','20260907_create_invoice_plan_rpc.sql'])
         await tx.exec(fs.readFileSync(path.join(root,'database/drafts',name),'utf8'))
     })
     let seq=0
     const operation=()=>`66666666-6666-4666-8666-${String(++seq).padStart(12,'0')}`
     const call=(op,rs,project={id:1,customer_id:1},signature=rs[0].evidence.sourceSignature)=>importDb.query(
       'select import_invoice_source($1,$2,$3::jsonb,$4::jsonb,$5,$6::jsonb) receipt',
-      [op,rs[0].row.source_annual_record_id,JSON.stringify(project),JSON.stringify({id:1,project_id:1}),signature,JSON.stringify(rs)])
-    async function snapshot(){const s={};for(const t of ['projects','contracts','annual_records','billing_units','billing_operations','billing_unit_events','invoice_import_evidence'])
+      [op,rs[0].row.source_annual_record_id,JSON.stringify(project),JSON.stringify({id:rs[0].row.contract_id,project_id:project.id,billing_method:'請求書'}),signature,JSON.stringify(rs)])
+    async function snapshot(){const s={};for(const t of ['projects','contracts','annual_records','billing_units','billing_operations','billing_unit_events','invoice_import_evidence',
+      'billing_recipient_plans','billing_recipient_plan_overrides','invoice_recipient_initializations'])
       s[t]=(await importDb.query(`select to_jsonb(t) value from ${t} t order by to_jsonb(t)::text`)).rows.map(x=>x.value);return s}
-    const start=await snapshot(),splitPayloads=payloads.filter(p=>p.row.source_annual_record_id===2)
+    const start=await snapshot(),splitPayloads=plain(payloads.filter(p=>p.row.source_annual_record_id===2))
+    splitPayloads[1].row.recipient_customer_id=2 // Synthetic explicitly confirmed one-off payer.
     const inspect=async()=>(await importDb.query('select inspect_invoice_import(1) report')).rows[0].report
     assert.equal((await inspect()).unimported_sources,3)
     assert.equal((await inspect()).source_checks_passed,false)
@@ -161,7 +164,7 @@ async function main(){
     assert.equal((await inspect()).source_checks_passed,false)
     await importDb.exec('update projects set customer_id=1 where id=1')
     assert.deepEqual(await snapshot(),finished)
-    // A direct update without an event is detected by the report (this fixture intentionally lacks the update guard).
+    // The report detects an uncommitted direct update, even before the deferred update guard runs.
     await assert.rejects(importDb.transaction(async tx=>{
       await tx.exec("update billing_units set scheduled_date='2027-12-02' where source_annual_record_id=2 and source_payment_index=2")
       const changedReport=(await tx.query('select inspect_invoice_import(1) report')).rows[0].report
@@ -173,13 +176,62 @@ async function main(){
     assert.ok(finished.billing_units.filter(u=>u.frozen_amount!==null).every(u=>u.frozen_at!==contexts[0].importedAt),'Freeze timestamp is assigned by DB')
     for(const sql of ['update invoice_import_evidence set schema_version=1','delete from invoice_import_evidence','truncate invoice_import_evidence'])
       await assert.rejects(importDb.exec(sql),/append-only/)
+    const initialize=(op,s,projectId=1,defaultId=1,startDate='2027-12-01')=>importDb.query(
+      'select initialize_invoice_recipients($1,$2,$3::jsonb,$4::jsonb,$5::jsonb,$6::jsonb,$7,$8) receipt',
+      [op,projectId,JSON.stringify(s.projects.find(p=>p.id===projectId)),JSON.stringify(s.contracts.find(c=>c.project_id===projectId)),
+        JSON.stringify(Object.fromEntries(s.invoice_import_evidence.filter(e=>e.project_id===projectId).map(e=>[e.source_annual_record_id,e.source_snapshot_hash]))),
+        JSON.stringify(Object.fromEntries(s.billing_units.filter(u=>u.project_id===projectId).map(u=>[u.id,u.revision]))),defaultId,startDate])
+    await assert.rejects(initialize(operation(),finished,1,2),/現顧客/)
+    await assert.rejects(initialize(operation(),finished,1,1,'2027-01-01'),/最初の予定日/)
+    const staleSources=structuredClone(finished);staleSources.invoice_import_evidence[0].source_snapshot_hash='0'.repeat(64)
+    await assert.rejects(initialize(operation(),staleSources),/移行元・請求回/)
+    await importDb.exec(`create function fail_recipient_init() returns trigger language plpgsql as $$begin raise exception 'synthetic init failure';end$$;
+      create trigger fail_init before insert on invoice_recipient_initializations for each row execute function fail_recipient_init();`)
+    await assert.rejects(initialize(operation(),finished),/synthetic init failure/)
+    assert.deepEqual(await snapshot(),finished,'Initial plan, exceptions, units, events and operation all roll back')
+    await importDb.exec('drop trigger fail_init on invoice_recipient_initializations')
+    const initOp=operation(),initReceipt=(await initialize(initOp,finished)).rows,initialized=await snapshot()
+    assert.equal(initReceipt[0].receipt.cutover_ready,false)
+    const pendingUnit=initialized.billing_units.find(u=>u.lifecycle==='planned')
+    assert.equal(pendingUnit.recipient_customer_id,2,'Keep the imported one-off payer')
+    assert.equal(pendingUnit.recipient_source,'override')
+    assert.equal(pendingUnit.frozen_amount,null)
+    assert.equal(initialized.billing_recipient_plan_overrides[0].recipient_customer_id,2)
+    assert.deepEqual(initialized.billing_units.filter(u=>u.lifecycle!=='planned'),finished.billing_units.filter(u=>u.lifecycle!=='planned'))
+    assert.deepEqual(initialized.annual_records,finished.annual_records)
+    assert.deepEqual(initialized.invoice_import_evidence,finished.invoice_import_evidence)
+    assert.deepEqual((await initialize(initOp,finished)).rows,initReceipt)
+    assert.deepEqual(await snapshot(),initialized)
+    await assert.rejects(initialize(operation(),initialized),/初期設定済み/)
+    await assert.rejects(initialize(initOp,finished,1,1,'2027-12-02'),/同じ操作ID/)
+    // A history-only project still needs a default for the first future invoice.
+    await importDb.exec('insert into projects values(2,2);insert into contracts values(2,2)')
+    const r4={...other,id:4,contract_id:2},c4={...review('fixture',[r4]).candidates[0],recipientId:2,recipientBasis:'架空の確認先'}
+    const i4=await identify('fixture',c4,r4)
+    const p4=await prepare('fixture',c4,r4,{...contexts[3],projectId:2,contractId:2,
+      methodConfirmation:{...contexts[3].methodConfirmation,sourceSnapshotHash:i4.columns.source_snapshot_hash}})
+    await importDb.query('insert into annual_records select * from jsonb_populate_record(null::annual_records,$1::jsonb)',[JSON.stringify(r4)])
+    const notImported=await snapshot(),today=(await importDb.query('select current_date::text today')).rows[0].today
+    await assert.rejects(initialize(operation(),notImported,2,2,today),/移行点検/)
+    await call(operation(),[p4],{id:2,customer_id:2})
+    const historyOnly=await snapshot()
+    await initialize(operation(),historyOnly,2,2,today)
+    const afterEmptyInit=await snapshot(),plan2=afterEmptyInit.billing_recipient_plans.find(p=>p.project_id===2)
+    assert.deepEqual(afterEmptyInit.billing_units,historyOnly.billing_units,'Zero-plan initialization does not invent a billing occurrence')
+    await importDb.query("select create_invoice_plan($1,2,2,$2,0,'synthetic-new-2100',2100,1,'2100-06-01')",[operation(),plan2.id])
+    assert.equal((await snapshot()).billing_units.find(u=>u.occurrence_key==='synthetic-new-2100').recipient_customer_id,2)
+    for(const sql of ['update invoice_recipient_initializations set schema_version=1','delete from invoice_recipient_initializations','truncate invoice_recipient_initializations'])
+      await assert.rejects(importDb.exec(sql),/append-only/)
     await importDb.exec("set test.actor=''")
     await assert.rejects(call(operation(),[payloads[0]]),/ログイン/)
     await assert.rejects(inspect(),/ログイン/)
+    await assert.rejects(initialize(operation(),initialized),/ログイン/)
+    assert.equal((await importDb.query("select has_function_privilege('public','initialize_invoice_recipients(uuid,bigint,jsonb,jsonb,jsonb,jsonb,bigint,date)','execute') allowed")).rows[0].allowed,false)
     assert.equal((await importDb.query("select has_function_privilege('public','import_invoice_source(uuid,bigint,jsonb,jsonb,text,jsonb)','execute') allowed")).rows[0].allowed,false)
     assert.equal((await importDb.query("select has_function_privilege('public','inspect_invoice_import(bigint)','execute') allowed")).rows[0].allowed,false)
     console.log('PASS: atomic source import, all-round coverage, source/parent recheck, immutable evidence, final failure rollback, idempotent retry and unchanged source')
     console.log('PASS: project-level unimported/changed-source inspection; clean checks explicitly do not authorize cutover')
+    console.log('PASS: atomic initial recipient plan, imported exception preservation, immutable past, stale/retry/failure guards and no-plan future default')
   }finally{await importDb.close()}
   console.log('PASS: complete invoice migration payload accepted by PostgreSQL, received-only and planned states, exact amounts, source identity, year/date preservation and strict evidence guards')
   console.log('Scope: synthetic invoice-source import only; no real method confirmation, whole-project cutover, concurrent legacy writers, durable restore or production writes')

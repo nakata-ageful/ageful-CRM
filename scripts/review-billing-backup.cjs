@@ -102,7 +102,8 @@ async function auditBillingBackup(data, approvals = [], recipientApproval) {
     retainedOnlyIds: review.retainedOnlyIds, rows,
   }
 }
-module.exports = { auditBillingBackup, hash, canonicalJson }
+module.exports = { auditBillingBackup, hash, canonicalJson,
+  isMaintenanceOnlyRecord: load('src/lib/maintenance-migration.ts').isMaintenanceOnlyRecord }
 if (require.main === module) {
   const [backupPath, approvalPath, recipientApprovalPath] = process.argv.slice(2)
   if (!backupPath) { console.error('Usage: node scripts/review-billing-backup.cjs BACKUP.json [AMOUNT_APPROVALS.json] [RECIPIENT_APPROVAL.json]'); process.exitCode = 1 }

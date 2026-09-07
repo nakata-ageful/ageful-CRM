@@ -59,6 +59,33 @@ async function main(){
   assert.equal(empty.issues.filter(i=>i.code==='missing_unit').length,3)
   await assert.rejects(reconcile({...backup,projects:[{id:1,customer_id:2}]},amounts,recipient,snapshot),/Recipient approval/)
   assert.equal((await reconcile(backup,[],recipient,snapshot)).financialSourceChecksPassed,false)
+  const maintenance={...planned,id:4,billing_scheduled_date:null,maintenance_record:'保守点検',escort_record:'駆付対応'}
+  const combined={...backup,annual_records:[...backup.annual_records,maintenance]}
+  const combinedRecipient={...recipient,datasetHash:hash(combined)}
+  const combinedAudit=await audit(combined,amounts,combinedRecipient)
+  const combinedSnapshot=structuredClone(snapshot)
+  for(const e of combinedSnapshot.invoice_import_evidence)for(const p of e.confirmed_payloads)p.evidence.datasetId=combinedAudit.datasetId
+  combinedSnapshot.invoice_import_evidence.push({source_annual_record_id:4,project_id:1,source_record:maintenance,
+    source_snapshot_hash:hash(maintenance),source_signature:canonicalJson(maintenance),project_snapshot:backup.projects[0],contract_snapshot:backup.contracts[0],
+    receipt:{source_kind:'maintenance_only',unit_ids:[]},confirmed_payloads:[]})
+  const combinedResult=await reconcile(combined,amounts,combinedRecipient,combinedSnapshot)
+  assert.equal(combinedResult.financialSourceChecksPassed,true)
+  assert.equal(combinedResult.expected.maintenanceOnly,1)
+  assert.equal(combinedResult.expected.units,3)
+  assert.equal(combinedResult.cutoverReady,false)
+  for(const mutate of [e=>{e.source_record={...maintenance,escort_record:null}},e=>{e.receipt.unit_ids=[4]},
+    e=>{e.confirmed_payloads=[{}]},e=>{delete e.receipt.source_kind}]){
+    const changed=structuredClone(combinedSnapshot);mutate(changed.invoice_import_evidence[3])
+    assert.equal((await reconcile(combined,amounts,combinedRecipient,changed)).financialSourceChecksPassed,false)
+  }
+  const only={...backup,annual_records:[maintenance]}
+  assert.equal((await reconcile(only,[],{...recipient,datasetHash:hash(only)},
+    {billing_units:[],invoice_import_evidence:[combinedSnapshot.invoice_import_evidence[3]]})).financialSourceChecksPassed,true)
+  const suspicious={...maintenance,payment_due_date:'2027-06-01'}
+  const suspiciousBackup={...only,annual_records:[suspicious]}
+  assert.equal((await reconcile(suspiciousBackup,[],{...recipient,datasetHash:hash(suspiciousBackup)},
+    {billing_units:[],invoice_import_evidence:[]})).financialSourceChecksPassed,false)
+  console.log('PASS: mixed invoice/maintenance and maintenance-only reconciliation, no invented bill, changed notes or invalid preservation rejected')
   console.log('PASS: approved whole-backup import reconciliation, exact per-round amounts/payers/items/dates, missing/duplicate/extra units and immutable inputs')
   console.log('PASS: balanced total with swapped per-round amounts is rejected; clean comparison never authorizes production cutover')
 }

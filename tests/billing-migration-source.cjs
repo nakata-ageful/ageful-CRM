@@ -22,6 +22,7 @@ const { reviewBillingMigration: review } = load('src/lib/billing-migration-revie
 const { identifyBillingMigrationSource: identify } = load('src/lib/billing-migration-source.ts')
 const { prepareMaintenancePreservation: preserve, verifyMaintenancePreservation: verifyPreserved } = load('src/lib/maintenance-migration.ts')
 const { billingUnitStatusLabel: statusLabel, isEditableInvoicePlan, resolveUnitAmount } = load('src/lib/billing-unit.ts')
+const { customerBillingHistory, summarizeBillingHistory } = load('src/lib/billing-history.ts')
 const single = { id: 1, contract_id: 1, year: 2025, payments: null, status: '請求済',
   billing_scheduled_date: '2025-06-01', billing_date: '2025-06-01', received_date: null,
   payment_due_date: null, transfer_failed: false, line_items: [{ name: '保守料', amount: 100 }] }
@@ -60,6 +61,20 @@ async function main() {
     assert.equal(isEditableInvoicePlan(unit),false)
     assert.equal(resolveUnitAmount(unit,()=>{throw Error('Must not calculate historical amount')}).amount,null)
   }
+  const history=[{...display,id:'past-A',projectId:1,serviceYear:2025,recipientId:1,lifecycle:'received',receivedOn:'2025-06-01',frozenAmount:100},
+    {...display,id:'next-B',projectId:1,serviceYear:2026,recipientId:2},
+    {...display,id:'other-A',projectId:2,serviceYear:2026,recipientId:1,lifecycle:'issued',issuedOn:'2026-06-01',frozenAmount:200},
+    {...display,id:'unknown',projectId:3,serviceYear:2026,recipientId:null}]
+  const customerA=customerBillingHistory(history,1)
+  assert.equal(customerA.map(u=>u.id).join(','),'other-A,past-A')
+  assert.equal(summarizeBillingHistory(customerA).receivedAmount,100)
+  assert.equal(summarizeBillingHistory(customerA).unpaidAmount,200)
+  assert.equal(customerBillingHistory(history,2).length,1)
+  customerA[0].frozenAmount=999
+  assert.equal(history[2].frozenAmount,200)
+  assert.equal(summarizeBillingHistory([{...history[0],frozenAmount:null}]).unknownActualCount,1)
+  assert.equal(summarizeBillingHistory([{...history[0],lifecycle:'cancelled'}]).receivedAmount,0)
+  assert.throws(()=>customerBillingHistory([...history,history[0]],1),/重複/)
   const candidates = review('fixture', [single, split]).candidates
   const mapped = await Promise.all(candidates.map(c => identify('fixture', c, c.recordId === 1 ? single : split)))
   assert.deepEqual(mapped.map(x => x.columns.source_payment_index), [0, 1, 2])

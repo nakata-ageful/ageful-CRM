@@ -1,7 +1,7 @@
 // Read-only reconciliation of an approved saved backup with an exported isolated import.
 // No .env, DB client, network, file writes or inferred historical billing method.
 const fs=require('node:fs')
-const {auditBillingBackup,hash,canonicalJson}=require('./review-billing-backup.cjs')
+const {auditBillingBackup,hash,canonicalJson,isMaintenanceOnlyRecord}=require('./review-billing-backup.cjs')
 const same=(a,b)=>a!==undefined&&b!==undefined&&hash(a)===hash(b)
 
 async function reconcileBillingImport(data,amountApprovals,recipientApproval,imported){
@@ -13,7 +13,7 @@ async function reconcileBillingImport(data,amountApprovals,recipientApproval,imp
   }
   const issues=[]
   const add=(code,recordId,unitId)=>issues.push({code,...(recordId===undefined?{}:{recordId}),...(unitId===undefined?{}:{unitId})})
-  if(!audit.rows.length)add('no_billable_sources')
+  if(!source.annual_records.length)add('no_source_records')
   const expectedKeys=new Set(),matchedIds=new Set(),expectedByProject=new Map()
   const records=new Map(source.annual_records.map(r=>[r.id,r]))
   const contracts=new Map(source.contracts.map(c=>[c.id,c])),projects=new Map(source.projects.map(p=>[p.id,p]))
@@ -58,7 +58,8 @@ async function reconcileBillingImport(data,amountApprovals,recipientApproval,imp
   }
   for(const record of source.annual_records){
     const expected=audit.rows.filter(r=>r.recordId===record.id)
-    if(!expected.length){add('retained_only_source_needs_support',record.id);continue}
+    const maintenanceOnly=!expected.length&&isMaintenanceOnlyRecord(record)
+    if(!expected.length&&!maintenanceOnly){add('retained_only_source_requires_review',record.id);continue}
     const entries=db.invoice_import_evidence.filter(e=>e.source_annual_record_id===record.id)
     if(entries.length!==1){add(entries.length?'duplicate_source_evidence':'missing_source_evidence',record.id);continue}
     const e=entries[0],contract=contracts.get(record.contract_id),project=contract&&projects.get(contract.project_id)
@@ -66,6 +67,12 @@ async function reconcileBillingImport(data,amountApprovals,recipientApproval,imp
       ||e.source_signature!==canonicalJson(record)
       ||!same(e.project_snapshot,project)||!same(e.contract_snapshot,contract))add('source_evidence_mismatch',record.id)
     const actualIds=db.billing_units.filter(u=>u.source_annual_record_id===record.id).map(u=>u.id).sort((a,b)=>a-b)
+    if(maintenanceOnly){
+      if(e.receipt?.source_kind!=='maintenance_only'||!same(e.confirmed_payloads,[])||!same(e.receipt?.unit_ids,[])||actualIds.length)
+        add('maintenance_preservation_mismatch',record.id)
+      continue
+    }
+    if(e.receipt?.source_kind==='maintenance_only')add('billing_source_marked_maintenance',record.id)
     if(!Array.isArray(e.receipt?.unit_ids)||!same([...e.receipt.unit_ids].sort((a,b)=>a-b),actualIds)
       ||actualIds.length!==expected.length)add('receipt_mismatch',record.id)
     if(!Array.isArray(e.confirmed_payloads)||e.confirmed_payloads.length!==expected.length){add('confirmation_coverage_mismatch',record.id);continue}
@@ -91,7 +98,8 @@ async function reconcileBillingImport(data,amountApprovals,recipientApproval,imp
   return {
     scope:'承認済みバックアップと取込スナップショットの元対応・金額・請求先照合。過去方法の業務確認・本番切替許可ではありません。',
     datasetId:audit.datasetId,financialSourceChecksPassed:issues.length===0,cutoverReady:false,
-    expected:{records:source.annual_records.length,units:audit.rows.length,actual:audit.counts.actual,planned:audit.counts.planned,amount:audit.knownActualAmount},
+    expected:{records:source.annual_records.length,maintenanceOnly:source.annual_records.filter(isMaintenanceOnlyRecord).length,
+      units:audit.rows.length,actual:audit.counts.actual,planned:audit.counts.planned,amount:audit.knownActualAmount},
     imported:{units:db.billing_units.length,matchedUnits:matchedIds.size,amount:total},
     projects:[...expectedByProject.values()].sort((a,b)=>a.projectId-b.projectId),issues,
   }

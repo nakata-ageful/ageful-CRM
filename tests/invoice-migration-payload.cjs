@@ -98,7 +98,7 @@ async function main(){
     await importDb.transaction(async tx=>{
       await tx.exec("set local ageful.allow_draft_migration='yes'")
       for(const name of ['20260907_billing_ownership_foundation.sql','20260907_invoice_write_rpc.sql','20260907_invoice_import_rpc.sql',
-        '20260907_invoice_recipient_initialization.sql','20260907_create_invoice_plan_rpc.sql'])
+        '20260907_invoice_recipient_initialization.sql','20260907_invoice_initialization_inspection.sql','20260907_create_invoice_plan_rpc.sql'])
         await tx.exec(fs.readFileSync(path.join(root,'database/drafts',name),'utf8'))
     })
     let seq=0
@@ -191,6 +191,27 @@ async function main(){
     assert.deepEqual(await snapshot(),finished,'Initial plan, exceptions, units, events and operation all roll back')
     await importDb.exec('drop trigger fail_init on invoice_recipient_initializations')
     const initOp=operation(),initReceipt=(await initialize(initOp,finished)).rows,initialized=await snapshot()
+    const inspectInit=async(project=1)=>(await importDb.query('select inspect_invoice_initialization($1) report',[project])).rows[0].report
+    assert.equal((await inspectInit()).initialization_checks_passed,true)
+    assert.equal((await inspectInit()).cutover_ready,false)
+    assert.equal((await inspect()).source_checks_passed,false,'Old inspection remains strictly pre-initialization')
+    await assert.rejects(importDb.transaction(async tx=>{
+      await tx.exec('update billing_units set recipient_customer_id=1 where lifecycle=\'planned\'')
+      const report=(await tx.query('select inspect_invoice_initialization(1) report')).rows[0].report
+      assert.equal(report.initialization_checks_passed,false)
+      assert.equal(report.changed_missing_or_extra_units,1)
+      throw Error('rollback inspection fixture')
+    }),/rollback inspection fixture/)
+    await assert.rejects(importDb.transaction(async tx=>{
+      await tx.exec('delete from billing_recipient_plan_overrides')
+      assert.equal((await tx.query('select inspect_invoice_initialization(1) report')).rows[0].report.initialization_checks_passed,false)
+      throw Error('rollback inspection fixture')
+    }),/rollback inspection fixture/)
+    await assert.rejects(importDb.transaction(async tx=>{
+      await tx.exec('update projects set customer_id=2 where id=1')
+      assert.equal((await tx.query('select inspect_invoice_initialization(1) report')).rows[0].report.changed_sources_or_parents,3)
+      throw Error('rollback inspection fixture')
+    }),/rollback inspection fixture/)
     assert.equal(initReceipt[0].receipt.cutover_ready,false)
     const pendingUnit=initialized.billing_units.find(u=>u.lifecycle==='planned')
     assert.equal(pendingUnit.recipient_customer_id,2,'Keep the imported one-off payer')
@@ -212,19 +233,42 @@ async function main(){
       methodConfirmation:{...contexts[3].methodConfirmation,sourceSnapshotHash:i4.columns.source_snapshot_hash}})
     await importDb.query('insert into annual_records select * from jsonb_populate_record(null::annual_records,$1::jsonb)',[JSON.stringify(r4)])
     const notImported=await snapshot(),today=(await importDb.query('select current_date::text today')).rows[0].today
+    assert.equal((await inspectInit(2)).initialization_checks_passed,false)
     await assert.rejects(initialize(operation(),notImported,2,2,today),/移行点検/)
     await call(operation(),[p4],{id:2,customer_id:2})
     const historyOnly=await snapshot()
     await initialize(operation(),historyOnly,2,2,today)
     const afterEmptyInit=await snapshot(),plan2=afterEmptyInit.billing_recipient_plans.find(p=>p.project_id===2)
+    assert.equal((await inspectInit(2)).initialization_checks_passed,true)
     assert.deepEqual(afterEmptyInit.billing_units,historyOnly.billing_units,'Zero-plan initialization does not invent a billing occurrence')
     await importDb.query("select create_invoice_plan($1,2,2,$2,0,'synthetic-new-2100',2100,1,'2100-06-01')",[operation(),plan2.id])
     assert.equal((await snapshot()).billing_units.find(u=>u.occurrence_key==='synthetic-new-2100').recipient_customer_id,2)
+    assert.equal((await inspectInit(2)).initialization_checks_passed,false,'Not an ongoing operational audit: extra future units require separate cutover handling')
+    await importDb.transaction(async tx=>{
+      await tx.exec("set local ageful.allow_draft_migration='yes'")
+      await tx.exec(fs.readFileSync(path.join(root,'database/drafts/20260907_imported_invoice_source_guard.sql'),'utf8'))
+    })
+    for(const sql of ["update annual_records set billing_date='2020-01-01' where id=1",
+      "update annual_records set payments='[]' where id=2",'delete from annual_records where id=1'])
+      await assert.rejects(importDb.exec(sql),/移行済み/)
+    await assert.rejects(importDb.exec('truncate annual_records'),/foreign key|移行済み/)
+    await assert.rejects(importDb.exec('truncate annual_records cascade'),/append-only|移行済み/)
+    // Even a legacy writer unable to see evidence through RLS must be blocked.
+    await importDb.exec('create role legacy_writer;grant usage on schema public to legacy_writer;grant select,update on annual_records to legacy_writer;set role legacy_writer')
+    await assert.rejects(importDb.exec("update annual_records set billing_date='2020-01-01' where id=1"),/移行済み/)
+    await importDb.exec('reset role')
+    await importDb.exec("insert into annual_records(id,contract_id,year) values(99,1,2100);update annual_records set billing_date='2100-01-01' where id=99")
+    assert.equal((await inspectInit()).unimported_sources,1,'New legacy rows remain detectable, not silently accepted')
+    await importDb.exec('delete from annual_records where id=99')
+    await importDb.exec("alter table annual_records add column maintenance_record text;update annual_records set maintenance_record='保守メモ更新' where id=1")
+    assert.equal((await importDb.query('select maintenance_record from annual_records where id=1')).rows[0].maintenance_record,'保守メモ更新')
     for(const sql of ['update invoice_recipient_initializations set schema_version=1','delete from invoice_recipient_initializations','truncate invoice_recipient_initializations'])
       await assert.rejects(importDb.exec(sql),/append-only/)
     await importDb.exec("set test.actor=''")
     await assert.rejects(call(operation(),[payloads[0]]),/ログイン/)
     await assert.rejects(inspect(),/ログイン/)
+    await assert.rejects(inspectInit(),/ログイン/)
+    assert.equal((await importDb.query("select has_function_privilege('public','inspect_invoice_initialization(bigint)','execute') allowed")).rows[0].allowed,false)
     await assert.rejects(initialize(operation(),initialized),/ログイン/)
     assert.equal((await importDb.query("select has_function_privilege('public','initialize_invoice_recipients(uuid,bigint,jsonb,jsonb,jsonb,jsonb,bigint,date)','execute') allowed")).rows[0].allowed,false)
     assert.equal((await importDb.query("select has_function_privilege('public','import_invoice_source(uuid,bigint,jsonb,jsonb,text,jsonb)','execute') allowed")).rows[0].allowed,false)
@@ -232,6 +276,7 @@ async function main(){
     console.log('PASS: atomic source import, all-round coverage, source/parent recheck, immutable evidence, final failure rollback, idempotent retry and unchanged source')
     console.log('PASS: project-level unimported/changed-source inspection; clean checks explicitly do not authorize cutover')
     console.log('PASS: atomic initial recipient plan, imported exception preservation, immutable past, stale/retry/failure guards and no-plan future default')
+    console.log('PASS: checkpoint-aware pre-cutover inspection; imported legacy billing mutation/delete/truncate blocked, maintenance notes remain editable')
   }finally{await importDb.close()}
   console.log('PASS: complete invoice migration payload accepted by PostgreSQL, received-only and planned states, exact amounts, source identity, year/date preservation and strict evidence guards')
   console.log('Scope: synthetic invoice-source import only; no real method confirmation, whole-project cutover, concurrent legacy writers, durable restore or production writes')

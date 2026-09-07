@@ -98,3 +98,12 @@ tests/billing-import-reconciliation.cjsをtest:billing-migrationへ追加。架�
 架空DBで個別請求先維持、過去不変、確認後の変更拒否、再送、終端失敗の全取消、予定ゼロから新規予定への既定先引継ぎ、証跡不変、未認証/PUBLIC拒否を確認。test:billing-db、test:billing-migration、build成功（既存のバンドルサイズ警告のみ）。本番へ適用していない。
 
 重要：inspect_invoice_importと全件照合CLIは初期設定前の点検。初期設定による正当なplan接続/revision変更後は、取込直後との差を検出する。これを黙って除外したり移行完了と扱わない。初期設定の履歴も含めた切替前点検は次工程。cutover_ready=false・所有者変更の旧年度拒否を維持し、旧書込停止・全体切替・実権限・並行接続・復元は未完。
+# 最新：初期設定後の点検と移行済み元請求の保護
+
+20260907_invoice_initialization_inspection.sqlを初期設定SQLの後に追加。inspect_invoice_initialization(project)は初期設定証跡とそのplan_changed履歴を使い、作成時の値から許される変更（plan/source/revision/updated_at）だけか、変更前後の接続・現行回との一致・既定/個別先・欠落/余分・元/親/操作の一致を単一SQLで点検する。初期設定済みかつ一致ならinitialization_checks_passed=true、cutover_readyは常にfalse。初期設定前、正当な新規予定生成や後続運用の後は成功扱いしない。継続的な運用監査やロック付き切替判定ではない。
+
+20260907_imported_invoice_source_guard.sqlは取込証跡のある旧年度行のid/contract_id/year/請求予定日/請求日/入金予定日/入金日/明細/payments/振替不能/status変更、行削除、全削除を拒否する。保守・駆付記録の更新は許可。元全JSONとの点検はメモ変更でも再確認を要求する（保守メモが請求改変だという意味ではない）。未取込行や新規旧年度の書込は対象外で、全面的な旧経路停止ではない。
+
+保護関数は信頼された移行ロール所有のSECURITY DEFINER、固定search_path、PUBLIC実行不可。呼出元から証跡が見えないことを理由に保護が抜けないようにする。隔離DBの低権限legacy_writerでも請求変更が拒否される試験を追加。実Supabaseの所有者/権限/トリガーや複数接続は別途検証が必要。
+
+試験：初期化前拒否/初期化後一致/予定ゼロ一致、個別先削除・請求先改変・親変更・余分な新規回・未取込年度の検出、未認証/PUBLIC拒否、元請求更新/削除/TRUNCATE/CASCADE拒否とメモ更新許可。通常アプリ・本番DB変更なし。旧年度ゲート解除もまだ行わない。

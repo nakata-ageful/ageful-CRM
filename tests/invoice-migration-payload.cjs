@@ -85,7 +85,103 @@ async function main(){
     await assert.rejects(insert(payloads[0].row),/unique constraint/)
     await assert.rejects(insert({...payloads[0].row,occurrence_key:'other',source_payment_index:99,frozen_amount:101}),/do not match/)
   }finally{await db.close()}
+  const importDb=new PGlite()
+  try{
+    await importDb.exec(`create table customers(id bigint primary key);create table projects(id bigint primary key,customer_id bigint default 1);
+      create table contracts(id bigint primary key,project_id bigint references projects(id));
+      create table annual_records(id bigint primary key,contract_id bigint references contracts(id),year integer,status text,
+        payments jsonb,billing_scheduled_date date,billing_date date,received_date date,payment_due_date date,transfer_failed boolean,line_items jsonb);
+      create schema auth;create function auth.uid() returns uuid language sql as 'select nullif(current_setting(''test.actor'',true),'''')::uuid';
+      set test.actor='11111111-1111-4111-8111-111111111111';
+      insert into customers values(1);insert into projects values(1);insert into contracts values(1,1);`)
+    for(const r of records)await importDb.query('insert into annual_records select * from jsonb_populate_record(null::annual_records,$1::jsonb)',[JSON.stringify(r)])
+    await importDb.transaction(async tx=>{
+      await tx.exec("set local ageful.allow_draft_migration='yes'")
+      for(const name of ['20260907_billing_ownership_foundation.sql','20260907_invoice_import_rpc.sql'])
+        await tx.exec(fs.readFileSync(path.join(root,'database/drafts',name),'utf8'))
+    })
+    let seq=0
+    const operation=()=>`66666666-6666-4666-8666-${String(++seq).padStart(12,'0')}`
+    const call=(op,rs,project={id:1,customer_id:1},signature=rs[0].evidence.sourceSignature)=>importDb.query(
+      'select import_invoice_source($1,$2,$3::jsonb,$4::jsonb,$5,$6::jsonb) receipt',
+      [op,rs[0].row.source_annual_record_id,JSON.stringify(project),JSON.stringify({id:1,project_id:1}),signature,JSON.stringify(rs)])
+    async function snapshot(){const s={};for(const t of ['projects','contracts','annual_records','billing_units','billing_operations','billing_unit_events','invoice_import_evidence'])
+      s[t]=(await importDb.query(`select to_jsonb(t) value from ${t} t order by to_jsonb(t)::text`)).rows.map(x=>x.value);return s}
+    const start=await snapshot(),splitPayloads=payloads.filter(p=>p.row.source_annual_record_id===2)
+    const inspect=async()=>(await importDb.query('select inspect_invoice_import(1) report')).rows[0].report
+    assert.equal((await inspect()).unimported_sources,3)
+    assert.equal((await inspect()).source_checks_passed,false)
+    await assert.rejects(call(operation(),[splitPayloads[0]]),/すべての回/)
+    await assert.rejects(call(operation(),[splitPayloads[0],splitPayloads[0]]),/重複/)
+    await assert.rejects(call(operation(),[payloads[0]],{id:1,notes:'確認後の変更'}),/発電所・契約/)
+    const wrongDate=plain(splitPayloads);wrongDate[1].row.scheduled_date='2027-12-02'
+    await assert.rejects(call(operation(),wrongDate),/元記録と一致/)
+    const wrongAmount=plain(splitPayloads);wrongAmount[0].row.frozen_amount=111
+    await assert.rejects(call(operation(),wrongAmount),/do not match/)
+    const wrongProof=plain(splitPayloads);wrongProof[1].evidence.methodConfirmation.sourceSnapshotHash='0'.repeat(64)
+    await assert.rejects(call(operation(),wrongProof),/確認根拠/)
+    const extra=plain(splitPayloads);extra[0].row.id=999
+    await assert.rejects(call(operation(),extra),/移行列/)
+    await assert.rejects(call(operation(),[payloads[0]],{id:1,customer_id:1},JSON.stringify({...single,status:'請求済'})),/元記録が更新/)
+    assert.deepEqual(await snapshot(),start)
+    await importDb.exec(`create function fail_import() returns trigger language plpgsql as $$begin raise exception 'synthetic final evidence failure';end$$;
+      create trigger fail_import before insert on invoice_import_evidence for each row execute function fail_import();`)
+    await assert.rejects(call(operation(),splitPayloads),/synthetic final evidence failure/)
+    assert.deepEqual(await snapshot(),start,'Source, units, events, operation and evidence all roll back')
+    await importDb.exec('drop trigger fail_import on invoice_import_evidence')
+    const op=operation(),receipt=(await call(op,splitPayloads)).rows
+    const imported=await snapshot()
+    assert.equal(imported.billing_units.length,2)
+    assert.equal(imported.billing_unit_events.length,2)
+    assert.equal(imported.invoice_import_evidence.length,1)
+    assert.equal((await inspect()).unimported_sources,2)
+    assert.deepEqual(imported.annual_records,start.annual_records,'Never mutate the old source')
+    assert.equal(receipt[0].receipt.cutover_ready,false)
+    assert.deepEqual((await call(op,splitPayloads)).rows,receipt)
+    assert.deepEqual(await snapshot(),imported)
+    await assert.rejects(call(operation(),splitPayloads),/取込済み/)
+    const changed=plain(splitPayloads);changed[0].evidence.amountBasis='別の根拠'
+    await assert.rejects(call(op,changed),/同じ操作ID/)
+    await call(operation(),[payloads[0]])
+    await call(operation(),[payloads[3]])
+    const finished=await snapshot()
+    assert.equal(finished.billing_units.length,4)
+    assert.equal(finished.invoice_import_evidence.length,3)
+    assert.equal(finished.billing_units.reduce((n,u)=>n+(u.frozen_amount??0),0),310)
+    const report=await inspect()
+    assert.equal(report.source_checks_passed,true)
+    assert.equal(report.cutover_ready,false,'Clean source checks must not silently authorize cutover')
+    // A later legacy edit must be detected even after successful import.
+    await importDb.exec("update annual_records set status='請求済' where id=1")
+    assert.equal((await inspect()).changed_sources,1)
+    assert.equal((await inspect()).source_checks_passed,false)
+    await importDb.exec("update annual_records set status='入金済' where id=1")
+    await importDb.exec('update projects set customer_id=2 where id=1')
+    assert.equal((await inspect()).changed_parents,3)
+    assert.equal((await inspect()).source_checks_passed,false)
+    await importDb.exec('update projects set customer_id=1 where id=1')
+    assert.deepEqual(await snapshot(),finished)
+    // A direct update without an event is detected by the report (this fixture intentionally lacks the update guard).
+    await assert.rejects(importDb.transaction(async tx=>{
+      await tx.exec("update billing_units set scheduled_date='2027-12-02' where source_annual_record_id=2 and source_payment_index=2")
+      const changedReport=(await tx.query('select inspect_invoice_import(1) report')).rows[0].report
+      assert.equal(changedReport.changed_or_untracked_units,1)
+      assert.equal(changedReport.source_checks_passed,false)
+      throw new Error('synthetic report test rollback')
+    }),/synthetic report test rollback/)
+    assert.deepEqual(await snapshot(),finished)
+    assert.ok(finished.billing_units.filter(u=>u.frozen_amount!==null).every(u=>u.frozen_at!==contexts[0].importedAt),'Freeze timestamp is assigned by DB')
+    for(const sql of ['update invoice_import_evidence set schema_version=1','delete from invoice_import_evidence','truncate invoice_import_evidence'])
+      await assert.rejects(importDb.exec(sql),/append-only/)
+    await importDb.exec("set test.actor=''")
+    await assert.rejects(call(operation(),[payloads[0]]),/ログイン/)
+    await assert.rejects(inspect(),/ログイン/)
+    assert.equal((await importDb.query("select has_function_privilege('public','import_invoice_source(uuid,bigint,jsonb,jsonb,text,jsonb)','execute') allowed")).rows[0].allowed,false)
+    assert.equal((await importDb.query("select has_function_privilege('public','inspect_invoice_import(bigint)','execute') allowed")).rows[0].allowed,false)
+    console.log('PASS: atomic source import, all-round coverage, source/parent recheck, immutable evidence, final failure rollback, idempotent retry and unchanged source')
+    console.log('PASS: project-level unimported/changed-source inspection; clean checks explicitly do not authorize cutover')
+  }finally{await importDb.close()}
   console.log('PASS: complete invoice migration payload accepted by PostgreSQL, received-only and planned states, exact amounts, source identity, year/date preservation and strict evidence guards')
-  console.log('Scope: synthetic preparation only; no source-locking import RPC, persistent evidence, live method confirmation, cutover or production writes')
+  console.log('Scope: synthetic invoice-source import only; no real method confirmation, whole-project cutover, concurrent legacy writers, durable restore or production writes')
 }
 main().catch(error=>{console.error(error);process.exitCode=1})

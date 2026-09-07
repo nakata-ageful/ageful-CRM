@@ -20,6 +20,8 @@ function load(file) {
 }
 const { reviewBillingMigration: review } = load('src/lib/billing-migration-review.ts')
 const { identifyBillingMigrationSource: identify } = load('src/lib/billing-migration-source.ts')
+const { prepareMaintenancePreservation: preserve, verifyMaintenancePreservation: verifyPreserved } = load('src/lib/maintenance-migration.ts')
+const { billingUnitStatusLabel: statusLabel, isEditableInvoicePlan, resolveUnitAmount } = load('src/lib/billing-unit.ts')
 const single = { id: 1, contract_id: 1, year: 2025, payments: null, status: '請求済',
   billing_scheduled_date: '2025-06-01', billing_date: '2025-06-01', received_date: null,
   payment_due_date: null, transfer_failed: false, line_items: [{ name: '保守料', amount: 100 }] }
@@ -28,6 +30,36 @@ const split = { ...single, id: 2, payments: [
   { seq: 2, scheduled_date: '2025-12-01', billing_date: null, received_date: null },
 ] }
 async function main() {
+  const maintenance={...single,status:'未入金',billing_scheduled_date:null,billing_date:null,line_items:[],payments:[],maintenance_record:'点検完了',escort_record:'訪問履歴'}
+  const retained=await preserve('fixture',[maintenance])
+  assert.equal(retained.billingUnitsCreated,0)
+  assert.equal(retained.readyToWrite,false)
+  assert.equal(retained.retained[0].sourceRecord.escort_record,'訪問履歴')
+  assert.equal(retained.retained[0].sourceSnapshotHash,createHash('sha256').update(retained.retained[0].sourceSignature).digest('hex'))
+  maintenance.maintenance_record='後日編集'
+  assert.equal(retained.retained[0].sourceRecord.maintenance_record,'点検完了')
+  const restored=JSON.parse(JSON.stringify(retained.retained.map(r=>r.sourceRecord)))
+  assert.equal((await verifyPreserved(retained,restored)).matches,true)
+  assert.equal((await verifyPreserved(retained,restored)).productionRestoreVerified,false)
+  assert.equal((await verifyPreserved(retained,[])).mismatches[0].reason,'missing')
+  assert.equal((await verifyPreserved(retained,[...restored,...restored])).mismatches[0].reason,'duplicate')
+  assert.equal((await verifyPreserved(retained,[{...restored[0],escort_record:null}])).mismatches[0].reason,'changed')
+  assert.equal((await verifyPreserved(retained,[...restored,{...restored[0],id:99}])).mismatches[0].reason,'extra')
+  await assert.rejects(verifyPreserved({...retained,retained:[{...retained.retained[0],sourceSnapshotHash:'0'.repeat(64)}]},restored),/照合情報/)
+  for(const patch of [{payment_due_date:'2025-06-10'},{line_items:single.line_items},{status:'入金済'},{transfer_failed:true},{payments:[{seq:1}]}])
+    await assert.rejects(preserve('fixture',[{...maintenance,...patch}]),/請求情報/)
+  assert.equal(review('fixture',[{...maintenance,payment_due_date:'2025-06-10'}]).recordIssues.length,1)
+  assert.equal(review('fixture',[maintenance]).candidates.length,0)
+  const display={method:'口座振替',lifecycle:'planned',issuedOn:null,receivedOn:null,frozenAt:null,frozenAmount:null}
+  assert.equal(statusLabel(display),'振替予定')
+  assert.equal(statusLabel({...display,lifecycle:'fixed'}),'入金確認待ち')
+  assert.equal(statusLabel({...display,lifecycle:'cancelled'}),'取りやめ')
+  assert.equal(statusLabel({...display,lifecycle:'review_required'}),'記録要確認')
+  for(const lifecycle of ['cancelled','review_required']) {
+    const unit={...display,method:'請求書',lifecycle}
+    assert.equal(isEditableInvoicePlan(unit),false)
+    assert.equal(resolveUnitAmount(unit,()=>{throw Error('Must not calculate historical amount')}).amount,null)
+  }
   const candidates = review('fixture', [single, split]).candidates
   const mapped = await Promise.all(candidates.map(c => identify('fixture', c, c.recordId === 1 ? single : split)))
   assert.deepEqual(mapped.map(x => x.columns.source_payment_index), [0, 1, 2])

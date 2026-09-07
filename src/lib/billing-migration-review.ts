@@ -1,6 +1,7 @@
 import type { AnnualRecord, BillingLineItem } from '../types'
 import { canonicalJson, copyJson } from './billing-json'
 import { isBillingDate } from './billing-unit'
+import { isMaintenanceOnlyRecord } from './maintenance-migration'
 
 export type MigrationConfirmation = {
   sourceKey: string
@@ -60,7 +61,7 @@ export function reviewBillingMigration(
       // 保守メモだけの行は請求を捏造せず、元行の保全対象として残す。
       if (!split && !hasActivity && !part.scheduled_date) {
         retainedOnlyIds.push(record.id)
-        if (record.line_items?.length || record.status === '請求済') recordIssues.push({ recordId: record.id, message: '明細・状態のみの記録です。請求回の実績は自動生成しません' })
+        if (!isMaintenanceOnlyRecord(record)) recordIssues.push({ recordId: record.id, message: '入金予定日・明細・状態等の請求情報があります。保守専用とは確定せず、請求回も自動生成しません' })
         continue
       }
       const candidate: BillingMigrationCandidate = {

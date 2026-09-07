@@ -9,7 +9,7 @@ export type BillingUnit = {
   method: '請求書' | '口座振替'
   scheduledDate: string | null
   recipientId: number | null
-  lifecycle: 'planned' | 'fixed' | 'issued' | 'received'
+  lifecycle: 'planned' | 'fixed' | 'issued' | 'received' | 'cancelled' | 'review_required'
   issuedOn: string | null
   receivedOn: string | null
   frozenAmount: number | null
@@ -19,6 +19,16 @@ export type BillingUnit = {
 }
 
 export type UnitAmount = { amount: number | null; basis: '確定額' | '予定額' | '金額要確認' }
+
+/** Shared display wording for invoice/debit history; does not decide when debit amounts freeze. */
+export function billingUnitStatusLabel(unit: BillingUnit): string {
+  if (unit.lifecycle === 'cancelled') return '取りやめ'
+  if (unit.lifecycle === 'review_required') return '記録要確認'
+  if (unit.lifecycle === 'received' || unit.receivedOn) return '入金済'
+  if (unit.lifecycle === 'issued' || unit.issuedOn) return '発行済・未入金'
+  if (unit.lifecycle === 'fixed') return '入金確認待ち'
+  return unit.method === '口座振替' ? '振替予定' : '未発行'
+}
 
 const isYen = (n: number) => Number.isSafeInteger(n) && n >= 0
 const isCustomerId = (n: number) => Number.isSafeInteger(n) && n > 0

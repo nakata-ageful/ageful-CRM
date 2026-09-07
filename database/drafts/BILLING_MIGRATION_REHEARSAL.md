@@ -116,3 +116,12 @@ tests/billing-import-reconciliation.cjsをtest:billing-migrationへ追加。架�
 SECURITY DEFINER/固定path/PUBLIC不可。初期設定と同じ発電所行をロックする。年度UPDATEが先に年度行をロックした競合ではデッドロックによる片方の取消があり得る。複数接続での待機/再試行は未検証、勝手な成功扱いをしない。契約自体のproject_id更新など全親経路の停止を保証するものでもない。
 
 隔離試験で日付4種のINSERT/UPDATE、明細/分割/状態/不能、年度の契約付替え、証跡を読めない旧writerを拒否。空の保守記録、保守メモ、未初期設定対象の書込は成功。本番適用・通常UI変更・移転ゲート解除なし。初期化後に新UIを使う準備ができたという意味ではなく、切替作業中の保護部品。
+# 最新：保守専用の保全準備・復元内容照合、回別表示の状態整理
+
+maintenance-migration.ts追加。請求日/予定日/入金日/入金予定日・明細/payments・不能・状態を確認し、請求情報がない元年度だけを全JSON/canonical/hash付き保全manifestにする。0円請求を作らずbillingUnitsCreated=0/readyToWrite=false。保守/駆付記録と未知の元列も値コピーする。reviewBillingMigrationもこの判定を使い、入金予定日だけの記録を無警告の保守専用と扱わない。retainedOnlyIdsは引き続き「請求回未生成」であり、無条件に安全な保守行を意味しない。
+
+verifyMaintenancePreservationはmanifest自身を再検証し、取り出した対象行との全値一致、欠落/重複/変更/余分を検出する。productionRestoreVerified=false。JSONの照合であり永続DB/権限/Auth/添付の復元試験ではない。SQL保全証跡・初期化点検への統合は未完。
+
+回別UIモデルにcancelled/review_requiredを追加し、共通表で取りやめ/記録要確認、口座振替plannedを振替予定と表示。fixedは入金確認待ち。編集対象や過去額のフォールバックを広げない。通常画面のDB読取接続や振替確定タイミングは未変更。
+
+合成データで全メモ保持、請求情報混入拒否、hash/不変性、照合差分、状態表示、取りやめ/要確認の編集拒否・現契約計算拒否を試験。監査CLIの許可依存に純粋保全モジュールだけ追加。実データ/本番/公開変更なし。

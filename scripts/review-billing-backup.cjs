@@ -5,7 +5,7 @@ const root = path.resolve(__dirname, '..'), cache = new Map()
 function load(file) {
   file = path.resolve(root, file)
   if (cache.has(file)) return cache.get(file).exports
-  if (!/\/src\/lib\/(billing-migration-review|billing-migration-source|billing-json|billing-unit)\.ts$/.test(file)) {
+  if (!/\/src\/lib\/(billing-migration-review|billing-migration-source|billing-json|billing-unit|maintenance-migration)\.ts$/.test(file)) {
     throw Error('Unapproved audit dependency')
   }
   const module = { exports: {} }; cache.set(file, module)

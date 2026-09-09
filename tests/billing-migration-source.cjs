@@ -76,7 +76,7 @@ async function main() {
     choices:[{...choice,recipientId:1,method:'口座振替'}]}),/元の請求先/)
   const { previewUnitLabel, previewAmountLabel, previewEventLabel } = load('src/dev/invoice-preview-labels.ts')
   const displayRow={id:1,project_id:1,service_year:2026,service_month:11,round_number:null,
-    lifecycle:'planned',collection_method:'invoice',scheduled_date:'2026-11-27',issued_on:null,received_on:null,
+    lifecycle:'planned',collection_method:'invoice',scheduled_date:'2026-11-27',issued_on:null,received_on:null,payment_due_on:null,
     recipient_customer_id:1,frozen_amount:null,frozen_line_items:null,frozen_at:null,planned_amount:82500,revision:1}
   assert.equal(previewUnitLabel(displayRow),'2026年 11月分')
   assert.equal(previewUnitLabel({...displayRow,service_month:null,round_number:2}),'2026年 第2回')

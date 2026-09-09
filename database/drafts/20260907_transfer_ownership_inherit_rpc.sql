@@ -119,6 +119,10 @@ BEGIN
       WHERE project_id=p_project_id AND lifecycle='planned';
   END IF;
   -- Validate non-schedule selections against the resulting schedule, not the previous divisor.
+  IF EXISTS(SELECT 1 FROM jsonb_each(coalesce(p_field_choices->'contract','{}'::jsonb)) e
+    WHERE e.key IN('billing_method','billing_count','billing_schedule_days') AND e.value->>'mode'<>'keep') THEN
+    RAISE EXCEPTION '旧移転処理の方法・予定変更は追加検証が必要です。新しい一括移転を使用してください';
+  END IF;
   patches:=public.prepare_transfer_detail_choices(to_jsonb(old_project),to_jsonb(current_contract),p_field_choices);
   -- Child request is deterministic and committed/rolled back with the parent transaction.
   child_operation:=substr(encode(sha256(convert_to(p_operation_key::text||':recipient-plan','UTF8')),'hex'),1,32)::uuid;

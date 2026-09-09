@@ -21,7 +21,8 @@ BEGIN
   -- Serialize against initialization. A conflicting legacy UPDATE can deadlock with
   -- an annual-row lock; PostgreSQL aborts one transaction, never silently accepts both.
   PERFORM 1 FROM public.projects WHERE id IN (project_key,old_project_key) ORDER BY id FOR UPDATE;
-  IF EXISTS(SELECT 1 FROM public.invoice_recipient_initializations WHERE project_id IN (project_key,old_project_key)) THEN
+  IF EXISTS(SELECT 1 FROM public.invoice_recipient_initializations WHERE project_id IN (project_key,old_project_key))
+    OR EXISTS(SELECT 1 FROM public.billing_migration_acceptances WHERE project_id IN (project_key,old_project_key)) THEN
     IF TG_OP='INSERT' THEN
       IF public.legacy_record_has_billing(new_value) THEN RAISE EXCEPTION '請求先の初期設定後は新しい請求画面で登録してください'; END IF;
     ELSE

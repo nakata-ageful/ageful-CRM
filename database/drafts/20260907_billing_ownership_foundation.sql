@@ -277,3 +277,17 @@ ALTER TABLE public.ownership_transfers ENABLE ROW LEVEL SECURITY;
 -- * SECURITY DEFINER functions
 -- * transfer_ownership / issue / collection / correction RPCs
 -- * legacy-data backfill and cutover gates
+
+-- Explicit acceptance receipts, written only by the migration verification routine.
+CREATE TABLE public.billing_migration_acceptances (
+  project_id bigint PRIMARY KEY REFERENCES public.projects(id),
+  accepted_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  report jsonb NOT NULL,
+  actor_user_id uuid NOT NULL
+);
+ALTER TABLE public.billing_migration_acceptances ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.billing_migration_acceptances FROM PUBLIC;
+CREATE TRIGGER billing_migration_acceptances_immutable BEFORE UPDATE OR DELETE ON public.billing_migration_acceptances
+  FOR EACH ROW EXECUTE FUNCTION public.reject_audit_row_mutation();
+CREATE TRIGGER billing_migration_acceptances_no_truncate BEFORE TRUNCATE ON public.billing_migration_acceptances
+  FOR EACH STATEMENT EXECUTE FUNCTION public.reject_audit_row_mutation();

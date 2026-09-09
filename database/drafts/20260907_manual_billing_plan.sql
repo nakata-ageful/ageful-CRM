@@ -27,7 +27,8 @@ BEGIN
   PERFORM 1 FROM public.projects WHERE id=p_project FOR UPDATE;
   PERFORM id FROM public.billing_recipient_plans WHERE project_id=p_project ORDER BY id FOR UPDATE;
   SELECT * INTO active_plan FROM public.billing_recipient_plans WHERE project_id=p_project AND retired_at IS NULL;
-  IF EXISTS(SELECT 1 FROM public.billing_units WHERE project_id=p_project AND source_annual_record_id IS NOT NULL) THEN
+  IF EXISTS(SELECT 1 FROM public.billing_units WHERE project_id=p_project AND source_annual_record_id IS NOT NULL)
+    AND NOT EXISTS(SELECT 1 FROM public.billing_migration_acceptances WHERE project_id=p_project) THEN
     RAISE EXCEPTION '移行済み記録との統合は未対応です';
   END IF;
   PERFORM id FROM public.billing_units WHERE project_id=p_project ORDER BY id FOR UPDATE;

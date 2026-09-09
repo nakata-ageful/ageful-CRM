@@ -193,9 +193,9 @@ BEGIN
       IF row_value->>'amount_basis'='source_record' AND (split OR row_value->'frozen_line_items' IS DISTINCT FROM source->'line_items') THEN
         RAISE EXCEPTION '保存明細を根拠にできません';
       END IF;
-    ELSIF part->>'scheduled_date' IS NULL OR row_value->'frozen_amount'<>'null'::jsonb OR row_value->'frozen_line_items'<>'null'::jsonb
+    ELSIF row_value->'frozen_amount'<>'null'::jsonb OR row_value->'frozen_line_items'<>'null'::jsonb
       OR row_value->'frozen_at'<>'null'::jsonb OR row_value->>'amount_basis' IS DISTINCT FROM 'unconfirmed' THEN
-      RAISE EXCEPTION '予定の金額を固定しないでください。予定日なしは保全専用記録として別途扱います';
+      RAISE EXCEPTION '予定の金額を固定しないでください';
     END IF;
     -- DB sets the migration freeze time; never trust a client-provided historical timestamp.
     row_value:=row_value||jsonb_build_object('frozen_at',CASE WHEN active THEN to_jsonb(transaction_timestamp()) ELSE 'null'::jsonb END);

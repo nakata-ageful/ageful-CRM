@@ -22,7 +22,7 @@ export function Billing(props: Props) {
   if (props.billingHistory) {
     const now = new Date()
     const today = props.billingToday ?? `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
-    return <><p role="status">回別請求の表示確認中です。旧方式の編集操作は使用しません。</p>
+    return <><p role="status">各回に保存した請求先・金額を表示しています。発行・入金・予定の変更は「請求詳細を開く」から行えます。</p>
       <BillingOverviewPanel data={props.billingHistory} today={today} onViewDetail={props.onViewDetail} />
     </>
   }

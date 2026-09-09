@@ -24,6 +24,7 @@ function environment({ section = null, liveShape = false } = {}) {
     }).outputText
     vm.runInNewContext(code, { module, exports: module.exports, Date, Map, Set, URLSearchParams, window: { location: { hash: '' } },
       require: name => {
+        if(name.endsWith('.css'))return {}
         if (name === 'react' || name === 'react/jsx-runtime') return require(name)
         if (!name.startsWith('.')) throw Error('External module forbidden: ' + name)
         const base = path.resolve(path.dirname(file), name)

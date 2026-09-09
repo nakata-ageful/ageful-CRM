@@ -38,7 +38,7 @@ export function billingUnitFromStorage(row: Record<string, unknown>): BillingUni
   return { id: String(integer('id',1)), projectId: integer('project_id',1), serviceYear: year,
     roundLabel: month !== null ? `${month}月分` : round !== null ? `第${round}回` : '保存済み単回記録',
     method: row.collection_method === 'invoice' ? '請求書' : '口座振替',
-    scheduledDate: date('scheduled_date'), issuedOn: date('issued_on'), receivedOn: date('received_on'),
+    scheduledDate: date('scheduled_date'), issuedOn: date('issued_on'), receivedOn: date('received_on'),paymentDueOn:date('payment_due_on'),
     recipientId: row.recipient_customer_id === null ? null : integer('recipient_customer_id',1),
     lifecycle: lifecycle as BillingUnit['lifecycle'], frozenAmount: amount, frozenLineItems: items, frozenAt,
     plannedAmount: row.planned_amount == null ? null : integer('planned_amount',0), revision: integer('revision',0) }

@@ -20,7 +20,7 @@ const plain=v=>JSON.parse(JSON.stringify(v)),original=JSON.stringify({project,co
 const kept=prepare(project,contract)
 assert.deepEqual(plain(kept.before),{project,contract})
 assert.deepEqual(plain(kept.after),{project,contract})
-assert.equal(Object.keys(ck).length,54)
+assert.equal(Object.keys(ck).length,55) // Includes DB updated_at; 50 editable + 5 protected.
 assert.ok(Object.values(kept.decisions.contract).every(c=>c.mode==='keep'))
 const selected=prepare(project,contract,{contract:{notes:{mode:'clear'},annual_maintenance_inc:{mode:'change',value:90000}},project:{sales_company:{mode:'change',value:'B販売会社'}}})
 assert.equal(selected.after.contract.notes,null)

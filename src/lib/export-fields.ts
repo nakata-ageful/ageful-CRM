@@ -117,7 +117,7 @@ export const EXPORT_FIELD_DEFS: ExportTableDef[] = [
       { key: 'subcontractor', label: '保守委託先' },
       { key: 'subcontract_fee_ex', label: '委託料（税抜）' },
       { key: 'subcontract_fee_inc', label: '委託料（税込）' },
-      { key: 'subcontract_billing_day', label: '委託請求日' },
+      { key: 'subcontract_billing_day', label: '委託料支払期日（毎年）' },
       { key: 'subcontract_start_date', label: '委託開始日' },
       { key: 'maintenance_start_date', label: '保守開始日' },
       { key: 'maintenance_contractor', label: '受託会社' },

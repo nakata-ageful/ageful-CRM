@@ -25,6 +25,12 @@ import { Billing } from './views/Billing'
 import { CsvImport } from './views/CsvImport'
 import { Prospects } from './views/Prospects'
 import { ProspectDetailView } from './views/ProspectDetail'
+import {BillingAccessGate} from './components/BillingAccessGate'
+import {OwnershipTransferEditor} from './components/OwnershipTransferEditor'
+import {billingRuntimeEnabled,loadBillingRuntime,saveBillingRuntime,hasPendingBillingRuntime,type BillingRuntimeSnapshot} from './lib/billing-runtime'
+import type {BillingHistoryData} from './components/BillingHistorySection'
+import {Modal} from './components/Modal'
+import {OwnershipTransferHistory} from './components/OwnershipTransferHistory'
 
 type ViewKey =
   | 'dashboard'
@@ -80,12 +86,17 @@ function navActive(navKey: ViewKey, currentView: ViewKey): boolean {
 }
 
 export default function App() {
+  return billingRuntimeEnabled?<BillingAccessGate><MainApp/></BillingAccessGate>:<MainApp/>
+}
+function MainApp() {
   const initial = parseHash()
   const [view, setViewRaw] = useState<ViewKey>(initial.view)
   const [pendingDetailId, setPendingDetailId] = useState<number | null>(initial.detailId)
   const [loading, setLoading] = useState(true)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [error, setError] = useState('')
+  const [runtime,setRuntime]=useState<BillingRuntimeSnapshot|null>(null)
+  const [transferOpen,setTransferOpen]=useState(false),[pendingBilling,setPendingBilling]=useState(false)
   // List data
   const [stats, setStats] = useState<DashboardStats>({ totalCustomers: 0, totalProjects: 0, activeMaintenanceCount: 0, pendingBillingCount: 0 })
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -130,6 +141,7 @@ export default function App() {
     if (!silent) setLoading(true)
     setError('')
     try {
+      const ledger=billingRuntimeEnabled?await loadBillingRuntime():null
       const [s, c, p, m, b, pr, pm] = await Promise.all([
         getDashboard(),
         getCustomers(),
@@ -146,13 +158,34 @@ export default function App() {
       setBillingRows(b)
       setProspects(pr)
       setPeriodicMaintenanceList(pm)
+      setRuntime(ledger)
+      if(billingRuntimeEnabled)setPendingBilling(await hasPendingBillingRuntime())
     } catch (e) {
-      setError('データの取得に失敗しました。')
+      if(billingRuntimeEnabled)setRuntime(null)
+      setError(billingRuntimeEnabled?'新しい請求データの取得に失敗しました。ログイン・移行確認・切替設定を確認してください。旧方式への自動切替はしません。':'データの取得に失敗しました。')
       console.error(e)
     } finally {
       if (!silent) setLoading(false)
     }
   }, [])
+
+  const billingHistory:BillingHistoryData|undefined=runtime?{
+    units:runtime.units,recipients:customers.map(c=>({id:c.id,name:c.name})),plannedAmount:()=>null,
+    recipientName:id=>customers.find(c=>c.id===id)?.name??`請求先ID ${id}（名前未取得）`,
+    projectName:id=>projectRows.find(p=>p.id===id)?.project_name??`発電所ID ${id}`,
+  }:undefined
+  async function reloadRuntime(){
+    // Propagate errors so the durable journal is retained until all views have fresh data.
+    const [ledger,c,p,b]=await Promise.all([loadBillingRuntime(),getCustomers(),getProjects(),getBillingRows()])
+    const detail=projectDetail?await getProjectDetail(projectDetail.project.id):null
+    const cd=customerDetail?await getCustomerDetail(customerDetail.customer.id):null
+    setRuntime(ledger);setCustomers(c);setProjectRows(p);setBillingRows(b)
+    if(detail)setProjectDetail(detail);if(cd)setCustomerDetail(cd)
+  }
+  async function saveRuntime(request:Record<string,unknown>|null){
+    try{await saveBillingRuntime(request,reloadRuntime);setPendingBilling(false)}
+    catch(e){setPendingBilling(await hasPendingBillingRuntime());throw e}
+  }
 
   useEffect(() => { loadAll() }, [loadAll])
 
@@ -300,12 +333,14 @@ export default function App() {
         )}
         {error && <div className="notice notice-error">{error}</div>}
 
+        {billingRuntimeEnabled&&pendingBilling&&<div className="notice"><p>前回の保存結果が未確認です。端末に一時保存した同じ操作で確認します（契約情報等を含み、確認完了後に削除します）。</p><button className="btn" onClick={()=>void saveRuntime(null).catch(e=>setError(e instanceof Error?e.message:String(e)))}>保存結果を再確認</button></div>}
         {loading ? (
           <div className="card loading-card">読み込み中...</div>
-        ) : (
+        ) : billingRuntimeEnabled&&!runtime ? <div className="card"><p>請求データの安全確認が完了していないため、画面を停止しています。</p><button onClick={()=>void loadAll()}>再確認</button></div> : (
           <>
             {view === 'dashboard' && (
               <Dashboard
+                billingHistory={billingHistory}
                 stats={stats}
                 maintenanceList={maintenanceList}
                 billingRows={billingRows}
@@ -324,6 +359,12 @@ export default function App() {
             )}
             {view === 'project-detail' && projectDetail && (
               <ProjectDetailView
+                billingHistory={billingHistory}
+                onSaveInvoice={billingHistory?request=>saveRuntime({action:'invoice',value:request}):undefined}
+                onOwnershipTransfer={billingHistory?()=>setTransferOpen(true):undefined}
+                billingUnits={runtime?.units.filter(u=>u.projectId===projectDetail.project.id)}
+                onAddDebit={runtime&&projectDetail.contract?async input=>{await saveRuntime({action:'debit_add',value:{...input,projectId:projectDetail.project.id,contractId:projectDetail.contract!.id}})}:undefined}
+                onSaveBillingPlan={runtime?async(choices,reason)=>{await saveRuntime({action:'plan',value:{projectId:projectDetail.project.id,choices,reason}})}:undefined}
                 detail={projectDetail}
                 onBack={() => {
                   // ブラウザ履歴を1つ戻す。popstate ハンドラで view が直前の画面に復元される。
@@ -349,6 +390,7 @@ export default function App() {
             )}
             {view === 'customer-detail' && customerDetail && (
               <CustomerDetailView
+                billingHistory={billingHistory}
                 detail={customerDetail}
                 onBack={() => { setView('customers'); loadAll(true) }}
                 onReload={reloadCustomerDetail}
@@ -386,6 +428,7 @@ export default function App() {
             )}
             {view === 'billing' && (
               <Billing
+                billingHistory={billingHistory}
                 rows={billingRows}
                 onReload={loadAll}
                 onViewDetail={(id) => navToProjectDetail(id, '請求詳細')}
@@ -420,6 +463,13 @@ export default function App() {
             )}
           </>
         )}
+        {view==='project-detail'&&runtime&&projectDetail&&billingHistory&&<OwnershipTransferHistory
+          transfers={runtime.transfers.filter(t=>t.project_id===projectDetail.project.id)} events={runtime.events.filter(e=>e.project_id===projectDetail.project.id)} recipientName={billingHistory.recipientName}/>}
+        {transferOpen&&runtime&&projectDetail?.contract&&<Modal title="所有者を変更" width={1100} onClose={()=>setTransferOpen(false)}>
+          <OwnershipTransferEditor project={projectDetail.project} contract={projectDetail.contract} customers={customers}
+            units={runtime.units.filter(u=>u.projectId===projectDetail.project.id)}
+            onSave={async input=>{await saveRuntime({action:'transfer',value:input});setTransferOpen(false)}}/>
+        </Modal>}
       </main>
     </div>
     </ToastProvider>

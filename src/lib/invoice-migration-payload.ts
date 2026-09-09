@@ -60,8 +60,8 @@ export async function prepareInvoiceMigrationPayload(
       || c.lineItems.some(i=>typeof i.name!=='string' || !i.name.trim() || !Number.isSafeInteger(i.amount) || i.amount<0)
       || c.lineItems.reduce((sum,i)=>sum+i.amount,0)!==c.amount) throw new Error('確定金額と各回の明細・確認根拠を揃えてください')
     amountBasis=base.amount===c.amount && canonicalJson(base.lineItems)===canonicalJson(c.lineItems)?'source_record':'operator_confirmed'
-  } else if (!c.scheduledDate || c.amount!==null || c.lineItems!==null) {
-    throw new Error('未発行予定には予定日が必要です。過去の確定額は設定しません')
+  } else if (c.amount!==null || c.lineItems!==null) {
+    throw new Error('未発行予定に過去の確定額は設定しません')
   }
   return {
     row: {

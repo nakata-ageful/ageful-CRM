@@ -12,6 +12,7 @@ export type BillingUnit = {
   lifecycle: 'planned' | 'fixed' | 'issued' | 'received' | 'cancelled' | 'review_required'
   issuedOn: string | null
   receivedOn: string | null
+  paymentDueOn?: string | null
   frozenAmount: number | null
   frozenLineItems: BillingLineItem[] | null
   frozenAt: string | null

@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ProjectDetail, AnnualRecordInput, PeriodicMaintenanceInput, MaintenanceResponseInput, MaintenancePlanLevel, BillingDetail as BillingDetailData } from '../types'
 import { BillingDetailView } from './BillingDetail'
+import type {BillingHistoryData} from '../components/BillingHistorySection'
+import type {InvoiceWriteRequest} from '../lib/invoice-write-session'
+import {ManualDebitPlanCreator,type NewDebitPlan} from '../components/ManualDebitPlanCreator'
+import {OwnershipBillingPlanEditor} from '../components/OwnershipBillingPlanEditor'
+import type {TransferBillingChoice,TransferBillingUnit} from '../lib/ownership-billing-plan'
 import { getBillingDetail } from '../lib/data'
 import { hasSupabaseEnv } from '../lib/supabase'
 import { BASIC_NOTE_KEYS } from '../lib/project-basic-notes'
@@ -102,6 +107,12 @@ type Props = {
   onReload: () => void
   onViewCustomer: (customerId: number) => void
   onViewMaintenance: (id: number) => void
+  billingHistory?:BillingHistoryData
+  onSaveInvoice?:(request:InvoiceWriteRequest)=>Promise<unknown>
+  onOwnershipTransfer?:()=>void
+  billingUnits?:readonly TransferBillingUnit[]
+  onAddDebit?:(input:NewDebitPlan)=>Promise<void>
+  onSaveBillingPlan?:(choices:TransferBillingChoice[],reason:string)=>Promise<void>
 }
 
 const WORK_TYPES = ['点検', '除草', '経産省定期報告']
@@ -132,7 +143,7 @@ function writeTabToHash(t: Tab) {
   }
 }
 
-export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, onViewMaintenance }: Props) {
+export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, onViewMaintenance,billingHistory,onSaveInvoice,onOwnershipTransfer,billingUnits,onAddDebit,onSaveBillingPlan }: Props) {
   const toast = useToast()
   const { project, customer, contract, annualRecords, maintenanceResponses, periodicMaintenance } = detail
   // DB追加前は新列を送信しない。モックではDBを変更せず動作確認できる。
@@ -743,6 +754,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
         </button>
         <span style={{ fontSize: 13, color: '#64748b' }}>発電所：</span>
         <b style={{ fontSize: 'inherit' }}>{project.plant_name || project.project_name}</b>
+        {onOwnershipTransfer&&contract&&<button className="btn btn-main" onClick={onOwnershipTransfer}>所有者を変更</button>}
         <button className="back-btn" onClick={onBack} style={{ marginLeft: 'auto' }}>← 戻る</button>
       </div>
 
@@ -1041,6 +1053,8 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           <div className="card loading-card">読み込み中...</div>
         ) : billingDetail ? (
           <BillingDetailView
+            billingHistory={billingHistory}
+            onSaveInvoice={onSaveInvoice}
             detail={billingDetail}
             embedded
             onBack={() => {}}
@@ -1053,6 +1067,14 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       )}
 
       {/* ── その他タブ ── */}
+      {tab==='請求詳細'&&billingHistory&&<>
+        {onAddDebit&&<ManualDebitPlanCreator recipients={billingHistory.recipients} testOnly={false} onSave={onAddDebit}/>}
+        {billingUnits&&onSaveBillingPlan&&<details className="card"><summary>今後の請求先・方法・予定額を変更</summary>
+          <OwnershipBillingPlanEditor key={billingUnits.map(u=>`${u.id}:${u.revision}`).join(',')} projectId={project.id}
+            oldOwner={{id:customer.id,name:customer.name}} newOwner={{id:customer.id,name:customer.name}}
+            recipientOptions={billingHistory.recipients} units={billingUnits} onSave={onSaveBillingPlan} testOnly={false}/>
+        </details>}
+      </>}
       {tab === 'その他' && (
         <div className="card">
           <div className="card-header-row">
@@ -1237,7 +1259,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
 
       {/* ── 請求 ── */}
       {/* ── 年次請求記録タブ ── */}
-      {tab === '年次請求記録' && (
+      {tab === '年次請求記録' && !billingHistory && (
         <>
           <div className="card">
             <div className="card-header-row">

@@ -18,6 +18,7 @@ export type Customer = {
 }
 
 export type Project = {
+  updated_at?: string | null
   id: number
   customer_id: number
   summary_notes?: string | null
@@ -84,6 +85,7 @@ export type Project = {
 export type MaintenancePlanLevel = 'なし' | '年1回' | '年2回' | '年3回' | '年4回' | '無制限'
 
 export type Contract = {
+  updated_at?: string | null
   id: number
   project_id: number
   billing_method: string | null  // 請求書 / 口座振替

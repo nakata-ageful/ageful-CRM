@@ -209,7 +209,7 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject, bi
         )}
       </div>
 
-      {billingHistory && <BillingHistorySection data={billingHistory} customerId={customer.id} />}
+      {billingHistory && <BillingHistorySection data={billingHistory} customerId={customer.id} onViewDetail={onViewProject} />}
       {/* ── 添付ファイル ── */}
       <div className="card">
         <div className="card-header-row">

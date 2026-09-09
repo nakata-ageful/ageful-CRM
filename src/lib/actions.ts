@@ -1,4 +1,4 @@
-import { hasSupabaseEnv, supabase } from './supabase'
+import { hasSupabaseEnv, supabase, billingRuntimeEnabled } from './supabase'
 import { basicNotesPayload } from './project-basic-notes'
 import { readBackupTables, checkBackupRelations } from './backup-reader'
 import {
@@ -913,6 +913,7 @@ export async function updateProspect(id: number, data: Partial<Omit<Prospect, 'i
  */
 async function syncBackToProspect(customerId: number | null | undefined, update: Record<string, unknown>) {
   if (!customerId || Object.keys(update).length === 0) return
+  if(!(await maySyncLegacyProspect(customerId)))return
   if (!hasSupabaseEnv) {
     const pr = prospectStore.getAll().find(p => p.converted_customer_id === customerId)
     if (pr) prospectStore.update(pr.id, update as Partial<Omit<Prospect, 'id' | 'created_at'>>)
@@ -926,6 +927,7 @@ async function syncProspectToCustomerProject(
   data: Partial<Omit<Prospect, 'id' | 'created_at'>>,
   customerId: number,
 ) {
+  if(!(await maySyncLegacyProspect(customerId)))return
   // 顧客テーブルへの同期
   const customerUpdate: Record<string, unknown> = {}
   if ('customer_name' in data) customerUpdate.name = data.customer_name
@@ -997,6 +999,15 @@ export async function deleteProspect(id: number): Promise<void> {
   if (!hasSupabaseEnv) { prospectStore.delete(id); return }
   const { error } = await db().from('prospects').delete().eq('id', id)
   if (error) throw error
+}
+
+/** Customer-only links cannot safely select a project after any ownership transfer. */
+async function maySyncLegacyProspect(customerId:number):Promise<boolean>{
+  if(!billingRuntimeEnabled)return true
+  const {data,error}=await db().rpc('billing_runtime_has_transfer',{p_customer:customerId})
+  if(error)throw error
+  if(typeof data!=='boolean')throw Error('見込みの同期対象を確認できません')
+  return !data
 }
 
 export async function convertProspectToCustomer(prospect: Prospect): Promise<number> {
@@ -1131,7 +1142,7 @@ export async function deleteAttachment(id: number, fileUrl: string): Promise<voi
 // ── 全データエクスポート ─────────────────────────────────
 
 export type ExportData = {
-  version: 1
+  version: 1 | 2
   exported_at: string
   customers: Record<string, unknown>[]
   projects: Record<string, unknown>[]
@@ -1143,6 +1154,12 @@ export type ExportData = {
 }
 
 export async function exportAllData(): Promise<ExportData> {
+  if(billingRuntimeEnabled){
+    const {data,error}=await db().rpc('billing_runtime_backup')
+    if(error)throw error
+    if(data?.version!==2||!Array.isArray(data.billing_units)||!Array.isArray(data.ownership_transfers))throw Error('新しい請求記録を含むバックアップを取得できませんでした')
+    return data as ExportData
+  }
   if (!hasSupabaseEnv) {
     return {
       version: 1,
@@ -1175,6 +1192,7 @@ export async function restoreAllData(
   data: ExportData,
   onProgress?: (msg: string) => void,
 ): Promise<{ success: boolean; errors: string[] }> {
+  if(data.version===2)throw Error('新しい請求履歴を含むバックアップは旧復元画面では扱えません。検証済みDB復元手順を使用してください')
   ensureLegacyRestoreAllowed(hasSupabaseEnv)
   const errors: string[] = []
   const log = (msg: string) => onProgress?.(msg)

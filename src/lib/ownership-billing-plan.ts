@@ -23,10 +23,11 @@ export function prepareOwnershipBillingPlan(input: {
   newOwnerId: number
   units: readonly TransferBillingUnit[]
   choices: readonly TransferBillingChoice[]
+  allowedRecipientIds?:readonly number[]
 }): { changes: TransferBillingChoice[]; preservedUnitIds: string[] } {
   const positive = (n: number) => Number.isSafeInteger(n) && n > 0
   if (![input.projectId,input.oldOwnerId,input.newOwnerId].every(positive)
-    || input.oldOwnerId === input.newOwnerId) throw Error('発電所・変更前後の所有者を確認してください')
+    || (!input.allowedRecipientIds&&input.oldOwnerId === input.newOwnerId)) throw Error('発電所・変更前後の所有者を確認してください')
   if (new Set(input.units.map(u=>u.id)).size !== input.units.length
     || new Set(input.choices.map(c=>c.unitId)).size !== input.choices.length) throw Error('同じ請求回が重複しています')
   if (input.units.some(u=>u.projectId !== input.projectId)) throw Error('別の発電所の請求が含まれています')
@@ -43,7 +44,9 @@ export function prepareOwnershipBillingPlan(input: {
   for (const c of input.choices) {
     const unit = editable.find(u=>u.id === c.unitId)!
     if (!Number.isSafeInteger(c.expectedRevision) || c.expectedRevision !== unit.revision) throw Error('請求予定が更新されています。確認し直してください')
-    if (c.recipientId !== input.oldOwnerId && c.recipientId !== input.newOwnerId) throw Error('請求先は変更前または変更後の所有者を指定してください')
+    if(input.allowedRecipientIds?!input.allowedRecipientIds.includes(c.recipientId)
+      :c.recipientId!==input.oldOwnerId&&c.recipientId!==input.newOwnerId&&c.recipientId!==unit.recipientId)
+      throw Error('請求先は変更前・変更後の所有者、またはこの回に保存されている請求先を指定してください')
     if (!['請求書','口座振替'].includes(c.method) || !isBillingDate(c.scheduledDate)) throw Error('請求方法・予定日を確認してください')
     if (c.plannedAmount !== null && (!Number.isSafeInteger(c.plannedAmount) || c.plannedAmount < 0)) throw Error('予定額を確認してください')
     if ((c.periodStart === null) !== (c.periodEnd === null)

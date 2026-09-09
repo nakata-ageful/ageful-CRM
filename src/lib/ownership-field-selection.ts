@@ -5,7 +5,7 @@ import { isBillingDate } from './billing-unit'
 type Kind = 'text' | 'number' | 'boolean' | 'date' | 'strings' | 'amounts' | 'flags' | 'protected'
 // Explicit keys: adding a model field must require a policy review at type-check time.
 export const contractFieldKinds = {
-  id:'protected', project_id:'protected', created_at:'protected', ownership_transfer_date:'protected',
+  id:'protected', project_id:'protected', created_at:'protected', updated_at:'protected', ownership_transfer_date:'protected',
   billing_method:'text', billing_due_day:'text', billing_amount_ex:'number', billing_amount_inc:'number',
   annual_maintenance_ex:'number', annual_maintenance_inc:'number', land_cost_monthly:'number',
   insurance_fee:'number', other_fee:'number', communication_fee:'number', local_association_fee:'number',
@@ -22,7 +22,7 @@ export const contractFieldKinds = {
   billing_amount_overrides:'amounts', billing_item_flags:'flags',
 } as const satisfies Record<keyof Contract, Kind>
 export const projectFieldKinds = {
-  id:'protected', customer_id:'protected', old_owner:'protected', created_at:'protected',
+  id:'protected', customer_id:'protected', old_owner:'protected', created_at:'protected',updated_at:'protected',
   summary_notes:'text', meti_notes:'text', power_company_notes:'text', project_no:'text', project_name:'text',
   plant_name:'text', site_postal_code:'text', site_prefecture:'text', site_address:'text', latitude:'number',
   longitude:'number', google_coordinates:'text', panel_kw:'number', panel_count:'number', panel_maker:'text',
@@ -37,7 +37,7 @@ export const projectFieldKinds = {
 } as const satisfies Record<keyof Project, Kind>
 
 export type FieldChoice = { mode:'keep' } | { mode:'clear' } | { mode:'change'; value:unknown }
-type Choices = { contract?:Partial<Record<keyof Contract,FieldChoice>>; project?:Partial<Record<keyof Project,FieldChoice>> }
+export type OwnershipFieldChoices = { contract?:Partial<Record<keyof Contract,FieldChoice>>; project?:Partial<Record<keyof Project,FieldChoice>> }
 const own = (o:object,k:string) => Object.prototype.hasOwnProperty.call(o,k)
 function valid(kind:Kind,value:unknown):boolean {
   if (value === null) return true
@@ -68,8 +68,13 @@ function select(before:Record<string,unknown>,rules:Record<string,Kind>,choices:
 }
 
 /** D-026 selection draft only. No DB writes, system owner/date changes or invoice recalculation. */
-export function prepareOwnershipFields(project:Project,contract:Contract,choices:Choices={}) {
+export function prepareOwnershipFields(project:Project,contract:Contract,choices:OwnershipFieldChoices={}) {
   if (contract.project_id!==project.id) throw new Error('発電所と契約が一致しません')
+  for(const [key,choice] of Object.entries(choices.contract??{})) {
+    if(choice.mode==='change'&&contractFieldKinds[key as keyof Contract]==='number'
+      &&choice.value!==null&&(typeof choice.value!=='number'||!Number.isSafeInteger(choice.value)||choice.value<0))
+      throw Error(`値の形式を確認してください: ${key}`)
+  }
   const before={project:copyJson(project),contract:copyJson(contract)}
   const p=select(before.project,projectFieldKinds,choices.project ?? {})
   const c=select(before.contract,contractFieldKinds,choices.contract ?? {})

@@ -5,13 +5,16 @@ import { isEditableInvoicePlan } from '../lib/billing-unit'
 import type { InvoiceWriteRequest } from '../lib/invoice-write-session'
 import { InvoicePlanEditor } from './InvoicePlanEditor'
 import { ManualDebitEditor } from './ManualDebitEditor'
+import {InvoiceCorrectionEditor} from './InvoiceCorrectionEditor'
 
 export function InvoiceLedgerDetail({data,projectId,onSave}:{data:BillingHistoryData;projectId:number;onSave?:(request:InvoiceWriteRequest)=>Promise<unknown>}) {
   const [selected,setSelected]=useState<string|null>(null)
   const [editingPlan,setEditingPlan]=useState(false)
+  const [correcting,setCorrecting]=useState(false)
   const units=data.units.filter(u=>u.projectId===projectId)
   const unit=units.find(u=>u.id===selected)
   return <><BillingHistorySection data={data} projectId={projectId}/>
+    {onSave&&data.recipients&&units.filter(u=>u.method==='請求書'&&['issued','received'].includes(u.lifecycle)).map(u=><button className="btn" key={`correct-invoice-${u.id}`} disabled={selected!==null} onClick={()=>{setCorrecting(true);setSelected(u.id)}}>{u.serviceYear}年 {u.roundLabel}：請求・入金記録を訂正</button>)}
     {onSave&&units.filter(u=>u.method==='口座振替'&&u.lifecycle==='received').map(u=><button key={`correct-${u.id}`} type="button" className="btn" disabled={selected!==null} onClick={()=>{setEditingPlan(false);setSelected(u.id)}}>{u.serviceYear}年 {u.roundLabel}：振替記録を訂正</button>)}
     {onSave&&units.filter(u=>u.method==='口座振替'&&u.lifecycle==='planned'&&!u.receivedOn&&u.frozenAmount===null).map(u=>
       <button key={`debit-${u.id}`} type="button" className="btn" disabled={selected!==null} onClick={()=>{setEditingPlan(false);setSelected(u.id)}}>{u.serviceYear}年 {u.roundLabel}：振替結果を記録</button>)}
@@ -21,7 +24,8 @@ export function InvoiceLedgerDetail({data,projectId,onSave}:{data:BillingHistory
       <button key={u.id} type="button" className="btn" disabled={selected!==null} onClick={()=>{setEditingPlan(false);setSelected(u.id)}}>
         {u.serviceYear}年 {u.roundLabel}：{u.lifecycle==='planned'?'発行':'入金確認'}
       </button>)}
-    {unit&&onSave&&(unit.method==='口座振替'?<ManualDebitEditor key={`debit-${unit.id}`} unit={unit} recipientName={data.recipientName} onSave={onSave} onClose={()=>setSelected(null)}/>
+    {unit&&onSave&&(correcting&&data.recipients?<InvoiceCorrectionEditor key={`correction-${unit.id}`} unit={unit} recipients={data.recipients} onSave={onSave} onClose={()=>{setSelected(null);setCorrecting(false)}}/>
+      :unit.method==='口座振替'?<ManualDebitEditor key={`debit-${unit.id}`} unit={unit} recipientName={data.recipientName} onSave={onSave} onClose={()=>setSelected(null)}/>
       :editingPlan&&data.recipients?<InvoicePlanEditor key={`plan-${unit.id}`} unit={unit} recipients={data.recipients} onSave={onSave} onClose={()=>setSelected(null)}/>
       :<InvoiceUnitEditor key={unit.id} unit={unit} recipientName={data.recipientName} onSave={onSave} onClose={()=>setSelected(null)}/>)}
   </>

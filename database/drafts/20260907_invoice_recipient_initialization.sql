@@ -90,7 +90,7 @@ BEGIN
   END IF;
   IF EXISTS(SELECT 1 FROM public.billing_units WHERE project_id=p_project_id AND lifecycle='planned' AND
     (original_method<>'invoice' OR collection_method<>'invoice' OR recipient_customer_id IS NULL OR recipient_source<>'confirmed'
-      OR recipient_plan_id IS NOT NULL OR scheduled_date IS NULL)) THEN RAISE EXCEPTION '未発行予定の請求先・予定日を確認してください'; END IF;
+      OR recipient_plan_id IS NOT NULL)) THEN RAISE EXCEPTION '未発行予定の請求先を確認してください'; END IF;
   IF (first_date IS NOT NULL AND p_effective_from<>first_date) OR (first_date IS NULL AND p_effective_from<current_date) THEN
     RAISE EXCEPTION '予定があれば最初の予定日、予定がなければ確認した今後の開始日を指定してください';
   END IF;

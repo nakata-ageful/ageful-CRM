@@ -7,6 +7,7 @@ import { annualBillableTotalInc } from '../lib/billing'
 import type { Contract } from '../types'
 import { hasSupabaseEnv } from '../lib/supabase'
 import { RESTORE_DISABLED_MESSAGE } from '../lib/restore-safety'
+import { billingRuntimeEnabled } from '../lib/billing-runtime'
 
 /** 金額確認CSVの費目列（契約テーブルの金額カラムと対応） */
 const KINGAKU_COLS = [
@@ -866,6 +867,15 @@ export function CsvImport({ onReload }: Props) {
     }
   }
 
+  async function handleFullRuntimeBackup() {
+    setExporting(true)
+    try {
+      const data=await exportAllData()
+      if(data.version!==2)throw Error('新しい請求記録を含むバックアップを確認できません')
+      downloadBlob(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),`ageful_application_full_${new Date().toISOString().slice(0,10)}.json`)
+    }catch(e){alert(`バックアップの取得に失敗しました: ${String(e)}`)}finally{setExporting(false)}
+  }
+
   async function handleExport() {
     setExporting(true)
     try {
@@ -874,6 +884,7 @@ export function CsvImport({ onReload }: Props) {
       const date = new Date().toISOString().slice(0, 10)
 
       if (exportFormat === 'csv') {
+        if(billingRuntimeEnabled&&Object.values(fieldSel.annual_records??{}).some(Boolean))throw Error('この旧形式の「請求記録」CSVには、切替後の各回の請求・入金を出せません。「請求記録」の選択を外すか、全アプリデータのJSONを使用してください。古い記録だけの請求CSVは出力しません。')
         // 選択した種別・項目を1ファイルにまとめる。種別ごとに見出し行＋表を積み上げ、間に空行を入れる
         const sections: string[] = []
         // 結合モード: 顧客・発電所・契約を発電所ごと1行に統合して先頭に置く
@@ -977,6 +988,11 @@ export function CsvImport({ onReload }: Props) {
         <div style={{ fontSize: 13, color: '#64748b', marginBottom: 12 }}>
           出力する形式とデータ・項目を選んでエクスポートできます。
         </div>
+        {billingRuntimeEnabled&&<div style={{marginBottom:16}}>
+          <button className="btn btn-main" disabled={exporting} onClick={handleFullRuntimeBackup}>全アプリデータを保存（新しい請求・所有者変更履歴を含むJSON）</button>
+          <p>下の項目選択に関係なく、全18テーブルを同じ時点で取得します。顧客情報を含むため、安全な場所に保管してください。ログイン設定・添付ファイル本体・DB構造は含まれず、Supabase全体の復元用バックアップとは別です。</p>
+          <p>下の金額確認CSVは現在の契約条件です。過去の請求実額ではありません。旧形式の請求記録CSVは、切替後の記録が抜けるため使用できません。</p>
+        </div>}
 
         {/* 金額確認CSV（定型・ワンクリック） */}
         <div style={{ marginBottom: 14, padding: '12px 14px', background: '#f0f9ff', borderRadius: 8, borderLeft: '3px solid #0ea5e9' }}>

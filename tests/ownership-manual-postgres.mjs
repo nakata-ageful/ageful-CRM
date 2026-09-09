@@ -36,6 +36,6 @@ try{
   assert.ok(third.ownership_transfers.some(t=>t.from_customer_id===1&&t.to_customer_id===2))
   assert.ok(third.ownership_transfers.some(t=>t.from_customer_id===2&&t.to_customer_id===3))
   await transfer(op,before);assert.deepEqual(await snapshot(),third,'Old replay cannot undo C ownership')
-  assert.equal((await db.query("select has_function_privilege('public','transfer_ownership_manual(uuid,bigint,bigint,date,jsonb,jsonb,jsonb,jsonb,text)','execute') as ok")).rows[0].ok,false)
+  assert.equal((await db.query("select has_function_privilege('public','transfer_ownership_manual(uuid,bigint,bigint,date,jsonb,jsonb,jsonb,jsonb,text,bigint)','execute') as ok")).rows[0].ok,false)
   console.log('PASS: atomic mixed-plan A→B→C, selected contract clear, complete snapshots, final-failure rollback, stable replay and stale guards. No legacy/recipient-plan integration.')
 }finally{await db.close()}

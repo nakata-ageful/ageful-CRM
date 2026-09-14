@@ -70,7 +70,8 @@ BEGIN
   IF project_value IS DISTINCT FROM p_expected_project OR contract_value IS DISTINCT FROM p_expected_contract THEN
     RAISE EXCEPTION '確認後に発電所・契約が更新されています';
   END IF;
-  IF contract_value->>'billing_method' IS DISTINCT FROM '請求書' THEN RAISE EXCEPTION '初期設定は請求書のみ検証済みです'; END IF;
+  -- Current collection settings do not determine the explicitly confirmed historical method.
+  IF coalesce(contract_value->>'billing_method','') NOT IN ('請求書','口座振替') THEN RAISE EXCEPTION '現在の請求方法を確認してください'; END IF;
   -- Default is explicitly supplied, not a runtime fallback. Initial D-025 mapping only.
   IF project_value->>'customer_id' IS DISTINCT FROM p_default_recipient_id::text THEN
     RAISE EXCEPTION '初期の既定請求先は確認した現顧客に合わせてください。以降の変更は別操作です';
@@ -79,6 +80,7 @@ BEGIN
   IF NOT FOUND THEN RAISE EXCEPTION '請求先が存在しません'; END IF;
   PERFORM 1 FROM public.annual_records WHERE contract_id=(contract_value->>'id')::bigint ORDER BY id FOR UPDATE;
   PERFORM 1 FROM public.billing_units WHERE project_id=p_project_id ORDER BY id FOR UPDATE;
+  IF EXISTS(SELECT 1 FROM public.billing_units WHERE project_id=p_project_id AND original_method<>'invoice') THEN RAISE EXCEPTION '過去の請求書記録以外は別の初期設定が必要です'; END IF;
   report:=public.inspect_invoice_import(p_project_id);
   IF report->'source_checks_passed' IS DISTINCT FROM 'true'::jsonb THEN RAISE EXCEPTION '元記録の移行点検を完了してください'; END IF;
   SELECT coalesce(jsonb_object_agg(source_annual_record_id::text,source_snapshot_hash),'{}') INTO source_manifest

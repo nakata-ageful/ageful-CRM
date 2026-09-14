@@ -21,6 +21,7 @@ const {prepareInvoiceMigrationPayload:prepare}=load('src/lib/invoice-migration-p
 const {identifyBillingMigrationSource:identify}=load('src/lib/billing-migration-source.ts')
 const {auditBillingBackup,hash,canonicalJson,isMaintenanceOnlyRecord}=require('../scripts/review-billing-backup.cjs')
 const {reconcileBillingImport}=require('../scripts/reconcile-billing-import.cjs')
+const {confirmedBillingHistory}=require('../scripts/confirmed-billing-history.cjs')
 const actor='11111111-1111-4111-8111-111111111111'
 const project={...Object.fromEntries(Object.keys(pk).map(k=>[k,null])),id:1,customer_id:1,project_name:'検証発電所'}
 const contract={...Object.fromEntries(Object.keys(ck).map(k=>[k,null])),id:1,project_id:1,maintenance_start_date:'2022-01-14',billing_method:'請求書',billing_count:1,billing_schedule_days:['6月15日'],annual_maintenance_inc:100,issuance_fee_inc:0,transfer_fee_inc:0}
@@ -36,6 +37,9 @@ async function main(){
  const amounts=real?JSON.parse(fs.readFileSync(amountFile,'utf8')):[]
  const payer=real?JSON.parse(fs.readFileSync(payerFile,'utf8')):{datasetHash:hash(data),mode:'existing_current_customer',basis:'Synthetic fixture approval'}
  const audit=await auditBillingBackup(data,amounts,payer)
+ const historyArg=process.argv.indexOf('--history-confirmations')
+ if(historyArg>=0&&!process.argv[historyArg+1])throw Error('確認ファイルを指定してください')
+ const historyConfirmations=historyArg>=0?confirmedBillingHistory(data,JSON.parse(fs.readFileSync(process.argv[historyArg+1],'utf8'))):new Map()
  const {PGlite}=await import('@electric-sql/pglite');let db=new PGlite()
  const sourceTables=['customers','projects','contracts','annual_records','maintenance_responses','periodic_maintenance','prospects','attachments']
  try{
@@ -72,15 +76,22 @@ async function main(){
     await db.query('select preserve_maintenance_source($1,$2,$3::jsonb,$4::jsonb,$5)',[key(),record.id,JSON.stringify(p),JSON.stringify(c),canonicalJson(record)]);continue
    }
    // Do not infer a historical invoice/debit method from a currently debit-paid contract.
-   if(real&&c.billing_method!=='請求書'){unresolvedMethods.push(record.id);continue}
+   const historyConfirmation=historyConfirmations.get(record.id)
+   if(real&&c.billing_method!=='請求書'&&historyConfirmation?.method!=='invoice'){unresolvedMethods.push(record.id);continue}
    const payloads=[]
    for(const candidate of selected){const identity=await identify(audit.datasetId,candidate,record)
     payloads.push(await prepare(audit.datasetId,candidate,record,{projectId:p.id,contractId:c.id,importedAt:'2026-09-09T00:00:00.000Z',
      methodConfirmation:{sourceSnapshotHash:identity.columns.source_snapshot_hash,originalMethod:'invoice',collectionMethod:'invoice',
-      basis:real?'LOCAL REHEARSAL ONLY: current invoice setting; historical method not independently verified':'Synthetic invoice confirmation'}}))}
+      basis:historyConfirmation?.method==='invoice'?historyConfirmation.basis:real?'LOCAL REHEARSAL ONLY: current invoice setting; historical method not independently verified':'Synthetic invoice confirmation'}}))}
    await db.query('select import_invoice_source($1,$2,$3::jsonb,$4::jsonb,$5,$6::jsonb)',[key(),record.id,JSON.stringify(p),JSON.stringify(c),payloads[0].evidence.sourceSignature,JSON.stringify(payloads)])
   }
   const imported={billing_units:await rows('billing_units'),invoice_import_evidence:(await db.query('select to_jsonb(e) value from invoice_import_evidence e')).rows.map(r=>r.value)}
+  const roundConfirmations=[...historyConfirmations.values()].filter(c=>c.round!==undefined).map(c=>{
+   const units=imported.billing_units.filter(u=>u.source_annual_record_id===c.recordId)
+   assert.equal(units.length,1);assert.equal(units[0].round_number,null)
+   return {sourceRecord:c.recordId,confirmedRound:c.round,status:'confirmed; original source and imported row unchanged; audited assignment still required'}
+  })
+  if(roundConfirmations.length)console.log(JSON.stringify({roundConfirmations},null,2))
   const reconciliation=await reconcileBillingImport(data,amounts,payer,imported)
   const multiContractProjects=data.projects.filter(p=>data.contracts.filter(c=>c.project_id===p.id).length>1)
   const coverageRows=data.projects.filter(p=>!multiContractProjects.some(x=>x.id===p.id)).map(p=>{

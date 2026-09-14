@@ -5,6 +5,7 @@ RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp A
 DECLARE actor uuid:=auth.uid(); fingerprint text; op public.billing_operations%ROWTYPE;
  c public.contracts%ROWTYPE; plan public.billing_recipient_plans%ROWTYPE; u public.billing_units%ROWTYPE;
  item jsonb; d date; y integer; n integer; method text; slot text; result jsonb:='[]'; current_versions jsonb;
+ ps date; pe date; anchor_month integer; anchor_day integer;
 BEGIN
  IF actor IS NULL OR p_key IS NULL OR p_project IS NULL OR p_reason IS NULL OR length(trim(p_reason))=0
  OR jsonb_typeof(p_items) IS DISTINCT FROM 'array' OR jsonb_array_length(p_items) NOT BETWEEN 1 AND 96 THEN RAISE EXCEPTION '追加する予定と確認内容を指定してください'; END IF;
@@ -22,26 +23,28 @@ BEGIN
  PERFORM id FROM public.billing_units WHERE project_id=p_project ORDER BY id FOR UPDATE;
  SELECT coalesce(jsonb_object_agg(id::text,revision),'{}') INTO current_versions FROM public.billing_units WHERE project_id=p_project;
  IF current_versions IS DISTINCT FROM p_versions OR (SELECT coalesce(max(id),0) FROM public.project_management_events WHERE project_id=p_project) IS DISTINCT FROM p_last THEN RAISE EXCEPTION '予定または管理履歴が更新されています'; END IF;
- IF EXISTS(SELECT 1 FROM public.billing_units WHERE project_id=p_project AND lifecycle='planned' AND scheduled_date IS NULL) THEN RAISE EXCEPTION '日付のない記録との対応を先に確認してください'; END IF;
+ IF c.maintenance_start_date IS NULL THEN RAISE EXCEPTION '保守開始日を確認してください'; END IF;
+ anchor_month:=extract(month FROM c.maintenance_start_date); anchor_day:=extract(day FROM c.maintenance_start_date);
  FOR item IN SELECT value FROM jsonb_array_elements(p_items) LOOP
-  IF jsonb_typeof(item) IS DISTINCT FROM 'object' OR NOT(item ?& ARRAY['date','year','round','method','recipientId','amount']) THEN RAISE EXCEPTION '予定の入力形式が不正です'; END IF;
+  IF jsonb_typeof(item) IS DISTINCT FROM 'object' OR NOT(item ?& ARRAY['date','year','round','method','recipientId','amount','periodStart','periodEnd']) THEN RAISE EXCEPTION '対象保守期間と予定の入力形式を確認してください'; END IF;
   d:=(item->>'date')::date; y:=(item->>'year')::integer; n:=(item->>'round')::integer; method:=item->>'method';
-  IF d IS NULL OR y IS NULL OR n IS NULL OR y NOT BETWEEN 2000 AND 2200 OR extract(year FROM d)<>y
+  IF d IS NULL OR y IS NULL OR n IS NULL OR y NOT BETWEEN 2000 AND 2199 OR d NOT BETWEEN date '2000-01-01' AND date '2200-12-31'
    OR n<1 OR n>96 OR method IS NULL OR method NOT IN ('invoice','direct_debit')
-   OR (method='direct_debit' AND n<>extract(month FROM d))
    OR jsonb_typeof(item->'amount') IS DISTINCT FROM 'number' OR (item->>'amount')::numeric NOT BETWEEN 0 AND 9007199254740991
    OR (item->>'amount')::numeric<>trunc((item->>'amount')::numeric)
    OR NOT EXISTS(SELECT 1 FROM public.customers WHERE id=(item->>'recipientId')::bigint) THEN RAISE EXCEPTION '予定日・回・請求先・金額を確認してください'; END IF;
-  IF NOT public.management_active_on(p_project,'all',d) THEN RAISE EXCEPTION '全取引終了後は予定を追加できません'; END IF;
-  slot:='future:'||y||':'||method||':'||n;
+  ps:=make_date(y,anchor_month,least(anchor_day,extract(day FROM (make_date(y,anchor_month,1)+interval '1 month -1 day'))::integer));
+  pe:=make_date(y+1,anchor_month,least(anchor_day,extract(day FROM (make_date(y+1,anchor_month,1)+interval '1 month -1 day'))::integer))-1;
+  IF (item->>'periodStart')::date IS DISTINCT FROM ps OR (item->>'periodEnd')::date IS DISTINCT FROM pe THEN RAISE EXCEPTION '対象保守期間が契約と一致しません'; END IF;
+  IF NOT public.management_active_on(p_project,'all',ps) AND NOT EXISTS(SELECT 1 FROM public.project_management_events WHERE project_id=p_project AND scope='all' AND action='resume' AND effective_date BETWEEN ps AND pe) THEN RAISE EXCEPTION '全取引終了後の保守期間には予定を追加できません'; END IF;
+  slot:='maintenance:'||y||':round:'||n;
   -- Include cancelled records and original identity: changing a date/method must not resurrect it.
   IF EXISTS(SELECT 1 FROM public.billing_units WHERE project_id=p_project AND
-   (occurrence_key=slot OR scheduled_date=d OR service_year=y AND
-    (original_method<>method OR round_number=n AND method='invoice' OR service_month=extract(month FROM d)
-     OR round_number IS NULL AND service_month IS NULL))) THEN RAISE EXCEPTION '保存済みの回との対応確認が必要です。二重作成は行いません'; END IF;
-  INSERT INTO public.billing_units(project_id,contract_id,recipient_plan_id,recipient_customer_id,recipient_source,occurrence_key,service_year,service_month,round_number,scheduled_date,original_method,collection_method,planned_amount,amount_basis,plan_note)
+   (occurrence_key=slot OR service_year=y AND
+    (round_number=n OR service_month IS NOT NULL OR round_number IS NULL))) THEN RAISE EXCEPTION '保存済みの回との対応確認が必要です。二重作成は行いません'; END IF;
+  INSERT INTO public.billing_units(project_id,contract_id,recipient_plan_id,recipient_customer_id,recipient_source,occurrence_key,service_year,service_month,round_number,scheduled_date,original_method,collection_method,planned_amount,amount_basis,plan_note,period_start,period_end)
   VALUES(p_project,c.id,plan.id,(item->>'recipientId')::bigint,CASE WHEN plan.id IS NULL THEN 'confirmed' WHEN plan.default_recipient_customer_id=(item->>'recipientId')::bigint THEN 'default' ELSE 'override' END,
-   slot,y,CASE WHEN method='direct_debit' THEN n END,CASE WHEN method='invoice' THEN n END,d,method,method,(item->>'amount')::bigint,'operator_confirmed',p_reason) RETURNING * INTO u;
+   slot,y,NULL,n,d,method,method,(item->>'amount')::bigint,'operator_confirmed',p_reason,ps,pe) RETURNING * INTO u;
   IF u.recipient_source='override' THEN INSERT INTO public.billing_recipient_plan_overrides(recipient_plan_id,billing_unit_id,project_id,recipient_customer_id) VALUES(plan.id,u.id,p_project,u.recipient_customer_id); END IF;
   INSERT INTO public.billing_unit_events(project_id,billing_unit_id,operation_key,event_type,before_value,after_value,actor_user_id,reason) VALUES(p_project,u.id,p_key,'created',NULL,to_jsonb(u),actor,p_reason);
   result:=result||jsonb_build_array(to_jsonb(u));

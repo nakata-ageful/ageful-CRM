@@ -14,6 +14,7 @@ const {durableBillingOperation}=load('src/lib/durable-billing-operation.ts')
 const {inspectFutureBillingCoverage}=load('src/lib/billing-cutover-coverage.ts')
 const {reviewFutureSchedule}=load('src/lib/future-schedule-review.ts')
 const {billingUnitFromStorage}=load('src/lib/billing-unit-storage.ts')
+const {maintenancePeriod}=load('src/lib/maintenance-period-label.ts')
 const {reviewBillingMigration:review}=load('src/lib/billing-migration-review.ts')
 const {prepareInvoiceMigrationPayload:prepare}=load('src/lib/invoice-migration-payload.ts')
 const {identifyBillingMigrationSource:identify}=load('src/lib/billing-migration-source.ts')
@@ -21,7 +22,7 @@ const {auditBillingBackup,hash,canonicalJson,isMaintenanceOnlyRecord}=require('.
 const {reconcileBillingImport}=require('../scripts/reconcile-billing-import.cjs')
 const actor='11111111-1111-4111-8111-111111111111'
 const project={...Object.fromEntries(Object.keys(pk).map(k=>[k,null])),id:1,customer_id:1,project_name:'検証発電所'}
-const contract={...Object.fromEntries(Object.keys(ck).map(k=>[k,null])),id:1,project_id:1,billing_method:'請求書',billing_count:1,billing_schedule_days:['6月15日'],annual_maintenance_inc:100,issuance_fee_inc:0,transfer_fee_inc:0}
+const contract={...Object.fromEntries(Object.keys(ck).map(k=>[k,null])),id:1,project_id:1,maintenance_start_date:'2022-01-14',billing_method:'請求書',billing_count:1,billing_schedule_days:['6月15日'],annual_maintenance_inc:100,issuance_fee_inc:0,transfer_fee_inc:0}
 const annual={id:1,contract_id:1,year:2025,status:'入金済',payments:null,billing_scheduled_date:null,billing_date:'2025-06-01',payment_due_date:null,received_date:'2025-06-10',transfer_failed:false,line_items:[{name:'保守料',amount:100}],maintenance_record:'元の保守備考',escort_record:null}
 const fixture={customers:[{id:1,name:'A'},{id:2,name:'B'}],projects:[project],contracts:[contract],annual_records:[annual,
  {...annual,id:2,year:2026,status:'未入金',billing_date:null,received_date:null,line_items:null,billing_scheduled_date:'2026-12-01'},
@@ -205,30 +206,37 @@ async function main(){
    await runtimeWrite(key(),'debit_add',nextDebit)
    const scheduleState=await runtimeSnapshot()
    const scheduleContract=(await db.query('select to_jsonb(c) value from contracts c where id=1')).rows[0].value
+   const periodItem=i=>({...i,...maintenancePeriod(scheduleContract.maintenance_start_date,i.year)})
    const scheduleRequest={projectId:1,contract:scheduleContract,versions:Object.fromEntries(scheduleState.units.map(u=>[u.id,u.revision])),last:resumed.management_events.at(-1).id,
-    items:[{date:'2028-06-15',year:2028,round:1,method:'invoice',recipientId:2,amount:75},{date:'2029-06-15',year:2029,round:1,method:'invoice',recipientId:1,amount:80}],reason:'将来の他費目と前払い期間を確認'}
+    items:[{date:'2027-12-01',year:2028,round:1,method:'invoice',recipientId:2,amount:75},{date:'2027-12-01',year:2029,round:1,method:'invoice',recipientId:1,amount:80}].map(periodItem),reason:'対象保守期間を確認（前払い）'}
    const scheduleKey=key();await runtimeWrite(scheduleKey,'future_schedule',scheduleRequest);await runtimeWrite(scheduleKey,'future_schedule',scheduleRequest)
    const scheduled=await runtimeSnapshot()
    assert.equal(scheduled.units.length,scheduleState.units.length+2)
+   assert.equal(scheduled.units.find(u=>u.occurrence_key==='maintenance:2028:round:1').service_year,2028)
+   assert.equal(scheduled.units.find(u=>u.occurrence_key==='maintenance:2028:round:1').scheduled_date,'2027-12-01')
    assert.deepEqual(scheduled.units.filter(u=>scheduleState.units.some(old=>old.id===u.id)),scheduleState.units,'Future generation must never update existing units')
    await assert.rejects(runtimeWrite(key(),'future_schedule',scheduleRequest),/更新されています/)
    const refreshed={...scheduleRequest,versions:Object.fromEntries(scheduled.units.map(u=>[u.id,u.revision]))}
    await assert.rejects(runtimeWrite(key(),'future_schedule',refreshed),/二重作成/)
-   await assert.rejects(runtimeWrite(key(),'future_schedule',{...refreshed,items:[{...refreshed.items[0],date:'2030-06-15',year:2030},{...refreshed.items[0]}]}),/二重作成/)
+   await assert.rejects(runtimeWrite(key(),'future_schedule',{...refreshed,items:[periodItem({...refreshed.items[0],date:'2030-06-15',year:2030}),{...refreshed.items[0]}]}),/二重作成/)
    assert.deepEqual(await runtimeSnapshot(),scheduled,'Later duplicate failure must roll back earlier insertion')
    await assert.rejects(runtimeWrite(key(),'future_schedule',{...refreshed,contract:{...scheduleContract,annual_maintenance_inc:999}}),/契約が更新/)
-   await assert.rejects(runtimeWrite(key(),'future_schedule',{...refreshed,items:[{...refreshed.items[0],date:'2026-12-15',year:2026}]}),/全取引終了/)
+   await assert.rejects(runtimeWrite(key(),'future_schedule',{...refreshed,items:[{...refreshed.items[0],periodStart:null}]}),/対象保守期間/)
+   await assert.rejects(runtimeWrite(key(),'future_schedule',{...refreshed,items:[{...refreshed.items[0],periodEnd:'2028-12-31'}]}),/対象保守期間/)
    console.log('PASS: future invoice rounds across years, explicit payers/amounts, insert-only preservation, replay, stale requests, duplicates, full rollback and management end guard')
-   const monthly={...refreshed,items:[{date:'2030-01-25',year:2030,round:1,method:'direct_debit',recipientId:2,amount:100},{date:'2030-02-25',year:2030,round:2,method:'direct_debit',recipientId:1,amount:200}]}
+   const monthly={...refreshed,items:[{date:'2029-12-25',year:2030,round:1,method:'direct_debit',recipientId:2,amount:100},{date:'2030-01-25',year:2030,round:2,method:'direct_debit',recipientId:1,amount:200}].map(periodItem)}
    await runtimeWrite(key(),'future_schedule',monthly)
-   const monthlyState=await runtimeSnapshot(),monthUnit=monthlyState.units.find(u=>u.occurrence_key==='future:2030:direct_debit:1')
+   const monthlyState=await runtimeSnapshot(),monthUnit=monthlyState.units.find(u=>u.occurrence_key==='maintenance:2030:round:1')
    assert.equal(monthUnit.planned_amount,100)
    await runtimeWrite(key(),'plan',{projectId:1,reason:'振替予定を請求書へ切替し日付を変更',choices:monthlyState.units.filter(u=>u.lifecycle==='planned').map(u=>({unitId:String(u.id),expectedRevision:u.revision,recipientId:u.recipient_customer_id,method:u.id===monthUnit.id?'請求書':u.collection_method==='invoice'?'請求書':'口座振替',scheduledDate:u.id===monthUnit.id?'2030-03-25':u.scheduled_date,plannedAmount:u.planned_amount,periodStart:u.period_start,periodEnd:u.period_end,note:u.plan_note}))})
    const movedState=await runtimeSnapshot()
    await assert.rejects(runtimeWrite(key(),'future_schedule',{...monthly,versions:Object.fromEntries(movedState.units.map(u=>[u.id,u.revision])),items:[monthly.items[0]]}),/二重作成/)
    console.log('PASS: monthly debit plans retain explicit amounts/payers and cannot be regenerated after date/method changes')
+   await runtimeWrite(key(),'management',{projectId:1,expectedLast:movedState.management_events.at(-1).id,scope:'all',action:'end',date:'2031-01-01',reason:'将来期間の停止確認',choices:movedState.units.filter(u=>u.lifecycle==='planned').map(u=>({unitId:String(u.id),expectedRevision:u.revision,action:'keep',amount:null}))})
+   const stopped=await runtimeSnapshot()
+   await assert.rejects(runtimeWrite(key(),'future_schedule',{...monthly,last:stopped.management_events.at(-1).id,versions:Object.fromEntries(stopped.units.map(u=>[u.id,u.revision])),items:[periodItem({...monthly.items[0],year:2032,date:'2030-12-01'})]}),/全取引終了/)
    const managementBackup=(await db.query('select billing_runtime_backup() value')).rows[0].value
-   assert.equal(managementBackup.project_management_events.length,3)
+   assert.equal(managementBackup.project_management_events.length,4)
    await assert.rejects(db.exec('select * from project_management_events'),/permission denied/)
    await db.exec(`set test.actor='22222222-2222-4222-8222-222222222222'`)
    await assert.rejects(db.query('select billing_runtime_snapshot()'),/利用権限/)

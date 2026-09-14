@@ -43,7 +43,7 @@ export function OwnershipBillingDbPreview(){
           const present=new Set((await tx.query<{column_name:string}>("select column_name from information_schema.columns where table_schema='public' and table_name=$1",[table])).rows.map(r=>r.column_name))
           for(const [key,kind] of Object.entries(kinds))if(!present.has(key))await tx.exec(`alter table ${table} add column ${key} ${kind==='number'?'numeric':kind==='boolean'?'boolean':kind==='date'?'date':['flags','amounts','strings'].includes(kind)?'jsonb':'text'}`)
         }
-        await tx.exec("update projects set project_name='サンプル発電所'; update contracts set billing_count=1,billing_schedule_days='[\"6月15日\"]',annual_maintenance_inc=82500;")
+        await tx.exec("update projects set project_name='サンプル発電所'; update contracts set maintenance_start_date='2022-01-14',billing_count=1,billing_schedule_days='[\"6月15日\"]',annual_maintenance_inc=82500;")
         await tx.exec(manualPlan);await tx.exec(detailChoices);await tx.exec(transfer);await tx.exec(createDebit);await tx.exec(managementSql);await tx.exec(futureSql)})
       let parent:{project:Record<string,unknown>;contract:Record<string,unknown>}
       async function reload(){

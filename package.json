@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "test:billing-db": "node tests/invoice-write-postgres.mjs && node tests/invoice-recipient-plan-postgres.mjs && node tests/ownership-transfer-postgres.mjs && node tests/invoice-schedule-postgres.mjs && node tests/manual-billing-plan-postgres.mjs && node tests/ownership-manual-postgres.mjs && node tests/ownership-four-methods-postgres.mjs",
     "test:billing-migration": "node tests/billing-backup-audit.cjs && node tests/billing-migration-source.cjs && node tests/invoice-migration-payload.cjs && node tests/billing-import-reconciliation.cjs",
-    "test:billing-runtime": "node tests/ownership-field-selection.cjs && node tests/billing-item-selection.cjs && node tests/management-lifecycle.cjs && node tests/future-schedule-review.cjs && node tests/billing-runtime-rehearsal.cjs"
+    "test:billing-runtime": "node tests/ownership-field-selection.cjs && node tests/billing-item-selection.cjs && node tests/management-lifecycle.cjs && node tests/maintenance-schedule.cjs && node tests/maintenance-period-review.cjs && node tests/future-schedule-review.cjs && node tests/billing-runtime-rehearsal.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

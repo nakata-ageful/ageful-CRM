@@ -1,4 +1,4 @@
-/** Display-only annual anniversary range. Never changes billing dates or stored periods. */
+/** Annual anniversary range. Never changes billing dates or stored periods. */
 export function maintenancePeriodLabel(startDate: string | null | undefined, year: number): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(startDate ?? '')
   if (!match) return `保守開始日未設定（記録年：${year}）`
@@ -12,4 +12,10 @@ export function maintenancePeriodLabel(startDate: string | null | undefined, yea
   const from = anniversary(year), until = anniversary(year + 1)
   until.setUTCDate(until.getUTCDate() - 1)
   return `保守期間：${from.toISOString().slice(0, 10)} ～ ${until.toISOString().slice(0, 10)}`
+}
+
+export function maintenancePeriod(startDate:string|null|undefined,year:number){
+ const match=/^保守期間：(\d{4}-\d{2}-\d{2}) ～ (\d{4}-\d{2}-\d{2})$/.exec(maintenancePeriodLabel(startDate,year))
+ if(!match)throw Error('保守開始日と対象期間の開始年を確認してください')
+ return {periodStart:match[1],periodEnd:match[2]}
 }

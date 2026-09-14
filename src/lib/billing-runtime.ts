@@ -2,22 +2,23 @@ import {supabase,billingRuntimeEnabled} from './supabase'
 import {billingUnitFromStorage} from './billing-unit-storage'
 import type {TransferBillingUnit} from './ownership-billing-plan'
 import {durableBillingOperation} from './durable-billing-operation'
+import {managementEventFromStorage,type ManagementEvent} from './management-lifecycle'
 
 // Deployment opt-in AND authenticated server readiness. Never silently fall back to old writers.
 export {billingRuntimeEnabled}
-export type BillingRuntimeSnapshot={units:TransferBillingUnit[];transfers:Record<string,unknown>[];events:Record<string,unknown>[]}
+export type BillingRuntimeSnapshot={units:TransferBillingUnit[];transfers:Record<string,unknown>[];events:Record<string,unknown>[];managementEvents:ManagementEvent[]}
 export async function loadBillingRuntime():Promise<BillingRuntimeSnapshot>{
   if(!supabase||!billingRuntimeEnabled)throw Error('新しい請求機能はまだ有効化されていません')
   const {data,error}=await supabase.rpc('billing_runtime_snapshot')
   if(error)throw error
-  if(data?.version!==1||data?.ready!==true||!Array.isArray(data.units)||!Array.isArray(data.transfers)||!Array.isArray(data.events))throw Error('請求データの移行・アクセス保護が未完了です。旧画面へは自動で切り替えません')
+  if(data?.version!==2||data?.ready!==true||!Array.isArray(data.units)||!Array.isArray(data.transfers)||!Array.isArray(data.events)||!Array.isArray(data.management_events))throw Error('請求データの移行・アクセス保護が未完了です。旧画面へは自動で切り替えません')
   const units:TransferBillingUnit[]=data.units.map((row:Record<string,unknown>)=>{
     if(!['pending','succeeded','failed','not_applicable'].includes(String(row.collection_state)))throw Error('振替状態が不正です')
     return {...billingUnitFromStorage(row),collectionState:row.collection_state as TransferBillingUnit['collectionState'],
       periodStart:row.period_start as string|null,periodEnd:row.period_end as string|null,planNote:row.plan_note as string}
   })
   if(new Set(units.map(u=>u.id)).size!==units.length)throw Error('請求回が重複しています')
-  return {units,transfers:data.transfers,events:data.events}
+  return {units,transfers:data.transfers,events:data.events,managementEvents:data.management_events.map(managementEventFromStorage)}
 }
 async function operation<T>(reload:()=>Promise<T>){
   if(!supabase||!billingRuntimeEnabled)throw Error('新しい請求機能は無効です')

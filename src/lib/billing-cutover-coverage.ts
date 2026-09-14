@@ -1,13 +1,14 @@
 import type {BillingRow} from '../types'
-import {computeUpcomingInvoices,toIsoDate,withdrawalAmount} from './billing'
+import {computeUpcomingInvoices,toIsoDate,withdrawalAmount,invoiceAmount} from './billing'
 import {isBillingDate} from './billing-unit'
+import {managementActiveOn,type ManagementEvent} from './management-lifecycle'
 
 type StoredUnit={project_id:number;recipient_customer_id:number;collection_method:string;scheduled_date:string|null;lifecycle:string;planned_amount:number|null}
 export type CoverageCandidate={projectId:number;recipientId:number;method:'invoice'|'direct_debit';date:string;round:number;amount:number;status:'missing'|'matches'|'review';reason?:string}
 /** Read-only pre-cutover comparison. Calculated amounts are proposals, NEVER historical actuals.
  * Does not authorize activation, create records or decide ambiguous date/round correspondence.
  */
-export function inspectFutureBillingCoverage(rows:readonly BillingRow[],recipients:ReadonlyMap<number,number>,units:readonly StoredUnit[],startMonth:string,months:number){
+export function inspectFutureBillingCoverage(rows:readonly BillingRow[],recipients:ReadonlyMap<number,number>,units:readonly StoredUnit[],startMonth:string,months:number,managementEvents:readonly ManagementEvent[]=[]){
   if(!/^\d{4}-\d{2}$/.test(startMonth)||!isBillingDate(`${startMonth}-01`)||!Number.isInteger(months)||months<1||months>24)throw Error('比較対象の年月と期間を確認してください')
   const [year,month]=startMonth.split('-').map(Number),candidates:CoverageCandidate[]=[],issues:{projectId:number;reason:string}[]=[]
   for(const row of rows){
@@ -26,14 +27,22 @@ export function inspectFutureBillingCoverage(rows:readonly BillingRow[],recipien
       for(const item of expected){
         if(!item.date||!isBillingDate(item.date)||Number(item.date.slice(5,7))!==m||!Number.isSafeInteger(item.amount)||item.amount<0){issues.push({projectId:row.project_id,reason:'予定日または計算額が不正'});continue}
         const method=c.billing_method==='請求書'?'invoice':'direct_debit'
+        if(!managementActiveOn(managementEvents,row.project_id,'all',item.date))continue
+        const maintenanceEnded=!managementActiveOn(managementEvents,row.project_id,'maintenance',item.date)
+        let amount=item.amount
+        if(maintenanceEnded){
+          const withoutMaintenance={...c,billing_item_flags:{...c.billing_item_flags,annual_maintenance:false}}
+          amount=method==='invoice'?invoiceAmount(withoutMaintenance,item.round,days.length):withdrawalAmount(withoutMaintenance,m)
+        }
         const matching=units.filter(u=>u.project_id===row.project_id&&u.scheduled_date===item.date)
         let status:CoverageCandidate['status']='missing',reason:string|undefined
         if(matching.length){
           const u=matching[0]
-          if(matching.length===1&&u.lifecycle==='planned'&&u.collection_method===method&&u.recipient_customer_id===recipientId&&u.planned_amount===item.amount)status='matches'
+          if(matching.length===1&&u.lifecycle==='planned'&&u.collection_method===method&&u.recipient_customer_id===recipientId&&u.planned_amount===amount)status='matches'
           else {status='review';reason='同日の保存記録と予定の金額・方法・請求先・回の対応を照合'}
         }
-        candidates.push({projectId:row.project_id,recipientId,method,date:item.date,round:item.round,amount:item.amount,status,reason})
+        if(maintenanceEnded){status='review';reason='保守終了後の対象費目・前払い期間・個別金額を確認してください（自動日割りなし）'}
+        candidates.push({projectId:row.project_id,recipientId,method,date:item.date,round:item.round,amount,status,reason})
       }
     }
   }

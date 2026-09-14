@@ -44,7 +44,7 @@ BEGIN
   PERFORM public.assert_billing_runtime_access();
   FOREACH t IN ARRAY ARRAY['customers','projects','contracts','annual_records','maintenance_responses','periodic_maintenance','prospects','attachments',
     'billing_units','billing_operations','billing_recipient_plans','billing_recipient_plan_overrides','billing_unit_events','ownership_transfers',
-    'invoice_import_evidence','invoice_recipient_initializations','billing_migration_acceptances','billing_runtime_control'] LOOP
+    'invoice_import_evidence','invoice_recipient_initializations','billing_migration_acceptances','billing_runtime_control','project_management_events'] LOOP
     expressions:=array_append(expressions,format('%L,(SELECT coalesce(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text),''[]''::jsonb) FROM public.%I t)',t,t));
   END LOOP;
   EXECUTE 'SELECT jsonb_build_object(''version'',2,''exported_at'',transaction_timestamp(),''backup_scope'',''application_data_only'','||array_to_string(expressions,',')||')' INTO result;
@@ -71,7 +71,8 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
 DECLARE result jsonb;
 BEGIN
   PERFORM public.assert_billing_runtime_access();
-  SELECT jsonb_build_object('version',1,'ready',true,
+  SELECT jsonb_build_object('version',2,'ready',true,
+    'management_events',(SELECT coalesce(jsonb_agg(to_jsonb(m) ORDER BY id),'[]') FROM public.project_management_events m),
     'units',(SELECT coalesce(jsonb_agg(to_jsonb(u) ORDER BY id),'[]') FROM public.billing_units u),
     'events',(SELECT coalesce(jsonb_agg(to_jsonb(e) ORDER BY id),'[]') FROM public.billing_unit_events e),
     'transfers',(SELECT coalesce(jsonb_agg(to_jsonb(t) ORDER BY id),'[]') FROM public.ownership_transfers t)) INTO result;
@@ -102,8 +103,14 @@ BEGIN
   ELSIF action='plan' THEN
     result:=public.write_manual_billing_plan(p_key,(v->>'projectId')::bigint,v->'choices',v->>'reason');
   ELSIF action='debit_add' THEN
+    -- Ending all business does not erase existing receivables, but prevents new normal plans.
+    PERFORM id FROM public.projects WHERE id=(v->>'projectId')::bigint FOR UPDATE;
+    IF NOT public.management_active_on((v->>'projectId')::bigint,'all',(v->>'date')::date) THEN RAISE EXCEPTION '全取引終了後の新規予定は作成できません。再開日を確認してください'; END IF;
     result:=public.create_manual_debit_plan(p_key,(v->>'projectId')::bigint,(v->>'contractId')::bigint,(v->>'recipient')::bigint,
       (v->>'year')::integer,(v->>'month')::integer,(v->>'date')::date,(v->>'amount')::bigint,v->>'note',v->>'reason');
+  ELSIF action='management' THEN
+    result:=public.write_management_lifecycle(p_key,(v->>'projectId')::bigint,(v->>'expectedLast')::bigint,
+      v->>'scope',v->>'action',(v->>'date')::date,v->'choices',v->>'reason');
   ELSE RAISE EXCEPTION '未対応の保存操作です'; END IF;
   PERFORM set_config('ageful.billing_runtime_write','no',true);
   RETURN result;

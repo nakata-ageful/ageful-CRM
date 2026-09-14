@@ -53,7 +53,7 @@ async function main(){
    '20260907_preserve_maintenance_source.sql','20260907_invoice_recipient_initialization.sql','20260907_invoice_initialization_inspection.sql',
    '20260907_imported_invoice_source_guard.sql','20260907_legacy_invoice_creation_guard.sql','20260907_transfer_detail_choices.sql',
    '20260907_manual_billing_plan.sql','20260907_transfer_ownership_manual.sql','20260907_manual_debit_result.sql','20260907_create_manual_debit_plan.sql',
-   '20260909_billing_runtime.sql'])await tx.exec(fs.readFileSync(path.join(root,'database/drafts',f),'utf8'))})
+   '20260914_management_lifecycle.sql','20260909_billing_runtime.sql'])await tx.exec(fs.readFileSync(path.join(root,'database/drafts',f),'utf8'))})
   const raw=review(audit.datasetId,data.annual_records)
   const confirmations=raw.candidates.map(c=>{const approval=amounts.find(a=>a.recordId===c.recordId&&a.paymentIndex===c.paymentIndex&&a.seq===c.seq)
    return {sourceKey:c.sourceKey,sourceSignature:c.sourceSignature,recipientId:audit.rows.find(r=>r.recordId===c.recordId&&r.originalPaymentIndex===c.paymentIndex).confirmedRecipientId,recipientBasis:payer.basis,
@@ -97,6 +97,8 @@ async function main(){
   }
   if(!real)assert.equal(reconciliation.financialSourceChecksPassed,true)
   else assert.ok(reconciliation.issues.every(i=>i.recordId?unresolvedMethods.includes(i.recordId):i.code==='total_amount_mismatch'),'Unexpected reconciliation mismatch beyond explicitly excluded method records')
+  // Rehearsal-only fallback: never write this synthetic effective date to production.
+  const rehearsalToday=(await db.query('select current_date::text value')).rows[0].value
   let accepted=0
   for(const p of data.projects){
    const cons=data.contracts.filter(c=>c.project_id===p.id),records=data.annual_records.filter(a=>cons.some(c=>c.id===a.contract_id))
@@ -106,7 +108,7 @@ async function main(){
     const units=(await rows('billing_units')).filter(u=>u.project_id===p.id),evidence=imported.invoice_import_evidence.filter(e=>e.project_id===p.id)
     const dates=units.filter(u=>u.lifecycle==='planned'&&u.scheduled_date).map(u=>u.scheduled_date).sort()
     await db.query('select initialize_invoice_recipients($1,$2,$3::jsonb,$4::jsonb,$5::jsonb,$6::jsonb,$7,$8)',[key(),p.id,JSON.stringify(p),JSON.stringify(cons[0]),
-     JSON.stringify(Object.fromEntries(evidence.map(e=>[e.source_annual_record_id,e.source_snapshot_hash]))),JSON.stringify(Object.fromEntries(units.map(u=>[u.id,u.revision]))),p.customer_id,dates[0]??'2026-09-09'])
+     JSON.stringify(Object.fromEntries(evidence.map(e=>[e.source_annual_record_id,e.source_snapshot_hash]))),JSON.stringify(Object.fromEntries(units.map(u=>[u.id,u.revision]))),p.customer_id,dates[0]??rehearsalToday])
    }
    await db.query('select accept_billing_migration($1)',[p.id]);accepted++
   }
@@ -174,6 +176,33 @@ async function main(){
    await db.exec('set role authenticated')
    const changed=recovered.units.find(u=>u.id===planned.id)
    await db.query('select billing_runtime_write($1,$2::jsonb)',[key(),JSON.stringify({action:'invoice',value:{unitId:changed.id,revision:changed.revision,mode:'debit_received',value:{received_on:'2026-12-01',amount:200,line_items:[{name:'保守料',amount:200}]},reason:'入金確認'}})])
+   const runtimeWrite=(id,action,value)=>db.query('select billing_runtime_write($1,$2::jsonb)',[id,JSON.stringify({action,value})])
+   const runtimeSnapshot=async()=>(await db.query('select billing_runtime_snapshot() value')).rows[0].value
+   await runtimeWrite(key(),'debit_add',{projectId:1,contractId:1,recipient:2,year:2027,month:6,date:'2027-06-25',amount:200,note:'終了確認用',reason:'明示予定追加'})
+   const snapshotBeforeManagement=await runtimeSnapshot(),managedPlan=snapshotBeforeManagement.units.find(u=>u.lifecycle==='planned')
+   const maintenanceEnd={projectId:1,expectedLast:0,scope:'maintenance',action:'end',date:'2026-10-01',reason:'保守終了・土地代だけ残す',choices:[{unitId:String(managedPlan.id),expectedRevision:managedPlan.revision,action:'amount',amount:75}]}
+   const endKey=key();await runtimeWrite(endKey,'management',maintenanceEnd);await runtimeWrite(endKey,'management',maintenanceEnd)
+   const maintenanceEnded=await runtimeSnapshot();assert.equal(maintenanceEnded.management_events.length,1)
+   assert.equal(maintenanceEnded.units.find(u=>u.id===managedPlan.id).planned_amount,75)
+   assert.deepEqual(maintenanceEnded.units.filter(u=>u.lifecycle!=='planned'),snapshotBeforeManagement.units.filter(u=>u.lifecycle!=='planned'))
+   await assert.rejects(runtimeWrite(key(),'management',{...maintenanceEnd,action:'resume',date:'2027-01-01'}),/履歴が更新/)
+   const fullEnd={...maintenanceEnd,expectedLast:maintenanceEnded.management_events[0].id,scope:'all',date:'2026-11-01',reason:'全取引終了',
+    choices:[{unitId:String(managedPlan.id),expectedRevision:maintenanceEnded.units.find(u=>u.id===managedPlan.id).revision,action:'cancel',amount:null}]}
+   await db.exec(`reset role;create function test_management_failure() returns trigger language plpgsql as $$begin if NEW.reason='failure_test' then raise exception 'management audit failure';end if;return NEW;end$$;
+     create trigger test_management_failure before insert on project_management_events for each row execute function test_management_failure();set role authenticated`)
+   await assert.rejects(runtimeWrite(key(),'management',{...fullEnd,reason:'failure_test'}),/management audit failure/)
+   assert.deepEqual(await runtimeSnapshot(),maintenanceEnded,'Final audit failure must roll back plan changes and operation')
+   await runtimeWrite(key(),'management',fullEnd)
+   const ended=await runtimeSnapshot();assert.equal(ended.units.find(u=>u.id===managedPlan.id).lifecycle,'cancelled')
+   const nextDebit={projectId:1,contractId:1,recipient:2,year:2027,month:7,date:'2027-07-25',amount:75,note:'土地代',reason:'明示追加'}
+   await assert.rejects(runtimeWrite(key(),'debit_add',nextDebit),/全取引終了後/)
+   await runtimeWrite(key(),'management',{projectId:1,expectedLast:ended.management_events.at(-1).id,scope:'all',action:'resume',date:'2027-02-01',choices:[],reason:'取引再開、保守は再開しない'})
+   const resumed=await runtimeSnapshot();assert.equal(resumed.management_events.length,3)
+   assert.equal(resumed.units.find(u=>u.id===managedPlan.id).lifecycle,'cancelled','Resume must not revive cancelled plans')
+   await runtimeWrite(key(),'debit_add',nextDebit)
+   const managementBackup=(await db.query('select billing_runtime_backup() value')).rows[0].value
+   assert.equal(managementBackup.project_management_events.length,3)
+   await assert.rejects(db.exec('select * from project_management_events'),/permission denied/)
    await db.exec(`set test.actor='22222222-2222-4222-8222-222222222222'`)
    await assert.rejects(db.query('select billing_runtime_snapshot()'),/利用権限/)
    assert.equal((await db.query('select count(*)::int n from customers')).rows[0].n,0)
@@ -187,6 +216,7 @@ async function main(){
   assert.equal(canonicalJson(await snapshot()),canonicalJson(beforeRestore),'Engine backup restore changed data')
   await db.exec(`set test.actor='${actor}'`)
   await assert.rejects(db.exec('delete from billing_unit_events'),/append-only/)
+  await assert.rejects(db.exec('truncate project_management_events'),/append-only/)
   if(!real){await db.exec("set role authenticated;set test.actor=''");await assert.rejects(db.query('select billing_runtime_backup()'),/利用権限/);await db.exec('reset role')}
   console.log(JSON.stringify({scope:real?'saved application JSON → isolated logical schema (not production DDL/Auth/storage restore)':'synthetic complete runtime rehearsal',
    sourceCounts:Object.fromEntries(sourceTables.map(t=>[t,(data[t]??[]).length])),expectedUnits:audit.rows.length,importedUnits:imported.billing_units.length,

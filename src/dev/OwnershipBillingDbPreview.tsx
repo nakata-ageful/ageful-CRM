@@ -13,6 +13,9 @@ import {ManualDebitPlanCreator,type NewDebitPlan} from '../components/ManualDebi
 import {OwnershipTransferEditor,type OwnershipTransferInput} from '../components/OwnershipTransferEditor'
 import {contractFieldKinds,projectFieldKinds} from '../lib/ownership-field-selection'
 import type {Contract,Project} from '../types'
+import managementSql from '../../database/drafts/20260914_management_lifecycle.sql?raw'
+import {ManagementLifecycleEditor} from '../components/ManagementLifecycleEditor'
+import {managementEventFromStorage,type ManagementEvent,type ManagementRequest} from '../lib/management-lifecycle'
 
 export function OwnershipBillingDbPreview(){
   const [units,setUnits]=useState<TransferBillingUnit[]|null>(null),[version,setVersion]=useState(0)
@@ -25,6 +28,8 @@ export function OwnershipBillingDbPreview(){
   const addRef=useRef<((value:NewDebitPlan)=>Promise<void>)|null>(null)
   const editRef=useRef<((choices:TransferBillingChoice[],reason:string)=>Promise<void>)|null>(null)
   const saveRef=useRef<((input:OwnershipTransferInput)=>Promise<void>)|null>(null)
+  const managementRef=useRef<((input:ManagementRequest)=>Promise<void>)|null>(null)
+  const [managementEvents,setManagementEvents]=useState<ManagementEvent[]>([])
   useEffect(()=>{
     let active=true;let close:(()=>Promise<void>)|undefined
     void createInvoiceTestDb().then(async db=>{
@@ -36,11 +41,13 @@ export function OwnershipBillingDbPreview(){
           for(const [key,kind] of Object.entries(kinds))if(!present.has(key))await tx.exec(`alter table ${table} add column ${key} ${kind==='number'?'numeric':kind==='boolean'?'boolean':kind==='date'?'date':['flags','amounts','strings'].includes(kind)?'jsonb':'text'}`)
         }
         await tx.exec("update projects set project_name='サンプル発電所'; update contracts set billing_count=1,billing_schedule_days='[\"6月15日\"]',annual_maintenance_inc=82500;")
-        await tx.exec(manualPlan);await tx.exec(detailChoices);await tx.exec(transfer);await tx.exec(createDebit)})
+        await tx.exec(manualPlan);await tx.exec(detailChoices);await tx.exec(transfer);await tx.exec(createDebit);await tx.exec(managementSql)})
       let parent:{project:Record<string,unknown>;contract:Record<string,unknown>}
       async function reload(){
         const rows=await db.query<{unit:Record<string,unknown>}>('select to_jsonb(u) as unit from billing_units u order by scheduled_date,id')
         const history=await db.query<{id:number;reason:string}>('select id,reason from billing_unit_events order by id desc')
+        const managementRows=(await db.query<{row:Record<string,unknown>}>('select to_jsonb(m) row from project_management_events m order by id')).rows
+        if(active)setManagementEvents(managementRows.map(r=>managementEventFromStorage(r.row)))
         parent=(await db.query<{p:typeof parent}>("select jsonb_build_object('project',(select to_jsonb(p) from projects p where id=1),'contract',(select to_jsonb(c) from contracts c where id=1)) p")).rows[0].p
         const transferRows=(await db.query<(typeof transfers)[number]>('select id,from_customer_id,to_customer_id,transfer_date::text,contract_before,contract_after from ownership_transfers order by id desc')).rows
         if(active){setParents(structuredClone(parent) as {project:Project;contract:Contract});setOwner(Number(parent.project.customer_id));setContractNote(String(parent.contract.notes??''));setTransferCount(transferRows.length);setTransfers(transferRows)}
@@ -74,6 +81,7 @@ export function OwnershipBillingDbPreview(){
       addRef.current=retryable((id,v:NewDebitPlan)=>db.query('select create_manual_debit_plan($1,1,1,$2,$3,$4,$5,$6,$7,$8)',[id,v.recipient,v.year,v.month,v.date,v.amount,v.note,v.reason]))
       const edit=retryable((id,v:{choices:TransferBillingChoice[];reason:string})=>db.query('select write_manual_billing_plan($1,1,$2::jsonb,$3)',[id,JSON.stringify(v.choices),v.reason]))
       editRef.current=(choices,reason)=>edit({choices,reason})
+      managementRef.current=retryable((id,r:ManagementRequest)=>db.query('select write_management_lifecycle($1,$2,$3,$4,$5,$6,$7::jsonb,$8)',[id,r.projectId,r.expectedLast,r.scope,r.action,r.date,JSON.stringify(r.choices),r.reason]))
       await reload();if(active)setMessage('架空データを読み込みました。')
     }).catch(e=>{if(active)setMessage(String(e))})
     return()=>{active=false;saveRef.current=null;if(close)void close()}
@@ -83,6 +91,7 @@ export function OwnershipBillingDbPreview(){
     <p className="notice">架空データ専用です。保存先はこのページ内の一時DBで、再読み込みすると消えます。本番は変更しません。</p>
     <p role="status">{message}</p>
     <p>現在の所有者：{owner===1?'顧客A':'顧客B'} ／ 契約備考：{contractNote||'未記入'} ／ 移転履歴：{transferCount}件</p>
+    {units&&<ManagementLifecycleEditor key={`management-${version}`} projectId={1} events={managementEvents} units={units} onSave={async r=>{if(!managementRef.current)throw Error('準備中です');await managementRef.current(r)}}/>}
     {units&&parents&&<OwnershipTransferEditor key={`transfer-${transferCount}`} {...parents} customers={[{id:1,name:'顧客A'},{id:2,name:'顧客B'}]} units={units} testOnly onSave={async input=>{if(!saveRef.current)throw Error('準備中です');await saveRef.current(input)}}/>}
     {units&&owner===2&&<InvoiceLedgerDetail data={{units,recipientName:id=>id===1?'顧客A':'顧客B',projectName:()=> 'サンプル発電所',plannedAmount:()=>null,recipients:[{id:1,name:'顧客A'},{id:2,name:'顧客B'}]}} projectId={1}
       onSave={async r=>{if(!writeRef.current)throw Error('準備中です');return writeRef.current(r)}}/>}

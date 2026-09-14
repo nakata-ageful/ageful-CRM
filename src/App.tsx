@@ -31,6 +31,7 @@ import {billingRuntimeEnabled,loadBillingRuntime,saveBillingRuntime,hasPendingBi
 import type {BillingHistoryData} from './components/BillingHistorySection'
 import {Modal} from './components/Modal'
 import {OwnershipTransferHistory} from './components/OwnershipTransferHistory'
+import {ManagementLifecycleEditor} from './components/ManagementLifecycleEditor'
 
 type ViewKey =
   | 'dashboard'
@@ -359,6 +360,7 @@ function MainApp() {
             )}
             {view === 'project-detail' && projectDetail && (
               <ProjectDetailView
+                managementEvents={runtime?.managementEvents.filter(e=>e.project_id===projectDetail.project.id)}
                 billingHistory={billingHistory}
                 onSaveInvoice={billingHistory?request=>saveRuntime({action:'invoice',value:request}):undefined}
                 onOwnershipTransfer={billingHistory?()=>setTransferOpen(true):undefined}
@@ -465,6 +467,10 @@ function MainApp() {
         )}
         {view==='project-detail'&&runtime&&projectDetail&&billingHistory&&<OwnershipTransferHistory
           transfers={runtime.transfers.filter(t=>t.project_id===projectDetail.project.id)} events={runtime.events.filter(e=>e.project_id===projectDetail.project.id)} recipientName={billingHistory.recipientName}/>}
+        {view==='project-detail'&&runtime&&projectDetail&&<ManagementLifecycleEditor
+          key={`${projectDetail.project.id}:${JSON.stringify(runtime.managementEvents)}:${runtime.units.map(u=>`${u.id}:${u.revision}`).join(',')}`}
+          projectId={projectDetail.project.id} events={runtime.managementEvents.filter(e=>e.project_id===projectDetail.project.id)} units={runtime.units}
+          onSave={async request=>{await saveRuntime({action:'management',value:request})}}/>}
         {transferOpen&&runtime&&projectDetail?.contract&&<Modal title="所有者を変更" width={1100} onClose={()=>setTransferOpen(false)}>
           <OwnershipTransferEditor project={projectDetail.project} contract={projectDetail.contract} customers={customers}
             units={runtime.units.filter(u=>u.projectId===projectDetail.project.id)}

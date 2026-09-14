@@ -10,6 +10,7 @@ function load(name){const file=path.resolve(root,name);if(cache.has(file))return
 const {billingItemSummary:summary,billingItemSelectionPatch:patch}=load('src/lib/billing-item-selection.ts')
 const {invoiceAmount,annualBillableTotalInc}=load('src/lib/billing.ts')
 const {resolveUnitAmount}=load('src/lib/billing-unit.ts')
+const {managementBillingContract,managementEventFromStorage,managementActiveOn}=load('src/lib/management-lifecycle.ts')
 const contract={id:1,annual_maintenance_inc:100000,land_cost_monthly:50000,insurance_fee:20000,billing_item_flags:{annual_maintenance:false},billing_amount_overrides:{'1':90000},has_issuance_fee:true,issuance_fee_inc:330}
 const original=JSON.stringify(contract),s=summary(contract)
 assert.equal(s.recordedTotal,170000);assert.equal(s.includedTotal,70000);assert.equal(s.excludedTotal,100000)
@@ -31,11 +32,15 @@ assert.ok(renderToStaticMarkup(React.createElement(Component,{contract})).includ
 const source=fs.readFileSync(path.join(root,'src/views/CsvImport.tsx'),'utf8'),ast=ts.createSourceFile('CsvImport.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX)
 const names=new Set(['KINGAKU_COLS','colLetter','buildKingakuCsv','csvEscape'])
 const snippets=ast.statements.filter(n=>ts.isFunctionDeclaration(n)&&names.has(n.name?.text)||ts.isVariableStatement(n)&&n.declarationList.declarations.some(d=>names.has(d.name.getText(ast)))).map(n=>n.getText(ast)).join('\n')
-const exported={};vm.runInNewContext(ts.transpileModule(snippets+'\nexports.build=buildKingakuCsv',{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText,{exports:exported,billingItemSummary:summary,annualBillableTotalInc})
+const exported={};vm.runInNewContext(ts.transpileModule(snippets+'\nexports.build=buildKingakuCsv',{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText,{exports:exported,billingItemSummary:summary,annualBillableTotalInc,managementBillingContract,managementEventFromStorage,managementActiveOn})
 const tables={customers:[{id:1,name:'テスト顧客'}],projects:[{id:1,customer_id:1,plant_name:'テスト発電所'}],contracts:[{...contract,project_id:1}]}
 const before=JSON.stringify(tables),csv=exported.build(tables),lines=csv.split('\n')
 assert.ok(lines[0].includes('自社請求対象額'));assert.ok(lines[0].includes('年次保守料：自社請求対象'))
 assert.ok(lines[1].includes('70000,対象外（記録のみ）,対象,対象,対象,対象,対象,100000,'))
 assert.ok(lines[2].includes('=SUM(S2:S2)'));assert.equal(JSON.stringify(tables),before)
 assert.ok(exported.build({}).includes('自社請求対象額'))
+const ended={...tables,project_management_events:[{id:1,project_id:1,scope:'all',action:'end',effective_date:'2026-08-15',reason:'終了'}]}
+assert.ok(exported.build(ended,'2026-08-16').includes('0,対象外（記録のみ）,対象外（記録のみ）'))
+assert.ok(exported.build(ended,'2026-08-16').includes('全取引終了,2026-08-16'))
+assert.ok(exported.build(ended,'2026-08-15').includes('70000,対象外（記録のみ）,対象,'))
 console.log('PASS: maintenance excluded while land/insurance remain billable; flags-only patch, stored plan/actual amounts retained, override/fee warnings, SSR migration gate and real export columns/totals.')

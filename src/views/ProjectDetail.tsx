@@ -7,6 +7,7 @@ import {ManualDebitPlanCreator,type NewDebitPlan} from '../components/ManualDebi
 import {OwnershipBillingPlanEditor} from '../components/OwnershipBillingPlanEditor'
 import {BillingItemSelection} from '../components/BillingItemSelection'
 import {billingItemSelectionPatch} from '../lib/billing-item-selection'
+import type {ManagementEvent} from '../lib/management-lifecycle'
 import type {TransferBillingChoice,TransferBillingUnit} from '../lib/ownership-billing-plan'
 import { getBillingDetail } from '../lib/data'
 import { hasSupabaseEnv } from '../lib/supabase'
@@ -110,6 +111,7 @@ type Props = {
   onViewCustomer: (customerId: number) => void
   onViewMaintenance: (id: number) => void
   billingHistory?:BillingHistoryData
+  managementEvents?:readonly ManagementEvent[]
   onSaveInvoice?:(request:InvoiceWriteRequest)=>Promise<unknown>
   onOwnershipTransfer?:()=>void
   billingUnits?:readonly TransferBillingUnit[]
@@ -145,7 +147,7 @@ function writeTabToHash(t: Tab) {
   }
 }
 
-export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, onViewMaintenance,billingHistory,onSaveInvoice,onOwnershipTransfer,billingUnits,onAddDebit,onSaveBillingPlan }: Props) {
+export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, onViewMaintenance,billingHistory,onSaveInvoice,onOwnershipTransfer,billingUnits,onAddDebit,onSaveBillingPlan,managementEvents }: Props) {
   const toast = useToast()
   const { project, customer, contract, annualRecords, maintenanceResponses, periodicMaintenance } = detail
   // DB追加前は新列を送信しない。モックではDBを変更せず動作確認できる。
@@ -925,7 +927,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       {/* ── 保守情報タブ ── */}
       {tab === '保守情報' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {contract&&<BillingItemSelection key={`${contract.id}:${JSON.stringify(contract.billing_item_flags)}`} contract={contract}
+          {contract&&<BillingItemSelection key={`${contract.id}:${JSON.stringify(contract.billing_item_flags)}`} contract={contract} managementEvents={managementEvents}
             onSave={billingHistory?async flags=>{await updateContract(contract.id,billingItemSelectionPatch(flags));onReload()}:undefined}/>}
           {/* 中項目: 保守契約 */}
           <div className="card">

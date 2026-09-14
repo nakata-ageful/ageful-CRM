@@ -5,6 +5,7 @@ import { useToast } from '../components/Toast'
 import { EXPORT_FIELD_DEFS, type ExportFieldDef } from '../lib/export-fields'
 import { annualBillableTotalInc } from '../lib/billing'
 import {billingItemSummary} from '../lib/billing-item-selection'
+import {managementBillingContract,managementEventFromStorage,managementActiveOn} from '../lib/management-lifecycle'
 import type { Contract } from '../types'
 import { hasSupabaseEnv } from '../lib/supabase'
 import { RESTORE_DISABLED_MESSAGE } from '../lib/restore-safety'
@@ -33,12 +34,14 @@ function colLetter(idx: number): string {
  * 合計セルは Excel の数式（=SUM(...)）で出力し、開いた側で再計算できるようにする。
  * 「年間総額（請求対象のみ）」はアプリの請求計算と同じ値（請求対象フラグ考慮）。
  */
-function buildKingakuCsv(tables: Record<string, Record<string, unknown>[]>): string {
+function buildKingakuCsv(tables: Record<string, Record<string, unknown>[]>, asOf?:string): string {
+  const now=new Date(),date=asOf??`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
+  const managementEvents=(tables.project_management_events??[]).map(managementEventFromStorage)
   const customersById = new Map((tables.customers ?? []).map(c => [c.id as number, c]))
   const contractsByProject = new Map((tables.contracts ?? []).map(c => [c.project_id as number, c]))
   const fixedCols = ['発電所名', '顧客名', '受託会社', '請求方法']
   const header = [...fixedCols, ...KINGAKU_COLS.map(c => c.label), '記録額の年間合計（全費目）', '自社請求対象額（費目合計・手数料／個別金額除く）',
-    ...billingItemSummary(null).items.map(i=>`${i.label}：自社請求対象`),'対象外の記録額（年間）','請求設定の注意']
+    ...billingItemSummary(null).items.map(i=>`${i.label}：自社請求対象`),'対象外の記録額（年間）','請求設定の注意','管理状況（出力基準日現在）','出力基準日']
 
   // 列位置（0始まり）。費目列は fixedCols の次から並ぶ
   const feeStart = fixedCols.length
@@ -51,8 +54,9 @@ function buildKingakuCsv(tables: Record<string, Record<string, unknown>[]>): str
     const cust = customersById.get(p.customer_id as number)
     const con = contractsByProject.get(p.id as number) as Contract | undefined
     const amounts = KINGAKU_COLS.map(c => Number((con as Record<string, unknown> | undefined)?.[c.key] ?? 0) || 0)
-    const billable = con ? annualBillableTotalInc(con) : 0
-    const summary=billingItemSummary(con)
+    const effective=con?managementBillingContract(con,managementEvents,date):undefined
+    const billable = effective ? annualBillableTotalInc(effective) : 0
+    const summary=billingItemSummary(effective)
     // 年間合計（全費目）は費目セルの数式で
     const rowTotalFormula = `=SUM(${colLetter(feeStart)}${excelRow}:${colLetter(feeEnd)}${excelRow})`
     return [
@@ -66,6 +70,7 @@ function buildKingakuCsv(tables: Record<string, Record<string, unknown>[]>): str
       ...summary.items.map(i=>con?(i.included?'対象':'対象外（記録のみ）'):'契約未登録'),
       String(summary.excludedTotal),
       [summary.hasOverrides?'各回・各月の個別金額あり':null,summary.hasFees?'手数料設定あり':null,'契約条件の集計であり請求・入金実績ではありません'].filter(Boolean).join('／'),
+      !managementActiveOn(managementEvents,p.id as number,'all',date)?'全取引終了':!managementActiveOn(managementEvents,p.id as number,'maintenance',date)?'保守終了（他費目は継続可）':'継続中',date,
     ]
   })
 
@@ -76,7 +81,7 @@ function buildKingakuCsv(tables: Record<string, Record<string, unknown>[]>): str
     totalRow.push(dataRows.length > 0 ? `=SUM(${colLetter(c)}2:${colLetter(c)}${lastDataRow})` : '0')
   }
   const flagCount=billingItemSummary(null).items.length,excludedColumn=colLetter(billableCol+flagCount+1)
-  totalRow.push(...Array(flagCount).fill(''),dataRows.length>0?`=SUM(${excludedColumn}2:${excludedColumn}${lastDataRow})`:'0','')
+  totalRow.push(...Array(flagCount).fill(''),dataRows.length>0?`=SUM(${excludedColumn}2:${excludedColumn}${lastDataRow})`:'0','','','')
 
   return [header, ...dataRows, totalRow].map(cols => cols.map(csvEscape).join(',')).join('\n')
 }
@@ -998,7 +1003,7 @@ export function CsvImport({ onReload }: Props) {
         </div>
         {billingRuntimeEnabled&&<div style={{marginBottom:16}}>
           <button className="btn btn-main" disabled={exporting} onClick={handleFullRuntimeBackup}>全アプリデータを保存（新しい請求・所有者変更履歴を含むJSON）</button>
-          <p>下の項目選択に関係なく、全18テーブルを同じ時点で取得します。顧客情報を含むため、安全な場所に保管してください。ログイン設定・添付ファイル本体・DB構造は含まれず、Supabase全体の復元用バックアップとは別です。</p>
+          <p>下の項目選択に関係なく、管理終了・再開履歴を含む全19テーブルを同じ時点で取得します。顧客情報を含むため、安全な場所に保管してください。ログイン設定・添付ファイル本体・DB構造は含まれず、Supabase全体の復元用バックアップとは別です。</p>
           <p>下の金額確認CSVは現在の契約条件です。過去の請求実額ではありません。旧形式の請求記録CSVは、切替後の記録が抜けるため使用できません。</p>
         </div>}
 

@@ -474,7 +474,7 @@ function MainApp() {
           onSave={async request=>{await saveRuntime({action:'management',value:request})}}/>}
         {view==='project-detail'&&runtime&&projectDetail?.contract&&billingRows.filter(r=>r.project_id===projectDetail.project.id).map(row=><FutureScheduleEditor
           key={`${row.project_id}:${JSON.stringify(runtime)}:${JSON.stringify(projectDetail.contract)}`} row={{...row,contract:projectDetail.contract}} customers={customers} units={runtime.units} events={runtime.managementEvents}
-          onSave={value=>saveRuntime({action:'future_schedule',value})}/>)}
+          onPeriodSave={value=>saveRuntime({action:'service_period',value})} onSave={value=>saveRuntime({action:'future_schedule',value})}/>)}
         {transferOpen&&runtime&&projectDetail?.contract&&<Modal title="所有者を変更" width={1100} onClose={()=>setTransferOpen(false)}>
           <OwnershipTransferEditor project={projectDetail.project} contract={projectDetail.contract} customers={customers}
             units={runtime.units.filter(u=>u.projectId===projectDetail.project.id)}

@@ -41,5 +41,7 @@ export function billingUnitFromStorage(row: Record<string, unknown>): BillingUni
     scheduledDate: date('scheduled_date'), issuedOn: date('issued_on'), receivedOn: date('received_on'),paymentDueOn:date('payment_due_on'),
     recipientId: row.recipient_customer_id === null ? null : integer('recipient_customer_id',1),
     lifecycle: lifecycle as BillingUnit['lifecycle'], frozenAmount: amount, frozenLineItems: items, frozenAt,
-    plannedAmount: row.planned_amount == null ? null : integer('planned_amount',0), revision: integer('revision',0) }
+    plannedAmount: row.planned_amount == null ? null : integer('planned_amount',0), revision: integer('revision',0),
+    ...(row.period_start===undefined?{}:{periodStart:date('period_start')}),...(row.period_end===undefined?{}:{periodEnd:date('period_end')}),
+    ...(row.plan_note===undefined?{}:{planNote:row.plan_note==null?null:String(row.plan_note)}) }
 }

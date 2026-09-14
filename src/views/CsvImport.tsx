@@ -10,6 +10,8 @@ import type { Contract } from '../types'
 import { hasSupabaseEnv } from '../lib/supabase'
 import { RESTORE_DISABLED_MESSAGE } from '../lib/restore-safety'
 import { billingRuntimeEnabled } from '../lib/billing-runtime'
+import {buildBillingUnitCsv,downloadBillingUnitCsv} from '../lib/billing-unit-csv'
+import {billingUnitFromStorage} from '../lib/billing-unit-storage'
 
 /** 金額確認CSVの費目列（契約テーブルの金額カラムと対応） */
 const KINGAKU_COLS = [
@@ -889,6 +891,13 @@ export function CsvImport({ onReload }: Props) {
     }catch(e){alert(`バックアップの取得に失敗しました: ${String(e)}`)}finally{setExporting(false)}
   }
 
+  async function handleUnitCsv(){setExporting(true);try{
+    const raw=await exportAllData();const data=raw as unknown as Record<string,Record<string,unknown>[]>;
+    if(raw.version!==2||!Array.isArray(data.billing_units))throw Error('新しい請求記録を取得できません');
+    const customers=new Map(data.customers.map(c=>[c.id,String(c.name)])),projects=new Map(data.projects.map(p=>[p.id,String(p.project_name??p.plant_name??p.id)]));
+    downloadBillingUnitCsv(buildBillingUnitCsv(data.billing_units.map(billingUnitFromStorage),id=>customers.get(id)??`顧客ID ${id}（名称要確認）`,id=>projects.get(id)??`発電所ID ${id}`));
+  }catch(e){alert(`各回CSVを出力できません: ${String(e)}`)}finally{setExporting(false)}}
+
   async function handleExport() {
     setExporting(true)
     try {
@@ -1003,6 +1012,7 @@ export function CsvImport({ onReload }: Props) {
         </div>
         {billingRuntimeEnabled&&<div style={{marginBottom:16}}>
           <button className="btn btn-main" disabled={exporting} onClick={handleFullRuntimeBackup}>全アプリデータを保存（新しい請求・所有者変更履歴を含むJSON）</button>
+          <button className="btn" disabled={exporting} onClick={handleUnitCsv}>各回の請求CSVをダウンロード</button>
           <p>下の項目選択に関係なく、管理終了・再開履歴を含む全19テーブルを同じ時点で取得します。顧客情報を含むため、安全な場所に保管してください。ログイン設定・添付ファイル本体・DB構造は含まれず、Supabase全体の復元用バックアップとは別です。</p>
           <p>下の金額確認CSVは現在の契約条件です。過去の請求実額ではありません。旧形式の請求記録CSVは、切替後の記録が抜けるため使用できません。</p>
         </div>}

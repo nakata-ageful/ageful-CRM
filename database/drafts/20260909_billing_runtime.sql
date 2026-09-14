@@ -110,6 +110,8 @@ BEGIN
       (v->>'year')::integer,(v->>'month')::integer,(v->>'date')::date,(v->>'amount')::bigint,v->>'note',v->>'reason');
   ELSIF action='future_schedule' THEN
     result:=public.create_future_schedule(p_key,(v->>'projectId')::bigint,v->'contract',v->'versions',(v->>'last')::bigint,v->'items',v->>'reason');
+  ELSIF action='service_period' THEN
+    result:=public.set_billing_service_period(p_key,(v->>'projectId')::bigint,v->'contract',v->'versions',(v->>'year')::integer,(v->>'periodStart')::date,(v->>'periodEnd')::date,v->>'reason');
   ELSIF action='management' THEN
     result:=public.write_management_lifecycle(p_key,(v->>'projectId')::bigint,(v->>'expectedLast')::bigint,
       v->>'scope',v->>'action',(v->>'date')::date,v->'choices',v->>'reason');

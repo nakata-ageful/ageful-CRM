@@ -10,7 +10,7 @@ export function MaintenancePeriodReview({startDate,units}:{startDate:string|null
  return <details><summary>保守期間ごとの保存記録を確認</summary>
   <p>保守開始日と保存された記録年から表示しています。請求日・入金日が期間外でも、前払い等があるため別の保守期間へ移しません。回数が未登録の記録は、そのまま表示します。</p>
   {!years.length&&<p>保存記録はありません。</p>}
-  {years.map(year=><section key={year} style={{marginBottom:14}}><h4>{maintenancePeriodLabel(startDate,year)}</h4>
+  {years.map(year=>{const group=units.filter(u=>u.serviceYear===year),first=group[0];const same=first.periodStart&&first.periodEnd&&group.every(u=>u.periodStart===first.periodStart&&u.periodEnd===first.periodEnd);return <section key={year} style={{marginBottom:14}}><h4>{same?`保守期間：${first.periodStart} ～ ${first.periodEnd}`:maintenancePeriodLabel(startDate,year)}</h4>
    {units.filter(u=>u.serviceYear===year).map(u=><div key={u.id} style={{padding:8,borderBottom:'1px solid #ddd'}}>
     <strong>{u.roundLabel==='保存済み単回記録'?'回数未登録の記録':u.roundLabel}</strong>
     <span> ／ {u.lifecycle==='cancelled'?'取りやめ':u.receivedOn?'入金済み':u.issuedOn?'発行済み':'保存済みの予定'}</span>
@@ -18,6 +18,6 @@ export function MaintenancePeriodReview({startDate,units}:{startDate:string|null
     <div>金額：{(u.frozenAmount??u.plannedAmount)==null?'未登録':`${(u.frozenAmount??u.plannedAmount)!.toLocaleString()}円`}</div>
     {u.periodStart&&u.periodEnd&&<div>この回に指定した対象期間：{u.periodStart} ～ {u.periodEnd}</div>}
    </div>)}
-  </section>)}
+  </section>})}
  </details>
 }

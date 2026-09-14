@@ -173,6 +173,18 @@ async function main(){
    }
   }
   for(const table of sourceTables)assert.equal(canonicalJson(await rows(table)),canonicalJson([...(data[table]??[])].sort((a,b)=>a.id-b.id)),`${table}: migration changed source`)
+  if(real&&data.annual_records.some(r=>r.id===61&&r.contract_id===16)){
+   const c=data.contracts.find(c=>c.id===16);assert.ok(c.maintenance_contract_notes.includes('2027年12月31日'))
+   const before=(await rows('billing_units')).filter(u=>u.project_id===c.project_id),periodKey=key()
+   const args=[periodKey,c.project_id,JSON.stringify(c),JSON.stringify(Object.fromEntries(before.map(u=>[u.id,u.revision]))),2026,'2026-10-27','2027-12-31','隔離コピー：最新契約備考に記載された特別保守期間の指定。実額・請求先・入金日は変更しない。']
+   const call=()=>db.query('select set_billing_service_period($1,$2,$3::jsonb,$4::jsonb,$5,$6,$7,$8) value',args)
+   const updated=(await call()).rows[0].value;assert.deepEqual((await call()).rows[0].value,updated)
+   assert.equal(updated.length,1)
+   const original=before.find(u=>u.id===updated[0].id)
+   assert.deepEqual({...updated[0],period_start:original.period_start,period_end:original.period_end,revision:original.revision,updated_at:original.updated_at},original)
+   console.log('PASS: latest-copy explicit extended period attached to existing paid record; financial/source values unchanged')
+  }
+  for(const table of sourceTables)assert.equal(canonicalJson(await rows(table)),canonicalJson([...(data[table]??[])].sort((a,b)=>a.id-b.id)),`${table}: period assignment changed source`)
   if(!real){
    assert.deepEqual(Object.keys(ck).sort(),Object.keys(labels).sort())
    const prepareFields=choices=>db.query('select prepare_transfer_detail_choices($1::jsonb,$2::jsonb,$3::jsonb)',[JSON.stringify(project),JSON.stringify(contract),JSON.stringify({contract:choices})])
@@ -280,6 +292,17 @@ async function main(){
    await assert.rejects(runtimeWrite(key(),'future_schedule',{...refreshed,items:[{...refreshed.items[0],periodStart:null}]}),/対象保守期間/)
    await assert.rejects(runtimeWrite(key(),'future_schedule',{...refreshed,items:[{...refreshed.items[0],periodEnd:'2028-12-31'}]}),/対象保守期間/)
    console.log('PASS: future invoice rounds across years, explicit payers/amounts, insert-only preservation, replay, stale requests, duplicates, full rollback and management end guard')
+   await db.exec('begin')
+   const longRequest={...refreshed,items:[{date:'2034-09-01',year:2034,round:1,method:'invoice',recipientId:2,amount:165000,periodStart:'2034-10-27',periodEnd:'2035-12-31'}],reason:'長い初年度の個別指定'}
+   await runtimeWrite(key(),'future_schedule',longRequest)
+   const longState=await runtimeSnapshot(),longVersions=Object.fromEntries(longState.units.map(u=>[u.id,u.revision]))
+   await db.exec('savepoint overlapping_period')
+   await assert.rejects(runtimeWrite(key(),'future_schedule',{...longRequest,versions:longVersions,items:[{...longRequest.items[0],year:2035,periodStart:'2035-10-27',periodEnd:'2036-10-26'}]}),/重複/)
+   await db.exec('rollback to savepoint overlapping_period')
+   await runtimeWrite(key(),'future_schedule',{...longRequest,versions:longVersions,items:[{...longRequest.items[0],year:2036,date:'2035-12-01',periodStart:'2036-01-01',periodEnd:'2036-12-31'}]})
+   assert.equal((await runtimeSnapshot()).units.find(u=>u.service_year===2036).period_start,'2036-01-01')
+   await db.exec('rollback')
+   console.log('PASS: PostgreSQL extended initial period and next January period; overlap denied and original snapshot retained')
    const monthly={...refreshed,items:[{date:'2029-12-25',year:2030,round:1,method:'direct_debit',recipientId:2,amount:100},{date:'2030-01-25',year:2030,round:2,method:'direct_debit',recipientId:1,amount:200}].map(periodItem)}
    await runtimeWrite(key(),'future_schedule',monthly)
    const monthlyState=await runtimeSnapshot(),monthUnit=monthlyState.units.find(u=>u.occurrence_key==='maintenance:2030:round:1')
@@ -292,6 +315,13 @@ async function main(){
    const stopped=await runtimeSnapshot()
    await assert.rejects(runtimeWrite(key(),'future_schedule',{...monthly,last:stopped.management_events.at(-1).id,versions:Object.fromEntries(stopped.units.map(u=>[u.id,u.revision])),items:[periodItem({...monthly.items[0],year:2032,date:'2030-12-01'})]}),/全取引終了/)
    const managementBackup=(await db.query('select billing_runtime_backup() value')).rows[0].value
+   const periodState=await runtimeSnapshot(),periodContract=(await db.query('select to_jsonb(c) value from contracts c where id=1')).rows[0].value
+   const periodRequest={projectId:1,contract:periodContract,versions:Object.fromEntries(periodState.units.map(u=>[u.id,u.revision])),year:2025,periodStart:'2025-01-14',periodEnd:'2026-01-13',reason:'過去実績の期間だけを指定'}
+   const metadataKey=key();await runtimeWrite(metadataKey,'service_period',periodRequest);await runtimeWrite(metadataKey,'service_period',periodRequest)
+   const periodSaved=(await runtimeSnapshot()).units.find(u=>u.service_year===2025),periodOriginal=periodState.units.find(u=>u.id===periodSaved.id)
+   assert.deepEqual({...periodSaved,period_start:periodOriginal.period_start,period_end:periodOriginal.period_end,revision:periodOriginal.revision,updated_at:periodOriginal.updated_at},periodOriginal)
+   await assert.rejects(runtimeWrite(key(),'service_period',periodRequest),/更新されています/)
+   console.log('PASS: authorized existing paid-period metadata correction preserves all financial fields, audit/replay and stale-write protection')
    assert.equal(managementBackup.project_management_events.length,4)
    await assert.rejects(db.exec('select * from project_management_events'),/permission denied/)
    await db.exec(`set test.actor='22222222-2222-4222-8222-222222222222'`)
@@ -305,6 +335,8 @@ async function main(){
   const snapshot=async()=>{const result={};for(const table of allTables)result[table]=(await db.query(`select to_jsonb(t) v from ${table} t order by to_jsonb(t)::text`)).rows.map(r=>r.v);return result}
   const beforeRestore=await snapshot(),archive=await db.dumpDataDir('none');await db.close();db=new PGlite({loadDataDir:archive})
   assert.equal(canonicalJson(await snapshot()),canonicalJson(beforeRestore),'Engine backup restore changed data')
+  const archiveArg=process.argv.indexOf('--archive')
+  if(archiveArg>=0){const output=path.resolve(process.argv[archiveArg+1]??'');if(!output.startsWith('/Users/keigoshoda/Documents/ChatGPT/エイジフル/private-backups/'))throw Error('Archive must stay in private backup directory');fs.writeFileSync(output,Buffer.from(await archive.arrayBuffer()),{flag:'wx',mode:0o600});console.log('Verified isolated-engine archive saved; not a production PostgreSQL/Auth/Storage backup')}
   await db.exec(`set test.actor='${actor}'`)
   await assert.rejects(db.exec('delete from billing_unit_events'),/append-only/)
   await assert.rejects(db.exec('truncate project_management_events'),/append-only/)

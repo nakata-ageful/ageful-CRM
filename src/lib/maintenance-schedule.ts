@@ -1,13 +1,14 @@
 import type {Contract} from '../types'
 import type {TransferBillingUnit} from './ownership-billing-plan'
 import {maintenancePeriod} from './maintenance-period-label'
+import {validateIndividualPeriod,type IndividualPeriod} from './individual-maintenance-period'
 import {invoiceAmount} from './billing'
 import {managementActiveOn,managementBillingContract,type ManagementEvent} from './management-lifecycle'
 export type MaintenanceScheduleItem={year:number;periodStart:string;periodEnd:string;round:number;method:'invoice'|'direct_debit';date:string;recipientId:number;amount:number|null;exclusion?:string}
 /** Identity is the selected service period, never the year of issue or payment. */
-export function maintenanceSchedule(contract:Contract,year:number,recipientId:number,units:readonly TransferBillingUnit[],events:readonly ManagementEvent[]):MaintenanceScheduleItem[]{
+export function maintenanceSchedule(contract:Contract,year:number,recipientId:number,units:readonly TransferBillingUnit[],events:readonly ManagementEvent[],individual?:IndividualPeriod):MaintenanceScheduleItem[]{
  if(!Number.isInteger(year)||year<2000||year>2199||!Number.isSafeInteger(recipientId)||recipientId<1)throw Error('対象保守期間と請求先を確認してください')
- const period=maintenancePeriod(contract.maintenance_start_date,year)
+ const period=validateIndividualPeriod(individual??maintenancePeriod(contract.maintenance_start_date,year),year,contract.project_id,units,contract.maintenance_start_date)
  const method=contract.billing_method==='請求書'?'invoice':contract.billing_method==='口座振替'?'direct_debit':null
  if(!method)throw Error('請求方法が未設定です')
  const count=contract.billing_count??(method==='direct_debit'?12:contract.billing_schedule_days?.length)

@@ -21,3 +21,11 @@ assert.equal(build({...c,billing_method:'口座振替',billing_count:12},2026,1,
 assert.equal(build({...c,billing_method:'口座振替'},2026,1,[],[])[0].amount,null)
 assert.throws(()=>build({...c,maintenance_start_date:null},2026,1,[],[]),/保守開始日/)
 console.log('PASS: period-and-round identity, prepayment, undated existing rounds, cancellation, next period and mid-period restart review')
+const long={periodStart:'2026-10-27',periodEnd:'2027-12-31'}
+assert.equal(build(c,2026,1,[],[],long)[0].periodEnd,long.periodEnd)
+const saved={...u,roundLabel:'第1回',...long}
+assert.throws(()=>build(c,2027,1,[saved],[]),/重複/)
+assert.equal(build(c,2028,1,[saved],[],{periodStart:'2028-01-01',periodEnd:'2028-12-31'})[0].periodStart,'2028-01-01')
+assert.throws(()=>build(c,2026,1,[saved],[]),/異なります/)
+assert.throws(()=>build(c,2026,1,[],[],{periodStart:'2026-02-30',periodEnd:'2027-12-31'}),/確認/)
+console.log('PASS: explicit extended initial period, next January period, overlap and inconsistent same-year rejection')

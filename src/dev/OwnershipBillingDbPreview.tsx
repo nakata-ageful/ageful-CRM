@@ -18,8 +18,13 @@ import {FutureScheduleEditor} from '../components/FutureScheduleEditor'
 import managementSql from '../../database/drafts/20260914_management_lifecycle.sql?raw'
 import {ManagementLifecycleEditor} from '../components/ManagementLifecycleEditor'
 import {managementEventFromStorage,type ManagementEvent,type ManagementRequest} from '../lib/management-lifecycle'
+import {Billing} from '../views/Billing'
+import {Dashboard} from '../views/Dashboard'
+import {CustomerDetailView} from '../views/CustomerDetail'
+import {buildBillingUnitCsv} from '../lib/billing-unit-csv'
 
-export function OwnershipBillingDbPreview(){
+export function OwnershipBillingDbPreview({normalScreens=false}:{normalScreens?:boolean}){
+  const [screen,setScreen]=useState('detail')
   const [units,setUnits]=useState<TransferBillingUnit[]|null>(null),[version,setVersion]=useState(0)
   const [message,setMessage]=useState('検証用DBを準備しています…'),[events,setEvents]=useState<{id:number;reason:string}[]>([])
   const [owner,setOwner]=useState(1)
@@ -32,6 +37,7 @@ export function OwnershipBillingDbPreview(){
   const saveRef=useRef<((input:OwnershipTransferInput)=>Promise<void>)|null>(null)
   const managementRef=useRef<((input:ManagementRequest)=>Promise<void>)|null>(null)
   const futureRef=useRef<((input:Record<string,unknown>)=>Promise<void>)|null>(null)
+  const periodRef=useRef<((input:Record<string,unknown>)=>Promise<void>)|null>(null)
   const [managementEvents,setManagementEvents]=useState<ManagementEvent[]>([])
   useEffect(()=>{
     let active=true;let close:(()=>Promise<void>)|undefined
@@ -86,17 +92,25 @@ export function OwnershipBillingDbPreview(){
       editRef.current=(choices,reason)=>edit({choices,reason})
       managementRef.current=retryable((id,r:ManagementRequest)=>db.query('select write_management_lifecycle($1,$2,$3,$4,$5,$6,$7::jsonb,$8)',[id,r.projectId,r.expectedLast,r.scope,r.action,r.date,JSON.stringify(r.choices),r.reason]))
       futureRef.current=retryable((id,r:Record<string,unknown>)=>db.query('select create_future_schedule($1,$2,$3::jsonb,$4::jsonb,$5,$6::jsonb,$7)',[id,r.projectId,JSON.stringify(r.contract),JSON.stringify(r.versions),r.last,JSON.stringify(r.items),r.reason]))
+      periodRef.current=retryable((id,r:Record<string,unknown>)=>db.query('select set_billing_service_period($1,$2,$3::jsonb,$4::jsonb,$5,$6,$7,$8)',[id,r.projectId,JSON.stringify(r.contract),JSON.stringify(r.versions),r.year,r.periodStart,r.periodEnd,r.reason]))
       await reload();if(active)setMessage('架空データを読み込みました。')
     }).catch(e=>{if(active)setMessage(String(e))})
     return()=>{active=false;saveRef.current=null;if(close)void close()}
   },[])
+  const history={units:units??[],recipientName:(id:number)=>id===1?'顧客A':'顧客B',projectName:()=> 'サンプル発電所',plannedAmount:()=>null,recipients:[{id:1,name:'顧客A'},{id:2,name:'顧客B'}]}
   return <main style={{maxWidth:1000,margin:'24px auto',padding:20}}>
     <h1>サンプル発電所 ― 所有者変更の保存検証</h1>
     <p className="notice">架空データ専用です。保存先はこのページ内の一時DBで、再読み込みすると消えます。本番は変更しません。</p>
     <p role="status">{message}</p>
     <p>現在の所有者：{owner===1?'顧客A':'顧客B'} ／ 契約備考：{contractNote||'未記入'} ／ 移転履歴：{transferCount}件</p>
+    {normalScreens&&<nav>{[['detail','発電所・請求詳細'],['billing','請求'],['dashboard','ダッシュボード'],['a','顧客Aの詳細'],['b','顧客Bの詳細'],['csv','CSV照合']].map(([id,label])=><button key={id} onClick={()=>setScreen(id)}>{label}</button>)}</nav>}
+    {normalScreens&&units&&screen==='billing'&&<Billing rows={[]} onReload={()=>{}} onViewDetail={()=>setScreen('detail')} billingHistory={history} billingToday="2026-12-15"/>}
+    {normalScreens&&units&&screen==='dashboard'&&<Dashboard stats={{totalCustomers:2,totalProjects:1,activeMaintenanceCount:0} as never} maintenanceList={[]} billingRows={[]} onNavigate={()=>setScreen('billing')} onViewMaintenance={()=>{}} onViewBilling={()=>setScreen('detail')} billingHistory={history} billingToday="2026-12-15"/>}
+    {normalScreens&&units&&['a','b'].includes(screen)&&<CustomerDetailView key={screen} detail={{customer:{id:screen==='a'?1:2,name:screen==='a'?'顧客A':'顧客B'},projects:[],attachments:[]} as never} onBack={()=>setScreen('billing')} onReload={()=>{}} onViewProject={()=>setScreen('detail')} billingHistory={history}/>}
+    {normalScreens&&units&&screen==='csv'&&<section><h2>各回CSVの出力内容</h2><p>「請求」のダウンロードと同じ生成関数です。日付未設定は空欄で保持します。</p><pre style={{whiteSpace:'pre-wrap'}}>{buildBillingUnitCsv(units,history.recipientName,history.projectName)}</pre></section>}
+    <div hidden={normalScreens&&screen!=='detail'}>
     {units&&<ManagementLifecycleEditor key={`management-${version}`} projectId={1} events={managementEvents} units={units} onSave={async r=>{if(!managementRef.current)throw Error('準備中です');await managementRef.current(r)}}/>}
-    {units&&parents&&<FutureScheduleEditor key={`future-${version}`} row={{project_id:1,project_name:'サンプル発電所',customer_name:'顧客A',company_name:null,contract:parents.contract,records:[],currentYearRecord:null,currentYearRecords:[],currentYear:2026}} customers={[{id:1,name:'顧客A'},{id:2,name:'顧客B'}] as Customer[]} units={units} events={managementEvents} onSave={async r=>{if(!futureRef.current)throw Error('準備中です');await futureRef.current(r)}}/>}
+    {units&&parents&&<FutureScheduleEditor key={`future-${version}`} row={{project_id:1,project_name:'サンプル発電所',customer_name:'顧客A',company_name:null,contract:parents.contract,records:[],currentYearRecord:null,currentYearRecords:[],currentYear:2026}} customers={[{id:1,name:'顧客A'},{id:2,name:'顧客B'}] as Customer[]} units={units} events={managementEvents} onPeriodSave={async r=>{if(!periodRef.current)throw Error('準備中です');await periodRef.current(r)}} onSave={async r=>{if(!futureRef.current)throw Error('準備中です');await futureRef.current(r)}}/>}
     {units&&parents&&<OwnershipTransferEditor key={`transfer-${transferCount}`} {...parents} customers={[{id:1,name:'顧客A'},{id:2,name:'顧客B'}]} units={units} testOnly onSave={async input=>{if(!saveRef.current)throw Error('準備中です');await saveRef.current(input)}}/>}
     {units&&owner===2&&<InvoiceLedgerDetail data={{units,recipientName:id=>id===1?'顧客A':'顧客B',projectName:()=> 'サンプル発電所',plannedAmount:()=>null,recipients:[{id:1,name:'顧客A'},{id:2,name:'顧客B'}]}} projectId={1}
       onSave={async r=>{if(!writeRef.current)throw Error('準備中です');return writeRef.current(r)}}/>}
@@ -112,5 +126,6 @@ export function OwnershipBillingDbPreview(){
         <details><summary>保存した契約情報（監査用・金額計算には使用しません）</summary><pre style={{whiteSpace:'pre-wrap'}}>{JSON.stringify({変更前:t.contract_before,変更後:t.contract_after},null,2)}</pre></details>
       </div>)}
     </section>
+    </div>
   </main>
 }

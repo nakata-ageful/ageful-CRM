@@ -16,7 +16,7 @@ export function BillingUnitTable({ units, recipientName, plannedAmount }: Props)
       const amount = resolveUnitAmount(unit, () => plannedAmount(unit))
       const status = billingUnitStatusLabel(unit)
       return <tr key={unit.id}>
-        <td>{unit.serviceYear}年 {unit.roundLabel}</td><td>{unit.scheduledDate ?? '日付要確認'}</td>
+        <td>{unit.periodStart&&unit.periodEnd?`${unit.periodStart} ～ ${unit.periodEnd}`:`${unit.serviceYear}年（保守期間未確認）`} {unit.roundLabel}</td><td>{unit.scheduledDate ?? '日付要確認'}</td>
         <td>{unit.recipientId == null ? '請求先要確認' : recipientName(unit.recipientId)}</td>
         <td>{amount.amount == null ? '金額要確認' : fmtYen(amount.amount)}<small style={{ display: 'block', color: '#64748b' }}>{amount.basis}</small></td>
         <td>{status}</td>

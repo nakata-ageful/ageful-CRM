@@ -2,11 +2,13 @@ import type { BillingHistoryData } from './BillingHistorySection'
 import { BillingHistorySection } from './BillingHistorySection'
 import { buildBillingOverview } from '../lib/billing-overview'
 import { fmtYen } from '../lib/utils'
+import {buildBillingUnitCsv,downloadBillingUnitCsv} from '../lib/billing-unit-csv'
 
 /** Read-only shared preview; caller supplies authorized units and a local calendar date. */
 export function BillingOverviewPanel({data,today,onViewDetail}:{data:BillingHistoryData;today:string;onViewDetail?:(projectId:number)=>void}) {
   const overview=buildBillingOverview(data.units,today)
   return <section><h2>請求</h2>
+    <button type="button" onClick={()=>downloadBillingUnitCsv(buildBillingUnitCsv(data.units,data.recipientName,data.projectName))}>各回の請求CSVをダウンロード</button><p>全期間の各回を出力します。予定額・確定額は別列で、保存されていない保守期間は要確認とします。</p>
     <p>未入金：{fmtYen(overview.totals.unpaidAmount)} ／ 入金済：{fmtYen(overview.totals.receivedAmount)}（今年度・昨年度）</p>
     {!!overview.totals.unknownActualCount&&<p role="status">金額要確認：{overview.totals.unknownActualCount}件。金額不明分は合計に含みません。</p>}
     {([['今月・来月・再来月の請求予定',overview.upcoming],['未入金',overview.unpaid],['入金済',overview.received]] as const).map(([label,units])=>

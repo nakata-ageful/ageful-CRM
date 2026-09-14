@@ -19,6 +19,9 @@ export type BillingUnit = {
   /** Saved estimate, distinct from issued/received actuals. Missing means not yet recorded. */
   plannedAmount?: number | null
   revision: number
+  periodStart?: string | null
+  periodEnd?: string | null
+  planNote?: string | null
 }
 
 export type UnitAmount = { amount: number | null; basis: '確定額' | '予定額' | '金額要確認' }

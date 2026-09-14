@@ -5,6 +5,7 @@ import { annualBillableTotalInc, invoiceAmount, withdrawalAmount } from '../lib/
 import { fmtYen, fmtDate, dateInputRange } from '../lib/utils'
 import { useToast } from '../components/Toast'
 import { statusFromBillingDates } from '../lib/annual-record-status'
+import { maintenancePeriodLabel } from '../lib/maintenance-period-label'
 import type { BillingHistoryData } from '../components/BillingHistorySection'
 import { InvoiceLedgerDetail } from '../components/InvoiceLedgerDetail'
 import type { InvoiceWriteRequest } from '../lib/invoice-write-session'
@@ -910,9 +911,9 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject, emb
                   const isEditing = editingHistoryId === r.id
                   return (
                     <div key={r.id} style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: 10, marginBottom: 10 }}>
-                      {/* 年度ヘッダー */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: '#64748b', background: '#f1f5f9', borderRadius: 4, padding: '2px 8px' }}>{r.year}年度</span>
+                      {/* 保守開始日の月日を基準にした表示。保存済み年度・請求日は変更しない。 */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
+                        <span title="保守開始日を基準にした年間期間です。個別の請求対象期間とは異なる場合があります。" style={{ fontSize: 11, fontWeight: 700, color: '#64748b', background: '#f1f5f9', borderRadius: 4, padding: '2px 8px' }}>{maintenancePeriodLabel(contract.maintenance_start_date, r.year)}</span>
                         {!isEditing ? (
                           <div style={{ display: 'flex', gap: 4 }}>
                             <button

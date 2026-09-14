@@ -253,6 +253,12 @@ async function main(){
    ...coverage.summary,settingIssues:coverage.issues.length,undatedSavedPlans:coverage.undatedSavedPlans,excludedMultiContractProjects:multiContractProjects.length,authorizesCutover:false}},null,2))
   console.log(JSON.stringify({futureScheduleReview:{scope:'candidates only; no creation authorization',selectable:scheduleReview.filter(r=>!r.exclusion).length,
    excluded:scheduleReview.filter(r=>r.exclusion).length,reasons:scheduleReview.filter(r=>r.exclusion).reduce((counts,r)=>{counts[r.exclusion]=(counts[r.exclusion]??0)+1;return counts},{})}},null,2))
+  // Explicit local inspection only. Default test logs never include project names or source notes.
+  if(real&&process.argv.includes('--review-details'))console.log(JSON.stringify({reviewDetails:[...new Set(scheduleReview.filter(r=>r.exclusion).map(r=>r.candidate.projectId))].map(id=>({
+   projectId:id,projectName:data.projects.find(p=>p.id===id)?.project_name,
+   candidates:scheduleReview.filter(r=>r.exclusion&&r.candidate.projectId===id).map(r=>({date:r.candidate.date,round:r.candidate.round,amount:r.candidate.amount,reason:r.exclusion})),
+   saved:imported.billing_units.filter(u=>u.project_id===id).map(u=>({sourceRecord:u.source_annual_record_id,sourceIndex:u.source_payment_index,year:u.service_year,round:u.round_number,month:u.service_month,state:u.lifecycle,scheduled:u.scheduled_date,issued:u.issued_on,received:u.received_on,amount:u.frozen_amount,plannedAmount:u.planned_amount}))
+  }))},null,2))
  }finally{await db.close()}
 }
 main().catch(e=>{console.error(e.message);process.exitCode=1})

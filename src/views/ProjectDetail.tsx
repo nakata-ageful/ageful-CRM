@@ -1468,25 +1468,6 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               </select>
             </label>
             <label className="form-label">
-              旧請求基準日（参考・通知対象外）
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <select disabled className="form-select" value={contractForm.billing_due_day.match(/(\d{1,2})月/)?.[1] ?? ''} onChange={e => {
-                  const day = contractForm.billing_due_day.match(/(\d{1,2})日/)?.[1] ?? '1'
-                  setContractForm(f => ({ ...f, billing_due_day: e.target.value ? `${e.target.value}月${day}日` : '' }))
-                }}>
-                  <option value="">月</option>
-                  {Array.from({ length: 12 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}月</option>)}
-                </select>
-                <select disabled className="form-select" value={contractForm.billing_due_day.match(/(\d{1,2})日/)?.[1] ?? ''} onChange={e => {
-                  const month = contractForm.billing_due_day.match(/(\d{1,2})月/)?.[1] ?? '1'
-                  setContractForm(f => ({ ...f, billing_due_day: e.target.value ? `${month}月${e.target.value}日` : '' }))
-                }}>
-                  <option value="">日</option>
-                  {Array.from({ length: 31 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}日</option>)}
-                </select>
-              </div>
-            </label>
-            <label className="form-label">
               年次保守料（税抜）
               <input className="form-input" inputMode="numeric" value={fmtFormNum(contractForm.annual_maintenance_ex)} onChange={e => {
                 const v = e.target.value.replace(/,/g, '')

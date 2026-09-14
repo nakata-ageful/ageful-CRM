@@ -39,7 +39,7 @@ async function main(){
  const audit=await auditBillingBackup(data,amounts,payer)
  const historyArg=process.argv.indexOf('--history-confirmations')
  if(historyArg>=0&&!process.argv[historyArg+1])throw Error('確認ファイルを指定してください')
- const historyConfirmations=historyArg>=0?confirmedBillingHistory(data,JSON.parse(fs.readFileSync(process.argv[historyArg+1],'utf8'))):new Map()
+ const historyConfirmations=historyArg>=0?confirmedBillingHistory(data,JSON.parse(fs.readFileSync(process.argv[historyArg+1],'utf8'))):real?new Map():new Map([[1,{recordId:1,round:1,basis:'Synthetic explicit round confirmation'}]])
  const {PGlite}=await import('@electric-sql/pglite');let db=new PGlite()
  const sourceTables=['customers','projects','contracts','annual_records','maintenance_responses','periodic_maintenance','prospects','attachments']
  try{
@@ -61,7 +61,7 @@ async function main(){
    '20260907_preserve_maintenance_source.sql','20260907_invoice_recipient_initialization.sql','20260907_invoice_initialization_inspection.sql',
    '20260907_imported_invoice_source_guard.sql','20260907_legacy_invoice_creation_guard.sql','20260907_transfer_detail_choices.sql',
    '20260907_manual_billing_plan.sql','20260907_transfer_ownership_manual.sql','20260907_manual_debit_result.sql','20260907_create_manual_debit_plan.sql',
-   '20260914_management_lifecycle.sql','20260914_future_schedule.sql','20260909_billing_runtime.sql'])await tx.exec(fs.readFileSync(path.join(root,'database/drafts',f),'utf8'))})
+   '20260914_management_lifecycle.sql','20260914_future_schedule.sql','20260909_billing_runtime.sql','20260914_confirm_imported_round.sql'])await tx.exec(fs.readFileSync(path.join(root,'database/drafts',f),'utf8'))})
   const raw=review(audit.datasetId,data.annual_records)
   const confirmations=raw.candidates.map(c=>{const approval=amounts.find(a=>a.recordId===c.recordId&&a.paymentIndex===c.paymentIndex&&a.seq===c.seq)
    return {sourceKey:c.sourceKey,sourceSignature:c.sourceSignature,recipientId:audit.rows.find(r=>r.recordId===c.recordId&&r.originalPaymentIndex===c.paymentIndex).confirmedRecipientId,recipientBasis:payer.basis,
@@ -89,7 +89,7 @@ async function main(){
   const roundConfirmations=[...historyConfirmations.values()].filter(c=>c.round!==undefined).map(c=>{
    const units=imported.billing_units.filter(u=>u.source_annual_record_id===c.recordId)
    assert.equal(units.length,1);assert.equal(units[0].round_number,null)
-   return {sourceRecord:c.recordId,confirmedRound:c.round,status:'confirmed; original source and imported row unchanged; audited assignment still required'}
+   return {sourceRecord:c.recordId,confirmedRound:c.round,status:'source confirmation validated before audited post-acceptance assignment'}
   })
   if(roundConfirmations.length)console.log(JSON.stringify({roundConfirmations},null,2))
   const reconciliation=await reconcileBillingImport(data,amounts,payer,imported)
@@ -138,6 +138,39 @@ async function main(){
      JSON.stringify(Object.fromEntries(evidence.map(e=>[e.source_annual_record_id,e.source_snapshot_hash]))),JSON.stringify(Object.fromEntries(units.map(u=>[u.id,u.revision]))),p.customer_id,dates[0]??rehearsalToday])
    }
    await db.query('select accept_billing_migration($1)',[p.id]);accepted++
+  }
+  for(const confirmation of historyConfirmations.values())if(confirmation.round!==undefined){
+   const unit=(await rows('billing_units')).find(u=>u.source_annual_record_id===confirmation.recordId)
+   const source=data.annual_records.find(r=>r.id===confirmation.recordId),operation=key()
+   const args=[operation,JSON.stringify(unit),JSON.stringify(source),confirmation.round,confirmation.basis]
+   const call=a=>db.query('select confirm_imported_round($1,$2::jsonb,$3::jsonb,$4,$5) value',a)
+   await db.exec("create function fail_round_audit() returns trigger language plpgsql as $$ begin raise exception 'round audit unavailable'; end $$; create trigger fail_round_audit before insert on billing_unit_events for each row execute function fail_round_audit()")
+   await assert.rejects(call(args),/round audit unavailable/)
+   assert.deepEqual((await rows('billing_units')).find(u=>u.id===unit.id),unit,'audit failure left a partial round assignment')
+   assert.equal((await db.query('select count(*)::int n from billing_operations where operation_key=$1',[operation])).rows[0].n,0)
+   await db.exec('drop trigger fail_round_audit on billing_unit_events;drop function fail_round_audit()')
+   await assert.rejects(call([key(),args[1],JSON.stringify({...source,year:2000}),args[3],args[4]]),/元記録/)
+   const assigned=(await call(args)).rows[0].value
+   assert.deepEqual((await call(args)).rows[0].value,assigned,'retry changed result')
+   assert.deepEqual({...assigned,round_number:unit.round_number,revision:unit.revision,updated_at:unit.updated_at},unit,'assignment altered financial/source fields')
+   await assert.rejects(call([key(),...args.slice(1)]),/更新/)
+   // Explicit D-029 scenario; planned day comes from the existing December 1 contract template.
+   if(source.id===51&&source.year===2026&&confirmation.round===1){
+    const c=data.contracts.find(c=>c.id===unit.contract_id)
+    assert.equal(c.billing_schedule_days[1],'12月1日')
+    const versions=Object.fromEntries((await rows('billing_units')).filter(u=>u.project_id===unit.project_id).map(u=>[u.id,u.revision]))
+    const period=maintenancePeriod(c.maintenance_start_date,2026)
+    const item={date:'2026-12-01',year:2026,round:2,method:'invoice',recipientId:unit.recipient_customer_id,amount:165000,...period}
+    const scheduleArgs=[key(),unit.project_id,JSON.stringify(c),JSON.stringify(versions),0,JSON.stringify([item]),'D-029 第2回165,000円。12月1日は既存契約の予定日。未発行・未入金。隔離コピー検証。']
+    const add=a=>db.query('select create_future_schedule($1,$2,$3::jsonb,$4::jsonb,$5,$6::jsonb,$7) value',a)
+    const created=(await add(scheduleArgs)).rows[0].value
+    assert.equal(created.length,1);assert.equal(created[0].lifecycle,'planned');assert.equal(created[0].planned_amount,165000)
+    assert.equal(created[0].issued_on,null);assert.equal(created[0].received_on,null)
+    assert.deepEqual((await add(scheduleArgs)).rows[0].value,created)
+    const fresh=Object.fromEntries((await rows('billing_units')).filter(u=>u.project_id===unit.project_id).map(u=>[u.id,u.revision]))
+    await assert.rejects(add([key(),...scheduleArgs.slice(1,3),JSON.stringify(fresh),...scheduleArgs.slice(4)]),/二重作成/)
+    console.log(JSON.stringify({confirmedRound:1,addedRound:2,plannedAmount:165000,scheduledDate:item.date,sourcePreserved:true,duplicateBlocked:true,scope:'isolated copy only'}))
+   }
   }
   for(const table of sourceTables)assert.equal(canonicalJson(await rows(table)),canonicalJson([...(data[table]??[])].sort((a,b)=>a.id-b.id)),`${table}: migration changed source`)
   if(!real){

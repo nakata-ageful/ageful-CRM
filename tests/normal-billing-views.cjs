@@ -1,0 +1,29 @@
+// Render the actual normal views with isolated fixtures. All data/action imports are denied.
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript');
+const React=require('react'),{renderToStaticMarkup}=require('react-dom/server'),root=path.resolve(__dirname,'..'),cache=new Map();
+function load(file){file=path.resolve(root,file);if(cache.has(file))return cache.get(file).exports;
+ if(/\/(actions|data|supabase|mock-store)\.ts$/.test(file))return new Proxy({},{get:()=>()=>{throw Error('Real data access forbidden')}});
+ const module={exports:{}};cache.set(file,module);
+ vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText,
+ {module,exports:module.exports,Date,require:name=>{if(['react','react/jsx-runtime'].includes(name))return require(name);if(!name.startsWith('.'))throw Error('External dependency forbidden');const p=path.resolve(path.dirname(file),name);return load(p+(fs.existsSync(p+'.ts')?'.ts':'.tsx'))}});return module.exports;}
+const {Billing}=load('src/views/Billing.tsx'),{Dashboard}=load('src/views/Dashboard.tsx'),{CustomerDetailView}=load('src/views/CustomerDetail.tsx');
+const render=(component,props)=>renderToStaticMarkup(React.createElement(component,props));
+const noAction=()=>{throw Error('SSR must not execute actions')};
+const base={projectId:1,serviceYear:2026,roundLabel:'第1回',method:'請求書',scheduledDate:'2026-12-01',issuedOn:null,receivedOn:null,frozenAmount:null,frozenLineItems:null,frozenAt:null,revision:0};
+const old={...base,id:'old',recipientId:1,lifecycle:'received',receivedOn:'2026-07-24',issuedOn:'2026-07-15',frozenAmount:165000,frozenLineItems:[{name:'保守料',amount:165000}],frozenAt:'2026-07-15T00:00:00Z'};
+for(const state of ['planned','issued','received']){
+ const next={...base,id:'next',roundLabel:'第2回',recipientId:2,lifecycle:state,plannedAmount:82500,
+ ...(state==='planned'?{}:{issuedOn:'2026-12-01',frozenAmount:82500,frozenLineItems:[{name:'保守料',amount:82500}],frozenAt:'2026-12-01T00:00:00Z'}),...(state==='received'?{receivedOn:'2026-12-10'}:{})};
+ const history={units:[old,next],recipientName:id=>id===1?'旧所有者A':'新所有者B',projectName:()=> '検証発電所',plannedAmount:()=>999999};
+ const before=JSON.stringify(history.units);
+ const billing=render(Billing,{rows:[],onReload:noAction,onViewDetail:noAction,billingHistory:history,billingToday:'2026-12-15'});
+ const dashboard=render(Dashboard,{stats:{totalCustomers:2,totalProjects:1,activeMaintenanceCount:0},maintenanceList:[],billingRows:[],onNavigate:noAction,onViewMaintenance:noAction,onViewBilling:noAction,billingHistory:history,billingToday:'2026-12-15'});
+ for(const html of [billing,dashboard]){assert.ok(html.includes('82,500'));assert.ok(html.includes('165,000'));assert.ok(!html.includes('999,999'));assert.ok(html.includes('新所有者B'));assert.ok(html.includes('旧所有者A'));}
+ for(const id of [1,2]){
+  const html=render(CustomerDetailView,{detail:{customer:{id,name:id===1?'旧所有者A':'新所有者B'},projects:[],attachments:[]},onBack:noAction,onReload:noAction,onViewProject:noAction,billingHistory:history});
+  assert.ok(html.includes('検証発電所'),'old owner has history even without a currently owned project');
+  assert.ok(html.includes(id===1?'165,000':'82,500'));assert.ok(!html.includes(id===1?'82,500':'165,000'),'other payer amount leaked');
+ }
+ assert.equal(JSON.stringify(history.units),before);
+}
+console.log('PASS: normal Billing/Dashboard/CustomerDetail render all three invoice states with saved amounts and payer-based history, including old owner without projects. No App routing, browser clicks, CSV download or production access.');

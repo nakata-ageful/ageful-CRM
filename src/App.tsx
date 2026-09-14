@@ -32,6 +32,7 @@ import type {BillingHistoryData} from './components/BillingHistorySection'
 import {Modal} from './components/Modal'
 import {OwnershipTransferHistory} from './components/OwnershipTransferHistory'
 import {ManagementLifecycleEditor} from './components/ManagementLifecycleEditor'
+import {FutureScheduleEditor} from './components/FutureScheduleEditor'
 
 type ViewKey =
   | 'dashboard'
@@ -471,6 +472,9 @@ function MainApp() {
           key={`${projectDetail.project.id}:${JSON.stringify(runtime.managementEvents)}:${runtime.units.map(u=>`${u.id}:${u.revision}`).join(',')}`}
           projectId={projectDetail.project.id} events={runtime.managementEvents.filter(e=>e.project_id===projectDetail.project.id)} units={runtime.units}
           onSave={async request=>{await saveRuntime({action:'management',value:request})}}/>}
+        {view==='project-detail'&&runtime&&projectDetail?.contract&&billingRows.filter(r=>r.project_id===projectDetail.project.id).map(row=><FutureScheduleEditor
+          key={`${row.project_id}:${JSON.stringify(runtime)}:${JSON.stringify(row.contract)}`} row={row} customers={customers} units={runtime.units} events={runtime.managementEvents}
+          onSave={value=>saveRuntime({action:'future_schedule',value})}/>)}
         {transferOpen&&runtime&&projectDetail?.contract&&<Modal title="所有者を変更" width={1100} onClose={()=>setTransferOpen(false)}>
           <OwnershipTransferEditor project={projectDetail.project} contract={projectDetail.contract} customers={customers}
             units={runtime.units.filter(u=>u.projectId===projectDetail.project.id)}

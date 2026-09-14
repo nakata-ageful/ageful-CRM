@@ -53,7 +53,7 @@ async function main(){
    '20260907_preserve_maintenance_source.sql','20260907_invoice_recipient_initialization.sql','20260907_invoice_initialization_inspection.sql',
    '20260907_imported_invoice_source_guard.sql','20260907_legacy_invoice_creation_guard.sql','20260907_transfer_detail_choices.sql',
    '20260907_manual_billing_plan.sql','20260907_transfer_ownership_manual.sql','20260907_manual_debit_result.sql','20260907_create_manual_debit_plan.sql',
-   '20260914_management_lifecycle.sql','20260909_billing_runtime.sql'])await tx.exec(fs.readFileSync(path.join(root,'database/drafts',f),'utf8'))})
+   '20260914_management_lifecycle.sql','20260914_future_schedule.sql','20260909_billing_runtime.sql'])await tx.exec(fs.readFileSync(path.join(root,'database/drafts',f),'utf8'))})
   const raw=review(audit.datasetId,data.annual_records)
   const confirmations=raw.candidates.map(c=>{const approval=amounts.find(a=>a.recordId===c.recordId&&a.paymentIndex===c.paymentIndex&&a.seq===c.seq)
    return {sourceKey:c.sourceKey,sourceSignature:c.sourceSignature,recipientId:audit.rows.find(r=>r.recordId===c.recordId&&r.originalPaymentIndex===c.paymentIndex).confirmedRecipientId,recipientBasis:payer.basis,
@@ -200,6 +200,30 @@ async function main(){
    const resumed=await runtimeSnapshot();assert.equal(resumed.management_events.length,3)
    assert.equal(resumed.units.find(u=>u.id===managedPlan.id).lifecycle,'cancelled','Resume must not revive cancelled plans')
    await runtimeWrite(key(),'debit_add',nextDebit)
+   const scheduleState=await runtimeSnapshot()
+   const scheduleContract=(await db.query('select to_jsonb(c) value from contracts c where id=1')).rows[0].value
+   const scheduleRequest={projectId:1,contract:scheduleContract,versions:Object.fromEntries(scheduleState.units.map(u=>[u.id,u.revision])),last:resumed.management_events.at(-1).id,
+    items:[{date:'2028-06-15',year:2028,round:1,method:'invoice',recipientId:2,amount:75},{date:'2029-06-15',year:2029,round:1,method:'invoice',recipientId:1,amount:80}],reason:'将来の他費目と前払い期間を確認'}
+   const scheduleKey=key();await runtimeWrite(scheduleKey,'future_schedule',scheduleRequest);await runtimeWrite(scheduleKey,'future_schedule',scheduleRequest)
+   const scheduled=await runtimeSnapshot()
+   assert.equal(scheduled.units.length,scheduleState.units.length+2)
+   assert.deepEqual(scheduled.units.filter(u=>scheduleState.units.some(old=>old.id===u.id)),scheduleState.units,'Future generation must never update existing units')
+   await assert.rejects(runtimeWrite(key(),'future_schedule',scheduleRequest),/更新されています/)
+   const refreshed={...scheduleRequest,versions:Object.fromEntries(scheduled.units.map(u=>[u.id,u.revision]))}
+   await assert.rejects(runtimeWrite(key(),'future_schedule',refreshed),/二重作成/)
+   await assert.rejects(runtimeWrite(key(),'future_schedule',{...refreshed,items:[{...refreshed.items[0],date:'2030-06-15',year:2030},{...refreshed.items[0]}]}),/二重作成/)
+   assert.deepEqual(await runtimeSnapshot(),scheduled,'Later duplicate failure must roll back earlier insertion')
+   await assert.rejects(runtimeWrite(key(),'future_schedule',{...refreshed,contract:{...scheduleContract,annual_maintenance_inc:999}}),/契約が更新/)
+   await assert.rejects(runtimeWrite(key(),'future_schedule',{...refreshed,items:[{...refreshed.items[0],date:'2026-12-15',year:2026}]}),/全取引終了/)
+   console.log('PASS: future invoice rounds across years, explicit payers/amounts, insert-only preservation, replay, stale requests, duplicates, full rollback and management end guard')
+   const monthly={...refreshed,items:[{date:'2030-01-25',year:2030,round:1,method:'direct_debit',recipientId:2,amount:100},{date:'2030-02-25',year:2030,round:2,method:'direct_debit',recipientId:1,amount:200}]}
+   await runtimeWrite(key(),'future_schedule',monthly)
+   const monthlyState=await runtimeSnapshot(),monthUnit=monthlyState.units.find(u=>u.occurrence_key==='future:2030:direct_debit:1')
+   assert.equal(monthUnit.planned_amount,100)
+   await runtimeWrite(key(),'plan',{projectId:1,reason:'振替予定を請求書へ切替し日付を変更',choices:monthlyState.units.filter(u=>u.lifecycle==='planned').map(u=>({unitId:String(u.id),expectedRevision:u.revision,recipientId:u.recipient_customer_id,method:u.id===monthUnit.id?'請求書':u.collection_method==='invoice'?'請求書':'口座振替',scheduledDate:u.id===monthUnit.id?'2030-03-25':u.scheduled_date,plannedAmount:u.planned_amount,periodStart:u.period_start,periodEnd:u.period_end,note:u.plan_note}))})
+   const movedState=await runtimeSnapshot()
+   await assert.rejects(runtimeWrite(key(),'future_schedule',{...monthly,versions:Object.fromEntries(movedState.units.map(u=>[u.id,u.revision])),items:[monthly.items[0]]}),/二重作成/)
+   console.log('PASS: monthly debit plans retain explicit amounts/payers and cannot be regenerated after date/method changes')
    const managementBackup=(await db.query('select billing_runtime_backup() value')).rows[0].value
    assert.equal(managementBackup.project_management_events.length,3)
    await assert.rejects(db.exec('select * from project_management_events'),/permission denied/)

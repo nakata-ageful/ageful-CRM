@@ -108,6 +108,8 @@ BEGIN
     IF NOT public.management_active_on((v->>'projectId')::bigint,'all',(v->>'date')::date) THEN RAISE EXCEPTION '全取引終了後の新規予定は作成できません。再開日を確認してください'; END IF;
     result:=public.create_manual_debit_plan(p_key,(v->>'projectId')::bigint,(v->>'contractId')::bigint,(v->>'recipient')::bigint,
       (v->>'year')::integer,(v->>'month')::integer,(v->>'date')::date,(v->>'amount')::bigint,v->>'note',v->>'reason');
+  ELSIF action='future_schedule' THEN
+    result:=public.create_future_schedule(p_key,(v->>'projectId')::bigint,v->'contract',v->'versions',(v->>'last')::bigint,v->'items',v->>'reason');
   ELSIF action='management' THEN
     result:=public.write_management_lifecycle(p_key,(v->>'projectId')::bigint,(v->>'expectedLast')::bigint,
       v->>'scope',v->>'action',(v->>'date')::date,v->'choices',v->>'reason');

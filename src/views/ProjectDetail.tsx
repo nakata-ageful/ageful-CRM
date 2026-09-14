@@ -1468,16 +1468,16 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               </select>
             </label>
             <label className="form-label">
-              請求予定日
+              旧請求基準日（参考・通知対象外）
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <select className="form-select" value={contractForm.billing_due_day.match(/(\d{1,2})月/)?.[1] ?? ''} onChange={e => {
+                <select disabled className="form-select" value={contractForm.billing_due_day.match(/(\d{1,2})月/)?.[1] ?? ''} onChange={e => {
                   const day = contractForm.billing_due_day.match(/(\d{1,2})日/)?.[1] ?? '1'
                   setContractForm(f => ({ ...f, billing_due_day: e.target.value ? `${e.target.value}月${day}日` : '' }))
                 }}>
                   <option value="">月</option>
                   {Array.from({ length: 12 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}月</option>)}
                 </select>
-                <select className="form-select" value={contractForm.billing_due_day.match(/(\d{1,2})日/)?.[1] ?? ''} onChange={e => {
+                <select disabled className="form-select" value={contractForm.billing_due_day.match(/(\d{1,2})日/)?.[1] ?? ''} onChange={e => {
                   const month = contractForm.billing_due_day.match(/(\d{1,2})月/)?.[1] ?? '1'
                   setContractForm(f => ({ ...f, billing_due_day: e.target.value ? `${month}月${e.target.value}日` : '' }))
                 }}>

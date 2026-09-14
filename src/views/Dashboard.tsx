@@ -5,6 +5,7 @@ import { computeUnpaidUnits, unpaidUnitAmount, computeUpcomingInvoices } from '.
 import { BillingOverviewPanel } from '../components/BillingOverviewPanel'
 import type { BillingHistoryData } from '../components/BillingHistorySection'
 import { buildBillingOverview } from '../lib/billing-overview'
+import {debitScheduleReminder} from '../lib/debit-schedule-reminder'
 
 type Props = {
   stats: DashboardStats
@@ -17,15 +18,6 @@ type Props = {
   billingToday?: string
 }
 
-
-/** "6月25日" → 今年の "2026-06-25" に変換 */
-function dueDayToDate(dueDayStr: string | null | undefined): string | null {
-  if (!dueDayStr) return null
-  const m = dueDayStr.match(/(\d{1,2})月(\d{1,2})日/)
-  if (!m) return null
-  const year = new Date().getFullYear()
-  return `${year}-${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')}`
-}
 
 export function Dashboard({ stats, maintenanceList, billingRows, onNavigate, onViewMaintenance, onViewBilling, billingHistory, billingToday }: Props) {
   const now = new Date()
@@ -40,14 +32,7 @@ export function Dashboard({ stats, maintenanceList, billingRows, onNavigate, onV
   const unpaidTotal = overview?.totals.unpaidAmount ?? unpaidUnits.reduce((sum, u) => sum + (unpaidUnitAmount(u) ?? 0), 0)
 
   // 口座振替で振替日を過ぎているが入金確認がない案件（今年度＋昨年度の全記録を対象）
-  const transferOverdueRows = (billingHistory ? [] : billingRows).filter(r => {
-    if (r.contract?.billing_method !== '口座振替') return false
-    const dueDate = dueDayToDate(r.contract?.billing_due_day)
-    if (!dueDate || dueDate > today) return false
-    // 対象期間に「入金済み or 振替失敗」の記録があれば処理済みとみなす
-    const handled = r.records.some(rec => rec.year >= currentYear - 1 && (rec.received_date || rec.transfer_failed))
-    return !handled
-  })
+  const transferOverdueRows = (billingHistory ? [] : billingRows).filter(r => debitScheduleReminder(r,today))
 
   // 請求予定: 請求タブと同じ「今月・来月・再来月の請求予定」を共有ロジックで算出
   const scheduledItems = billingHistory ? [] : computeUpcomingInvoices(billingRows)
@@ -83,7 +68,8 @@ export function Dashboard({ stats, maintenanceList, billingRows, onNavigate, onV
           <div className="kpi-card" style={{ borderColor: '#f59e0b' }}>
             <div className="kpi-label" style={{ color: '#d97706' }}>振替 要確認</div>
             <div className="kpi-value" style={{ color: '#d97706' }}>{transferOverdueRows.length}</div>
-            <div style={{ fontSize: 11, color: '#92400e', marginBottom: 4 }}>振替日を過ぎて未入金</div>
+            <div style={{ fontSize: 11, color: '#92400e', marginBottom: 4 }}>今月の予定日到来・振替結果を確認</div>
+            <div style={{ fontSize: 11, color: '#64748b' }}>銀行結果は自動取得しません。日付が対応しない旧記録は確認済みと判定しません。</div>
             <button className="kpi-link" onClick={() => onNavigate('billing')}>確認する →</button>
           </div>
         )}

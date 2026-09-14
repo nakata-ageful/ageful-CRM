@@ -1,0 +1,16 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript')
+function load(file){const m={exports:{}};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText,{exports:m.exports,require:n=>load(path.resolve(path.dirname(file),n)+'.ts')});return m.exports}
+const {debitScheduleReminder:check}=load(path.resolve(__dirname,'../src/lib/debit-schedule-reminder.ts'))
+const row={contract:{billing_method:'口座振替',billing_due_day:'1月1日',billing_schedule_days:['25日']},records:[]}
+assert.equal(check(row,'2026-09-24'),false)
+assert.equal(check(row,'2026-09-25'),true)
+assert.equal(check({...row,contract:{...row.contract,billing_due_day:'12月31日'}},'2026-09-25'),true)
+assert.equal(check({...row,records:[{year:2025,received_date:'2025-09-25'}]},'2026-09-25'),true)
+assert.equal(check({...row,records:[{billing_scheduled_date:'2026-09-25',received_date:'2026-09-25'}]},'2026-09-25'),false)
+assert.equal(check({...row,records:[{payments:[{scheduled_date:'2026-09-25',received_date:'2026-09-25'}]}]},'2026-09-25'),false)
+assert.equal(check({...row,contract:{...row.contract,billing_schedule_days:null}},'2026-09-25'),false)
+assert.equal(check({...row,contract:{...row.contract,billing_schedule_days:['31日']}},'2026-09-30'),false)
+const dashboard=fs.readFileSync(path.resolve(__dirname,'../src/views/Dashboard.tsx'),'utf8')
+assert.ok(!dashboard.includes('billing_due_day'))
+assert.ok(!dashboard.includes('振替日を過ぎて未入金'))
+console.log('PASS: reminders use scheduled dates, ignore legacy baseline and unrelated past receipts, and do not infer bank failure')

@@ -376,7 +376,7 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject, emb
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>口座振替</div>
                   <span style={{ fontSize: 12, color: '#0ea5e9', fontWeight: 600 }}>
-                    毎年 {contract.billing_due_day ?? '—'}
+                    予定日：{contract.billing_schedule_days?.join('・') || '未設定（請求情報で設定）'}
                   </span>
                 </div>
 
@@ -649,7 +649,8 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject, emb
                 {([
                   { label: '保守契約者', value: contract.maintenance_contractor ?? contract.subcontractor },
                   { label: '請求方法', value: contract.billing_method },
-                  { label: '請求基準日', value: contract.billing_due_day },
+                  { label: '各回の請求予定日', value: contract.billing_schedule_days?.join('・') || '未設定（請求情報で設定）' },
+                  { label: '旧請求基準日（参考・通知対象外）', value: contract.billing_due_day },
                   { label: '請求金額（税込）', value: contract.billing_amount_inc != null ? fmtYen(contract.billing_amount_inc) : null },
                   { label: '年間保守料', value: contract.annual_maintenance_inc != null ? fmtYen(contract.annual_maintenance_inc) : null },
                   { label: '年間請求回数', value: billingCount > 1 ? `${billingCount}回` : null },
@@ -718,16 +719,16 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject, emb
                     </select>
                   </label>
                   <label style={{ fontSize: 11, color: '#475569' }}>
-                    請求基準日
+                    旧請求基準日（参考・編集不可）
                     <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
-                      <select className="form-select" style={{ fontSize: 12, padding: '4px 6px' }} value={contractEdit.billing_due_day.match(/(\d{1,2})月/)?.[1] ?? ''} onChange={e => {
+                      <select disabled className="form-select" style={{ fontSize: 12, padding: '4px 6px' }} value={contractEdit.billing_due_day.match(/(\d{1,2})月/)?.[1] ?? ''} onChange={e => {
                         const day = contractEdit.billing_due_day.match(/(\d{1,2})日/)?.[1] ?? '1'
                         setContractEdit(prev => ({ ...prev, billing_due_day: e.target.value ? `${e.target.value}月${day}日` : '' }))
                       }}>
                         <option value="">月</option>
                         {Array.from({ length: 12 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}月</option>)}
                       </select>
-                      <select className="form-select" style={{ fontSize: 12, padding: '4px 6px' }} value={contractEdit.billing_due_day.match(/(\d{1,2})日/)?.[1] ?? ''} onChange={e => {
+                      <select disabled className="form-select" style={{ fontSize: 12, padding: '4px 6px' }} value={contractEdit.billing_due_day.match(/(\d{1,2})日/)?.[1] ?? ''} onChange={e => {
                         const month = contractEdit.billing_due_day.match(/(\d{1,2})月/)?.[1] ?? '1'
                         setContractEdit(prev => ({ ...prev, billing_due_day: e.target.value ? `${month}月${e.target.value}日` : '' }))
                       }}>

@@ -4,6 +4,7 @@ import { bulkImportProjects, exportAllData, restoreAllData } from '../lib/action
 import { useToast } from '../components/Toast'
 import { EXPORT_FIELD_DEFS, type ExportFieldDef } from '../lib/export-fields'
 import { annualBillableTotalInc } from '../lib/billing'
+import {billingItemSummary} from '../lib/billing-item-selection'
 import type { Contract } from '../types'
 import { hasSupabaseEnv } from '../lib/supabase'
 import { RESTORE_DISABLED_MESSAGE } from '../lib/restore-safety'
@@ -36,7 +37,8 @@ function buildKingakuCsv(tables: Record<string, Record<string, unknown>[]>): str
   const customersById = new Map((tables.customers ?? []).map(c => [c.id as number, c]))
   const contractsByProject = new Map((tables.contracts ?? []).map(c => [c.project_id as number, c]))
   const fixedCols = ['発電所名', '顧客名', '受託会社', '請求方法']
-  const header = [...fixedCols, ...KINGAKU_COLS.map(c => c.label), '年間合計（全費目）', '年間総額（請求対象のみ）']
+  const header = [...fixedCols, ...KINGAKU_COLS.map(c => c.label), '記録額の年間合計（全費目）', '自社請求対象額（費目合計・手数料／個別金額除く）',
+    ...billingItemSummary(null).items.map(i=>`${i.label}：自社請求対象`),'対象外の記録額（年間）','請求設定の注意']
 
   // 列位置（0始まり）。費目列は fixedCols の次から並ぶ
   const feeStart = fixedCols.length
@@ -50,6 +52,7 @@ function buildKingakuCsv(tables: Record<string, Record<string, unknown>[]>): str
     const con = contractsByProject.get(p.id as number) as Contract | undefined
     const amounts = KINGAKU_COLS.map(c => Number((con as Record<string, unknown> | undefined)?.[c.key] ?? 0) || 0)
     const billable = con ? annualBillableTotalInc(con) : 0
+    const summary=billingItemSummary(con)
     // 年間合計（全費目）は費目セルの数式で
     const rowTotalFormula = `=SUM(${colLetter(feeStart)}${excelRow}:${colLetter(feeEnd)}${excelRow})`
     return [
@@ -60,6 +63,9 @@ function buildKingakuCsv(tables: Record<string, Record<string, unknown>[]>): str
       ...amounts.map(String),
       rowTotalFormula,
       String(billable),
+      ...summary.items.map(i=>con?(i.included?'対象':'対象外（記録のみ）'):'契約未登録'),
+      String(summary.excludedTotal),
+      [summary.hasOverrides?'各回・各月の個別金額あり':null,summary.hasFees?'手数料設定あり':null,'契約条件の集計であり請求・入金実績ではありません'].filter(Boolean).join('／'),
     ]
   })
 
@@ -69,6 +75,8 @@ function buildKingakuCsv(tables: Record<string, Record<string, unknown>[]>): str
   for (let c = feeStart; c <= billableCol; c++) {
     totalRow.push(dataRows.length > 0 ? `=SUM(${colLetter(c)}2:${colLetter(c)}${lastDataRow})` : '0')
   }
+  const flagCount=billingItemSummary(null).items.length,excludedColumn=colLetter(billableCol+flagCount+1)
+  totalRow.push(...Array(flagCount).fill(''),dataRows.length>0?`=SUM(${excludedColumn}2:${excludedColumn}${lastDataRow})`:'0','')
 
   return [header, ...dataRows, totalRow].map(cols => cols.map(csvEscape).join(',')).join('\n')
 }
@@ -1000,6 +1008,7 @@ export function CsvImport({ onReload }: Props) {
           <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>
             1行=1発電所で、費目ごと（年次保守料・土地賃料・保険料など）の金額を横並びにした表。
             右端に発電所ごとの年間合計、最下行に費目ごとの合計が入り、Excelでそのまま確認できます。
+            費目ごとの自社請求対象・対象外と、対象外の記録額も出力します。全費目の合計は自社の売上実績ではありません。
           </div>
           <button className="btn btn-main btn-sm" onClick={handleExportKingaku} disabled={exporting}>
             {exporting ? '⏳ 作成中...' : '⬇ 金額確認CSVをダウンロード'}

@@ -5,6 +5,8 @@ import type {BillingHistoryData} from '../components/BillingHistorySection'
 import type {InvoiceWriteRequest} from '../lib/invoice-write-session'
 import {ManualDebitPlanCreator,type NewDebitPlan} from '../components/ManualDebitPlanCreator'
 import {OwnershipBillingPlanEditor} from '../components/OwnershipBillingPlanEditor'
+import {BillingItemSelection} from '../components/BillingItemSelection'
+import {billingItemSelectionPatch} from '../lib/billing-item-selection'
 import type {TransferBillingChoice,TransferBillingUnit} from '../lib/ownership-billing-plan'
 import { getBillingDetail } from '../lib/data'
 import { hasSupabaseEnv } from '../lib/supabase'
@@ -923,6 +925,8 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       {/* ── 保守情報タブ ── */}
       {tab === '保守情報' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {contract&&<BillingItemSelection key={`${contract.id}:${JSON.stringify(contract.billing_item_flags)}`} contract={contract}
+            onSave={billingHistory?async flags=>{await updateContract(contract.id,billingItemSelectionPatch(flags));onReload()}:undefined}/>}
           {/* 中項目: 保守契約 */}
           <div className="card">
             <div className="card-header-row">
@@ -2390,7 +2394,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                       const checked = contractForm.billing_item_flags[it.key] !== false
                       return (
                         <label key={it.key} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: amount > 0 ? '#0f172a' : '#94a3b8', cursor: 'pointer' }}>
-                          <input type="checkbox" checked={checked}
+                          <input type="checkbox" checked={checked} disabled={!billingHistory}
                             onChange={e => setContractForm(f => ({ ...f, billing_item_flags: { ...f.billing_item_flags, [it.key]: e.target.checked } }))} />
                           {it.label}
                           <span style={{ marginLeft: 'auto', fontVariantNumeric: 'tabular-nums' }}>{amount > 0 ? fmtYen(amount) : '—'}</span>
@@ -2399,6 +2403,8 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                     })}
                   </div>
                   <p style={{ fontSize: 11, color: '#94a3b8', margin: '6px 0 0' }}>※ チェックを外した項目は保守内容に記載のみで、請求金額の計算に入りません</p>
+                  {!billingHistory&&<p role="status">過去額を保護するため、請求対象の変更は新しい回別請求への移行後に利用できます。</p>}
+                  {billingHistory&&<p>保存済みの予定・発行済み・入金済みの金額は変わりません。各回の個別金額と手数料は別に確認してください。</p>}
                 </div>
 
                 {isInvoice && (

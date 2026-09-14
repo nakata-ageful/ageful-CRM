@@ -148,6 +148,10 @@ async function main(){
    await assert.rejects(db.exec('delete from customers where id=1'),/削除できません/)
    await assert.rejects(db.exec('select * from billing_units'),/permission denied/)
    const before=(await db.query('select billing_runtime_snapshot() value')).rows[0].value
+   await db.exec('begin')
+   await db.exec(`update contracts set billing_item_flags='{"annual_maintenance":false,"land_cost":true}'::jsonb where id=1`)
+   assert.deepEqual((await db.query('select billing_runtime_snapshot() value')).rows[0].value.units,before.units,'Fee selection must not change stored occurrences')
+   await db.exec('rollback')
    const backup=(await db.query('select billing_runtime_backup() value')).rows[0].value
    assert.equal(backup.version,2);assert.equal(backup.billing_units.length,before.units.length)
    assert.deepEqual(backup.annual_records,[...fixture.annual_records].sort((a,b)=>canonicalJson(a).localeCompare(canonicalJson(b))))

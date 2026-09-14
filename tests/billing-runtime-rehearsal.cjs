@@ -12,6 +12,8 @@ const {contractFieldKinds:ck,projectFieldKinds:pk}=load('src/lib/ownership-field
 const {contractTransferLabels:labels,validateContractBillingSettings:validate}=load('src/lib/contract-transfer-form.ts')
 const {durableBillingOperation}=load('src/lib/durable-billing-operation.ts')
 const {inspectFutureBillingCoverage}=load('src/lib/billing-cutover-coverage.ts')
+const {reviewFutureSchedule}=load('src/lib/future-schedule-review.ts')
+const {billingUnitFromStorage}=load('src/lib/billing-unit-storage.ts')
 const {reviewBillingMigration:review}=load('src/lib/billing-migration-review.ts')
 const {prepareInvoiceMigrationPayload:prepare}=load('src/lib/invoice-migration-payload.ts')
 const {identifyBillingMigrationSource:identify}=load('src/lib/billing-migration-source.ts')
@@ -84,6 +86,7 @@ async function main(){
    return {project_id:p.id,contract:c??null,records:data.annual_records.filter(a=>a.contract_id===c?.id)}
   })
   const coverage=inspectFutureBillingCoverage(coverageRows,new Map(data.projects.map(p=>[p.id,p.customer_id])),imported.billing_units,'2026-09',15)
+  const scheduleReview=reviewFutureSchedule(coverage.candidates,imported.billing_units.map(u=>({...billingUnitFromStorage(u),collectionState:u.collection_state})))
   if(!real){
    assert.equal(coverage.candidates[0].date,'2027-06-15');assert.equal(coverage.summary.missing,1)
    const proposal=coverage.candidates[0]
@@ -248,6 +251,8 @@ async function main(){
    sourceRowsUnchanged:true,engineBackupRestoreMatched:true,restoredTables:allTables.length,productionCutoverReady:false},null,2))
   console.log(JSON.stringify({futureCoverage:{scope:'read-only current-contract proposals; not issued amounts or an automatic migration',startMonth:coverage.startMonth,months:coverage.months,
    ...coverage.summary,settingIssues:coverage.issues.length,undatedSavedPlans:coverage.undatedSavedPlans,excludedMultiContractProjects:multiContractProjects.length,authorizesCutover:false}},null,2))
+  console.log(JSON.stringify({futureScheduleReview:{scope:'candidates only; no creation authorization',selectable:scheduleReview.filter(r=>!r.exclusion).length,
+   excluded:scheduleReview.filter(r=>r.exclusion).length,reasons:scheduleReview.filter(r=>r.exclusion).reduce((counts,r)=>{counts[r.exclusion]=(counts[r.exclusion]??0)+1;return counts},{})}},null,2))
  }finally{await db.close()}
 }
 main().catch(e=>{console.error(e.message);process.exitCode=1})

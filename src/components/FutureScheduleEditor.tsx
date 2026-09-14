@@ -3,21 +3,24 @@ import type {BillingRow,Customer} from '../types'
 import type {TransferBillingUnit} from '../lib/ownership-billing-plan'
 import type {ManagementEvent} from '../lib/management-lifecycle'
 import {inspectFutureBillingCoverage} from '../lib/billing-cutover-coverage'
+import {reviewFutureSchedule} from '../lib/future-schedule-review'
 
 type Item={date:string;year:number;round:number;method:'invoice'|'direct_debit';recipientId:number;amount:number;include:boolean;reason?:string}
 export function FutureScheduleEditor({row,customers,units,events,onSave}:{row:BillingRow;customers:Customer[];units:TransferBillingUnit[];events:ManagementEvent[];onSave:(value:Record<string,unknown>)=>Promise<unknown>}){
  const [month,setMonth]=useState(()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`})
  const [months,setMonths]=useState(15),[recipient,setRecipient]=useState(''),[items,setItems]=useState<Item[]>([]),[notice,setNotice]=useState(''),[reason,setReason]=useState(''),[reviewed,setReviewed]=useState(false),[busy,setBusy]=useState(false)
  const own=units.filter(u=>u.projectId===row.project_id)
+ const [excluded,setExcluded]=useState<{date:string;round:number;reason:string}[]>([])
  function preview(){try{
   if(!recipient)throw Error('今回追加する予定の請求先を選択してください')
-  if(own.some(u=>u.lifecycle==='planned'&&!u.scheduledDate))throw Error('日付のない保存予定があります。重複を防ぐため、先に対応を確認してください')
   const result=inspectFutureBillingCoverage([{...row,records:[]}],new Map([[row.project_id,Number(recipient)]]),own.map(u=>({project_id:u.projectId,recipient_customer_id:u.recipientId??0,collection_method:u.method==='請求書'?'invoice':'direct_debit',scheduled_date:u.scheduledDate,lifecycle:u.lifecycle,planned_amount:u.plannedAmount??null})),month,months,events)
   // Preserve same-year round identity even if its operator-assigned date or method moved.
-  const proposals=result.candidates.filter(c=>!own.some(u=>u.scheduledDate===c.date||u.serviceYear===Number(c.date.slice(0,4))&&(c.method==='invoice'&&u.roundLabel.endsWith('月分')||c.method==='direct_debit'&&u.roundLabel.startsWith('第')||u.roundLabel===`第${c.round}回`&&c.method==='invoice'||u.roundLabel===`${Number(c.date.slice(5,7))}月分`||u.roundLabel==='保存済み単回記録')))
+  const reviewed=reviewFutureSchedule(result.candidates,own)
+  const proposals=reviewed.filter(r=>!r.exclusion).map(r=>r.candidate)
+  setExcluded(reviewed.filter(r=>r.exclusion).map(r=>({date:r.candidate.date,round:r.candidate.round,reason:r.exclusion!})))
   setItems(proposals.map(c=>({date:c.date,year:Number(c.date.slice(0,4)),round:c.round,method:c.method,recipientId:Number(recipient),amount:c.amount,include:false,reason:c.reason})))
   setNotice([...result.issues.map(i=>i.reason),`追加候補 ${proposals.length}件。保存済みの回は変更しません。`,proposals.length<result.candidates.length?'保存記録がある回、または年内の方法変更等で対応が不明な候補は除外しました。請求詳細で確認してください。':''].filter(Boolean).join(' / '));setReviewed(false)
- }catch(e){setNotice(e instanceof Error?e.message:String(e));setItems([])}}
+ }catch(e){setNotice(e instanceof Error?e.message:String(e));setItems([]);setExcluded([])}}
  function change(index:number,patch:Partial<Item>){setItems(items.map((i,n)=>n===index?{...i,...patch}:i));setReviewed(false)}
  async function save(){setBusy(true);try{await onSave({projectId:row.project_id,contract:row.contract,versions:Object.fromEntries(own.map(u=>[u.id,u.revision])),last:Math.max(0,...events.filter(e=>e.project_id===row.project_id).map(e=>e.id)),items:items.filter(i=>i.include).map(({include,reason,...i})=>i),reason});setItems([]);setReviewed(false);setNotice('確認した請求予定を追加しました。')}catch(e){setNotice(e instanceof Error?e.message:String(e))}finally{setBusy(false)}}
  return <section className="card" style={{padding:20,marginTop:16}}><details><summary>今後の請求予定を追加</summary>
@@ -27,10 +30,11 @@ export function FutureScheduleEditor({row,customers,units,events,onSave}:{row:Bi
   <label>作成期間 <select value={months} onChange={e=>{setMonths(Number(e.target.value));setItems([])}}><option value={12}>12か月</option><option value={15}>15か月</option><option value={24}>24か月</option></select></label>{' '}
   <label>追加分の請求先 <select value={recipient} onChange={e=>{setRecipient(e.target.value);setItems([])}}><option value="">選択してください</option>{customers.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>{' '}<button onClick={preview}>不足分の候補を表示</button>
   {notice&&<p role="status">{notice}</p>}
+  {!!excluded.length&&<details><summary>追加しない候補と理由（{excluded.length}件）</summary>{excluded.map((r,n)=><p key={n}>{r.date} ／ 第{r.round}回：{r.reason}</p>)}</details>}
   {items.map((i,n)=><div key={`${i.date}:${i.round}`} style={{padding:10,borderBottom:'1px solid #ddd'}}>
    <label><input type="checkbox" checked={i.include} onChange={e=>change(n,{include:e.target.checked})}/>追加する：{i.date} ／ {i.method==='invoice'?`請求書 第${i.round}回`:`口座振替 ${i.round}月分`}</label>{' '}
    <label>請求先 <select value={i.recipientId} onChange={e=>change(n,{recipientId:Number(e.target.value)})}>{customers.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>{' '}
-   <label>予定額 <input type="number" min={0} step={1} value={i.amount} onChange={e=>change(n,{amount:e.target.value===''?NaN:Number(e.target.value)})}/></label>
+   <label>予定額 <input type="number" min={0} step={1} value={Number.isNaN(i.amount)?'':i.amount} onChange={e=>change(n,{amount:e.target.value===''?NaN:Number(e.target.value)})}/></label>
    {i.reason&&<p>{i.reason}</p>}
   </div>)}
   {!!items.length&&<><label>確認内容・備考 <input value={reason} onChange={e=>{setReason(e.target.value);setReviewed(false)}}/></label>{' '}

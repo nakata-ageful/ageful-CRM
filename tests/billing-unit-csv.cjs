@@ -8,3 +8,13 @@ const paid=build([{...unit,lifecycle:'received',frozenAmount:165000,issuedOn:'20
 assert.ok(paid.includes('2026-09-01,2026-09-01,2026-09-10,入金済,確定額,165000,0,165000'));
 assert.ok(build([{...unit,plannedAmount:null,periodStart:null,periodEnd:null}],()=> 'B',()=> '発電所').includes('金額要確認,,,,'));
 console.log('PASS: per-unit CSV saved payer, explicit period, dates, zero/unknown, planned/frozen separation, notes escaping, formula protection, immutable inputs');
+// Optional diagnostic fixture: use the application's exporter, not another CSV serializer.
+// Never overwrite an existing file; this is not proof of browser download completion.
+if(process.argv[2]==='--export-fixture'){
+ const output=process.argv[3];assert.ok(output&&path.isAbsolute(output),'absolute diagnostic path required');
+ const content=build([unit,{...unit,id:'2',roundLabel:'第2回',lifecycle:'received',frozenAmount:165000,issuedOn:'2026-09-01',receivedOn:'2026-09-10'},
+  {...unit,id:'3',roundLabel:'第3回',plannedAmount:null,periodStart:null,periodEnd:null}],()=> '検証顧客B',()=> '検証発電所');
+ fs.writeFileSync(output,content,{flag:'wx',mode:0o600});
+ assert.equal(fs.readFileSync(output,'utf8'),content);
+ console.log('PASS: diagnostic CSV file saved and read back byte-for-byte (synthetic data only)');
+}

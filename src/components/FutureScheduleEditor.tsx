@@ -4,6 +4,7 @@ import type {TransferBillingUnit} from '../lib/ownership-billing-plan'
 import type {ManagementEvent} from '../lib/management-lifecycle'
 import {inspectFutureBillingCoverage} from '../lib/billing-cutover-coverage'
 import {reviewFutureSchedule} from '../lib/future-schedule-review'
+import {MaintenancePeriodReview} from './MaintenancePeriodReview'
 
 type Item={date:string;year:number;round:number;method:'invoice'|'direct_debit';recipientId:number;amount:number;include:boolean;reason?:string}
 export function FutureScheduleEditor({row,customers,units,events,onSave}:{row:BillingRow;customers:Customer[];units:TransferBillingUnit[];events:ManagementEvent[];onSave:(value:Record<string,unknown>)=>Promise<unknown>}){
@@ -25,6 +26,7 @@ export function FutureScheduleEditor({row,customers,units,events,onSave}:{row:Bi
  async function save(){setBusy(true);try{await onSave({projectId:row.project_id,contract:row.contract,versions:Object.fromEntries(own.map(u=>[u.id,u.revision])),last:Math.max(0,...events.filter(e=>e.project_id===row.project_id).map(e=>e.id)),items:items.filter(i=>i.include).map(({include,reason,...i})=>i),reason});setItems([]);setReviewed(false);setNotice('確認した請求予定を追加しました。')}catch(e){setNotice(e instanceof Error?e.message:String(e))}finally{setBusy(false)}}
  return <section className="card" style={{padding:20,marginTop:16}}><details><summary>今後の請求予定を追加</summary>
   <p>来年以降も、期間を選んで不足分だけ追加できます。発行・引落しは行いません。前払い期間、保守終了後の他費目、各回の請求先と金額を確認してください。</p>
+  <MaintenancePeriodReview startDate={row.contract?.maintenance_start_date??null} units={own}/>
   <fieldset disabled={busy} style={{border:0,padding:0}}>
   <label>開始月 <input type="month" value={month} onChange={e=>{setMonth(e.target.value);setItems([])}}/></label>{' '}
   <label>作成期間 <select value={months} onChange={e=>{setMonths(Number(e.target.value));setItems([])}}><option value={12}>12か月</option><option value={15}>15か月</option><option value={24}>24か月</option></select></label>{' '}

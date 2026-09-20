@@ -14,6 +14,7 @@ const {durableBillingOperation}=load('src/lib/durable-billing-operation.ts')
 const {inspectFutureBillingCoverage}=load('src/lib/billing-cutover-coverage.ts')
 const {reviewFutureSchedule}=load('src/lib/future-schedule-review.ts')
 const {billingUnitFromStorage}=load('src/lib/billing-unit-storage.ts')
+const {legacyScheduleSetupReview}=load('src/lib/billing-cutover-coverage.ts')
 const {maintenancePeriod}=load('src/lib/maintenance-period-label.ts')
 const {maintenanceSchedule}=load('src/lib/maintenance-schedule.ts')
 const {reviewBillingMigration:review}=load('src/lib/billing-migration-review.ts')
@@ -345,10 +346,19 @@ async function main(){
   await assert.rejects(db.exec('delete from billing_unit_events'),/append-only/)
   await assert.rejects(db.exec('truncate project_management_events'),/append-only/)
   if(!real){await db.exec("set role authenticated;set test.actor=''");await assert.rejects(db.query('select billing_runtime_backup()'),/利用権限/);await db.exec('reset role')}
+  const finalStoredUnits=await rows('billing_units')
+  const setupRows=data.projects.map(p=>{const contracts=data.contracts.filter(c=>c.project_id===p.id),contract=contracts[0]??null
+   const customer=data.customers.find(c=>c.id===p.customer_id)
+   return {project_id:p.id,project_name:p.project_name,customer_name:customer?.company_name??customer?.name??'-',company_name:customer?.company_name??null,
+    contract,contract_count:contracts.length,records:contract?data.annual_records.filter(a=>a.contract_id===contract.id):[],currentYearRecord:null,currentYearRecords:[],currentYear:2026}
+  })
+  const setupReview=legacyScheduleSetupReview(setupRows,new Map(data.projects.map(p=>[p.id,p.customer_id])),finalStoredUnits.map(u=>billingUnitFromStorage(u)),'2026-09-20')
   console.log(JSON.stringify({scope:real?'saved application JSON → isolated logical schema (not production DDL/Auth/storage restore)':'synthetic complete runtime rehearsal',
    sourceCounts:Object.fromEntries(sourceTables.map(t=>[t,(data[t]??[]).length])),expectedUnits:audit.rows.length,importedUnits:imported.billing_units.length,
    importedActualAmount:imported.billing_units.reduce((sum,u)=>sum+(u.frozen_amount??0),0),acceptedProjects:accepted,unresolvedMethodRecordIds:unresolvedMethods,
-   sourceRowsUnchanged:true,engineBackupRestoreMatched:true,restoredTables:allTables.length,productionCutoverReady:false},null,2))
+   sourceRowsUnchanged:true,engineBackupRestoreMatched:true,restoredTables:allTables.length,
+   nearTermSetup:{visibleUnsavedPlans:setupReview.items.length,projectsWithConfigurationIssues:new Set(setupReview.issues.map(i=>i.projectId)).size,
+    issueReasons:setupReview.issues.reduce((counts,i)=>{counts[i.reason]=(counts[i.reason]??0)+1;return counts},{})},productionCutoverReady:false},null,2))
   if(process.argv.includes('--legacy-calendar-review'))console.log(JSON.stringify({futureCoverage:{scope:'DEPRECATED calendar-year diagnostic; NOT maintenance-period coverage',startMonth:coverage.startMonth,months:coverage.months,
    ...coverage.summary,settingIssues:coverage.issues.length,undatedSavedPlans:coverage.undatedSavedPlans,excludedMultiContractProjects:multiContractProjects.length,authorizesCutover:false}},null,2))
   if(process.argv.includes('--legacy-calendar-review'))console.log(JSON.stringify({futureScheduleReview:{scope:'DEPRECATED calendar-year diagnostic; no creation authorization',selectable:scheduleReview.filter(r=>!r.exclusion).length,

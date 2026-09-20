@@ -8,6 +8,7 @@ import {debitScheduleReminder} from './debit-schedule-reminder'
 type StoredUnit={project_id:number;recipient_customer_id:number;collection_method:string;scheduled_date:string|null;lifecycle:string;planned_amount:number|null}
 export type CoverageCandidate={projectId:number;recipientId:number;method:'invoice'|'direct_debit';date:string;round:number;amount:number;status:'missing'|'matches'|'review';reason?:string}
 export type ScheduleSetupItem=CoverageCandidate&{projectName:string;customerName:string}
+export type ScheduleSetupIssue={projectId:number;projectName:string;reason:string}
 /** Read-only pre-cutover comparison. Calculated amounts are proposals, NEVER historical actuals.
  * Does not authorize activation, create records or decide ambiguous date/round correspondence.
  */
@@ -62,13 +63,24 @@ export function inspectFutureBillingCoverage(rows:readonly BillingRow[],recipien
  * Read-only: never creates a ledger occurrence or authorizes cutover by itself.
  */
 export function legacyScheduleSetupItems(rows:readonly BillingRow[],recipients:ReadonlyMap<number,number>,units:readonly BillingUnit[],today:string):ScheduleSetupItem[]{
+ return legacyScheduleSetupReview(rows,recipients,units,today).items
+}
+
+export function legacyScheduleSetupReview(rows:readonly BillingRow[],recipients:ReadonlyMap<number,number>,units:readonly BillingUnit[],today:string):{
+ items:ScheduleSetupItem[];issues:ScheduleSetupIssue[]
+}{
  if(!isBillingDate(today))throw Error('集計日が不正です')
  const startMonth=today.slice(0,7)
+ const unsafe=rows.filter(r=>(r.contract_count??(r.contract?1:0))!==1)
+ const safe=rows.filter(r=>!unsafe.includes(r))
  const stored:StoredUnit[]=units.map((u):StoredUnit=>({project_id:u.projectId,recipient_customer_id:u.recipientId??0,
   collection_method:u.method==='請求書'?'invoice':'direct_debit',scheduled_date:u.scheduledDate,lifecycle:u.lifecycle,planned_amount:u.plannedAmount??null}))
- const coverage=inspectFutureBillingCoverage(rows,recipients,stored,startMonth,3)
- return coverage.candidates.filter(c=>c.status==='missing'&&(c.method==='invoice'||c.date.startsWith(startMonth)))
-  .filter(c=>c.method!=='direct_debit'||debitScheduleReminder(rows.find(r=>r.project_id===c.projectId)!,today))
-  .map(c=>{const row=rows.find(r=>r.project_id===c.projectId)!;return {...c,projectName:row.project_name,customerName:row.customer_name}})
+ const coverage=inspectFutureBillingCoverage(safe,recipients,stored,startMonth,3)
+ const items=coverage.candidates.filter(c=>c.status==='missing'&&(c.method==='invoice'||c.date.startsWith(startMonth)))
+  .filter(c=>c.method!=='direct_debit'||debitScheduleReminder(safe.find(r=>r.project_id===c.projectId)!,today))
+  .map(c=>{const row=safe.find(r=>r.project_id===c.projectId)!;return {...c,projectName:row.project_name,customerName:row.customer_name}})
   .sort((a,b)=>a.date.localeCompare(b.date)||a.projectId-b.projectId)
+ const issues=[...unsafe.map(row=>({projectId:row.project_id,projectName:row.project_name,reason:'契約が複数または未設定のため、請求に使う契約の確認が必要です'})),
+  ...coverage.issues.map(issue=>{const row=safe.find(r=>r.project_id===issue.projectId)!;return {...issue,projectName:row.project_name}})]
+ return {items,issues}
 }

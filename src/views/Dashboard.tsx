@@ -6,7 +6,7 @@ import { BillingOverviewPanel } from '../components/BillingOverviewPanel'
 import type { BillingHistoryData } from '../components/BillingHistorySection'
 import { buildBillingOverview } from '../lib/billing-overview'
 import {debitScheduleReminder} from '../lib/debit-schedule-reminder'
-import {legacyScheduleSetupItems} from '../lib/billing-cutover-coverage'
+import {legacyScheduleSetupReview} from '../lib/billing-cutover-coverage'
 
 type Props = {
   stats: DashboardStats
@@ -25,7 +25,7 @@ export function Dashboard({ stats, maintenanceList, billingRows, onNavigate, onV
   const now = new Date()
   const today = billingToday ?? `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
   const overview = billingHistory ? buildBillingOverview(billingHistory.units, today) : null
-  const setupItems=billingHistory?legacyScheduleSetupItems(billingRows,projectRecipients??new Map(),billingHistory.units,today):[]
+  const setup=billingHistory?legacyScheduleSetupReview(billingRows,projectRecipients??new Map(),billingHistory.units,today):{items:[],issues:[]}
   const currentYear = new Date().getFullYear()
   const activeList = maintenanceList.filter(m => m.status === '対応中')
 
@@ -189,7 +189,7 @@ export function Dashboard({ stats, maintenanceList, billingRows, onNavigate, onV
             </tbody>
           </table>
         </div>}
-        {billingHistory && <div style={{gridColumn:'1 / -1'}}><BillingOverviewPanel data={billingHistory} today={today} onViewDetail={onViewBilling} setupItems={setupItems} /></div>}
+        {billingHistory && <div style={{gridColumn:'1 / -1'}}><BillingOverviewPanel data={billingHistory} today={today} onViewDetail={onViewBilling} setupItems={setup.items} setupIssues={setup.issues} /></div>}
       </div>
     </>
   )

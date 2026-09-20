@@ -287,6 +287,8 @@ export type BillingRow = {
   customer_name: string
   company_name: string | null
   contract: Contract | null
+  /** Must be exactly one before contract-derived billing reminders are trusted. */
+  contract_count?: number
   currentYearRecord: AnnualRecord | null   // 既存ロジック用（最初の1件）
   currentYearRecords: AnnualRecord[]        // 同年複数対応
   records: AnnualRecord[]                   // 全年度（過去データの未入金も請求タブで扱うため）

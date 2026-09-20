@@ -6,7 +6,7 @@ function load(file){file=path.resolve(root,file);if(cache.has(file))return cache
   {module,exports:module.exports,require:name=>{if(!name.startsWith('.'))throw Error('External dependency forbidden');return load(path.resolve(path.dirname(file),name)+'.ts')}})
  return module.exports
 }
-const {legacyScheduleSetupItems}=load('src/lib/billing-cutover-coverage.ts')
+const {legacyScheduleSetupItems,legacyScheduleSetupReview}=load('src/lib/billing-cutover-coverage.ts')
 const plain=value=>JSON.parse(JSON.stringify(value))
 const contract={project_id:1,billing_method:'請求書',billing_schedule_days:['9月25日','11月25日'],annual_maintenance_inc:120000,
  billing_item_flags:{annual_maintenance:true,land_cost:false,insurance:false,local_association:false,communication:false,other:false}}
@@ -23,5 +23,7 @@ const due=legacyScheduleSetupItems([debit],new Map([[2,10]]),[],'2026-09-20')
 assert.deepEqual(plain(due.map(x=>[x.date,x.method])),[['2026-09-15','direct_debit']])
 const handled={...debit,records:[{id:1,contract_id:1,year:2026,billing_scheduled_date:'2026-09-15',billing_date:null,payment_due_date:null,received_date:'2026-09-16',line_items:null,payments:null,maintenance_record:null,escort_record:null,transfer_failed:false,status:'入金済'}]}
 assert.equal(legacyScheduleSetupItems([handled],new Map([[2,10]]),[],'2026-09-20').length,0)
+const multiple=legacyScheduleSetupReview([{...row,contract_count:2}],recipients,[],'2026-09-20')
+assert.equal(multiple.items.length,0);assert.match(multiple.issues[0].reason,/契約が複数/)
 assert.equal(JSON.stringify(row),before)
 console.log('PASS: runtime keeps unmatched near-term invoice reminders visible, hides matched units, and shows only due unhandled debit checks without creating records')

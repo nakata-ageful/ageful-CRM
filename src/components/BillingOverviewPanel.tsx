@@ -3,10 +3,10 @@ import { BillingHistorySection } from './BillingHistorySection'
 import { buildBillingOverview } from '../lib/billing-overview'
 import { fmtYen } from '../lib/utils'
 import {buildBillingUnitCsv,downloadBillingUnitCsv} from '../lib/billing-unit-csv'
-import type {ScheduleSetupItem} from '../lib/billing-cutover-coverage'
+import type {ScheduleSetupIssue,ScheduleSetupItem} from '../lib/billing-cutover-coverage'
 
 /** Read-only shared preview; caller supplies authorized units and a local calendar date. */
-export function BillingOverviewPanel({data,today,onViewDetail,setupItems=[]}:{data:BillingHistoryData;today:string;onViewDetail?:(projectId:number)=>void;setupItems?:readonly ScheduleSetupItem[]}) {
+export function BillingOverviewPanel({data,today,onViewDetail,setupItems=[],setupIssues=[]}:{data:BillingHistoryData;today:string;onViewDetail?:(projectId:number)=>void;setupItems?:readonly ScheduleSetupItem[];setupIssues?:readonly ScheduleSetupIssue[]}) {
   const overview=buildBillingOverview(data.units,today)
   return <section><h2>請求</h2>
     <button type="button" onClick={()=>downloadBillingUnitCsv(buildBillingUnitCsv(data.units,data.recipientName,data.projectName))}>各回の請求CSVをダウンロード</button><p>全期間の各回を出力します。予定額・確定額は別列で、保存されていない保守期間は要確認とします。</p>
@@ -24,6 +24,10 @@ export function BillingOverviewPanel({data,today,onViewDetail,setupItems=[]}:{da
       <div style={{overflowX:'auto'}}><table><thead><tr><th>発電所</th><th>現在の顧客</th><th>請求予定日</th><th>請求方法</th><th>予定額（税込）</th><th>操作</th></tr></thead><tbody>{setupItems.map(item=><tr key={`${item.projectId}:${item.date}:${item.round}:${item.method}`}>
         <td>{item.projectName}</td><td>{item.customerName}</td><td>{item.date}</td><td>{item.method==='invoice'?'請求書':'口座振替'}</td><td>{fmtYen(item.amount)}</td>
         <td>{onViewDetail&&<button type="button" className="btn" onClick={()=>onViewDetail(item.projectId)}>発電所詳細で設定</button>}</td></tr>)}</tbody></table></div>
+    </section>}
+    {!!setupIssues.length&&<section className="card" style={{marginTop:20}}><h3>請求設定要確認（{setupIssues.length}件）</h3>
+      <p>推測で契約を選ばず、請求予定を作らずに残しています。</p><ul>{setupIssues.map(issue=><li key={`${issue.projectId}:${issue.reason}`}>
+        {issue.projectName}：{issue.reason} {onViewDetail&&<button type="button" className="btn" onClick={()=>onViewDetail(issue.projectId)}>発電所詳細を開く</button>}</li>)}</ul>
     </section>}
   </section>
 }

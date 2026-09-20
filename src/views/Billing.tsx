@@ -7,6 +7,7 @@ import { hasSavedInvoicePlanAt } from '../lib/billing-plan-status'
 import { useToast } from '../components/Toast'
 import { BillingOverviewPanel } from '../components/BillingOverviewPanel'
 import type { BillingHistoryData } from '../components/BillingHistorySection'
+import {legacyScheduleSetupItems} from '../lib/billing-cutover-coverage'
 
 type Props = {
   rows: BillingRow[]
@@ -14,6 +15,7 @@ type Props = {
   onViewDetail: (projectId: number) => void
   billingHistory?: BillingHistoryData
   billingToday?: string
+  projectRecipients?: ReadonlyMap<number,number>
 }
 
 // 日付ヘルパー・金額計算・未入金判定は lib/billing.ts に共通化（ダッシュボードと共有）
@@ -23,7 +25,8 @@ export function Billing(props: Props) {
     const now = new Date()
     const today = props.billingToday ?? `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
     return <><p role="status">各回に保存した請求先・金額を表示しています。発行・入金・予定の変更は「請求詳細を開く」から行えます。</p>
-      <BillingOverviewPanel data={props.billingHistory} today={today} onViewDetail={props.onViewDetail} />
+      <BillingOverviewPanel data={props.billingHistory} today={today} onViewDetail={props.onViewDetail}
+        setupItems={legacyScheduleSetupItems(props.rows,props.projectRecipients??new Map(),props.billingHistory.units,today)} />
     </>
   }
   return <LegacyBilling {...props} />

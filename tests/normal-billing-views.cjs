@@ -26,4 +26,12 @@ for(const state of ['planned','issued','received']){
  }
  assert.equal(JSON.stringify(history.units),before);
 }
+const setupRow={project_id:1,project_name:'設定待ち発電所',customer_name:'現在の顧客',company_name:null,currentYear:2026,
+ currentYearRecord:null,currentYearRecords:[],records:[],contract:{project_id:1,billing_method:'請求書',billing_schedule_days:['12月1日'],annual_maintenance_inc:165000,
+  billing_item_flags:{annual_maintenance:true,land_cost:false,insurance:false,local_association:false,communication:false,other:false}}};
+const emptyHistory={units:[],recipientName:()=>'',projectName:()=>'',plannedAmount:()=>null};
+for(const html of [
+ render(Billing,{rows:[setupRow],onReload:noAction,onViewDetail:noAction,billingHistory:emptyHistory,billingToday:'2026-11-15',projectRecipients:new Map([[1,2]])}),
+ render(Dashboard,{stats:{totalCustomers:1,totalProjects:1,activeMaintenanceCount:0},maintenanceList:[],billingRows:[setupRow],onNavigate:noAction,onViewMaintenance:noAction,onViewBilling:noAction,billingHistory:emptyHistory,billingToday:'2026-11-15',projectRecipients:new Map([[1,2]])}),
+]){assert.ok(html.includes('設定待ちの請求予定'));assert.ok(html.includes('2026-12-01'));assert.ok(html.includes('新しい請求回としてはまだ保存していません'));}
 console.log('PASS: normal Billing/Dashboard/CustomerDetail render all three invoice states with saved amounts and payer-based history, including old owner without projects. No App routing, browser clicks, CSV download or production access.');

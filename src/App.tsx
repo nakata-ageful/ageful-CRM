@@ -343,6 +343,7 @@ function MainApp() {
             {view === 'dashboard' && (
               <Dashboard
                 billingHistory={billingHistory}
+                projectRecipients={new Map(projectRows.map(p=>[p.id,p.customer_id]))}
                 stats={stats}
                 maintenanceList={maintenanceList}
                 billingRows={billingRows}
@@ -432,6 +433,7 @@ function MainApp() {
             {view === 'billing' && (
               <Billing
                 billingHistory={billingHistory}
+                projectRecipients={new Map(projectRows.map(p=>[p.id,p.customer_id]))}
                 rows={billingRows}
                 onReload={loadAll}
                 onViewDetail={(id) => navToProjectDetail(id, '請求詳細')}

@@ -80,7 +80,6 @@ BEGIN
   IF NOT FOUND THEN RAISE EXCEPTION '請求先が存在しません'; END IF;
   PERFORM 1 FROM public.annual_records WHERE contract_id=(contract_value->>'id')::bigint ORDER BY id FOR UPDATE;
   PERFORM 1 FROM public.billing_units WHERE project_id=p_project_id ORDER BY id FOR UPDATE;
-  IF EXISTS(SELECT 1 FROM public.billing_units WHERE project_id=p_project_id AND original_method<>'invoice') THEN RAISE EXCEPTION '過去の請求書記録以外は別の初期設定が必要です'; END IF;
   report:=public.inspect_invoice_import(p_project_id);
   IF report->'source_checks_passed' IS DISTINCT FROM 'true'::jsonb THEN RAISE EXCEPTION '元記録の移行点検を完了してください'; END IF;
   SELECT coalesce(jsonb_object_agg(source_annual_record_id::text,source_snapshot_hash),'{}') INTO source_manifest

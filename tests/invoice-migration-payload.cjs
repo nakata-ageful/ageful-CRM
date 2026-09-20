@@ -23,6 +23,7 @@ const split={...single,id:2,year:2026,status:'未入金',received_date:null,paym
   {seq:2,scheduled_date:'2027-12-01',billing_date:null,received_date:null},
 ]}
 const other={...single,id:3,billing_date:'2025-06-01',received_date:null,status:'請求済'}
+const failedDebit={...other,id:5,contract_id:5,transfer_failed:true,line_items:[{name:'保守料',amount:100},{name:'手数料',amount:10}]}
 async function main(){
   const records=[single,split,other],initial=review('fixture',records)
   const confirmations=initial.candidates.map(c=>({sourceKey:c.sourceKey,sourceSignature:c.sourceSignature,
@@ -58,6 +59,26 @@ async function main(){
   await assert.rejects(prepare('fixture',{...candidates[0],lineItems:[{name:'違う金額',amount:99}]},single,contexts[0]),/確定金額/)
   await assert.rejects(prepare('fixture',{...candidates[0],lineItems:null},single,contexts[0]),/確定金額/)
   await assert.rejects(prepare('fixture',{...candidates[2],amount:100,lineItems:[{name:'推測',amount:100}]},split,contexts[2]),/未発行予定/)
+  const failedBase=review('fixture',[failedDebit]).candidates[0]
+  const failedCandidate=review('fixture',[failedDebit],[{sourceKey:failedBase.sourceKey,sourceSignature:failedBase.sourceSignature,
+    recipientId:1,recipientBasis:'架空の請求先確認'}]).candidates[0]
+  const failedIdentity=await identify('fixture',failedCandidate,failedDebit)
+  const failedContext={projectId:5,contractId:5,importedAt:'2026-09-07T01:00:00.000Z',methodConfirmation:{
+    sourceSnapshotHash:failedIdentity.columns.source_snapshot_hash,originalMethod:'direct_debit',collectionMethod:'invoice',basis:'架空の振替不能後切替確認'}}
+  const failedPayload=await prepare('fixture',failedCandidate,failedDebit,failedContext)
+  assert.equal(failedPayload.row.original_method,'direct_debit')
+  assert.equal(failedPayload.row.collection_method,'invoice')
+  assert.equal(failedPayload.row.lifecycle,'issued')
+  assert.equal(failedPayload.row.collection_state,'pending')
+  assert.equal(failedPayload.row.frozen_amount,110)
+  await assert.rejects(prepare('fixture',failedCandidate,failedDebit,{...failedContext,methodConfirmation:{...failedContext.methodConfirmation,originalMethod:'invoice'}}),/請求方法/)
+  const invalidFailed={...failedDebit,received_date:'2025-06-10'}
+  const invalidBase=review('fixture',[invalidFailed]).candidates[0]
+  const invalidCandidate=review('fixture',[invalidFailed],[{sourceKey:invalidBase.sourceKey,sourceSignature:invalidBase.sourceSignature,
+    recipientId:1,recipientBasis:'架空の請求先確認'}]).candidates[0]
+  const invalidIdentity=await identify('fixture',invalidCandidate,invalidFailed)
+  await assert.rejects(prepare('fixture',invalidCandidate,invalidFailed,{...failedContext,methodConfirmation:{...failedContext.methodConfirmation,
+    sourceSnapshotHash:invalidIdentity.columns.source_snapshot_hash}}),/振替不能後/)
   const modified={...single,notes:'変更'}
   await assert.rejects(prepare('fixture',candidates[0],modified,contexts[0]),/元データ/)
   const ctx=structuredClone(contexts[0]),c=plain(candidates[0]),r=structuredClone(single)
@@ -94,8 +115,9 @@ async function main(){
         payments jsonb,billing_scheduled_date date,billing_date date,received_date date,payment_due_date date,transfer_failed boolean,line_items jsonb);
       create schema auth;create function auth.uid() returns uuid language sql as 'select nullif(current_setting(''test.actor'',true),'''')::uuid';
       set test.actor='11111111-1111-4111-8111-111111111111';
-      insert into customers values(1),(2);insert into projects values(1);insert into contracts values(1,1);`)
+      insert into customers values(1),(2);insert into projects values(1),(5);insert into contracts values(1,1,'請求書'),(5,5,'口座振替');`)
     for(const r of records)await importDb.query('insert into annual_records select * from jsonb_populate_record(null::annual_records,$1::jsonb)',[JSON.stringify(r)])
+    await importDb.query('insert into annual_records select * from jsonb_populate_record(null::annual_records,$1::jsonb)',[JSON.stringify(failedDebit)])
     await importDb.transaction(async tx=>{
       await tx.exec("set local ageful.allow_draft_migration='yes'")
       for(const name of ['20260907_billing_ownership_foundation.sql','20260907_saved_planned_amount.sql','20260907_invoice_write_rpc.sql','20260907_invoice_import_rpc.sql',
@@ -291,6 +313,13 @@ async function main(){
     await importDb.exec('grant insert on annual_records to legacy_writer;set role legacy_writer')
     await assert.rejects(importDb.exec("insert into annual_records(id,contract_id,year,status) values(103,1,2100,'入金済')"),/新しい請求画面/)
     await importDb.exec('reset role')
+    const failedReceipt=(await importDb.query('select import_invoice_source($1,5,$2::jsonb,$3::jsonb,$4,$5::jsonb) receipt',[
+      operation(),JSON.stringify({id:5,customer_id:1}),JSON.stringify({id:5,project_id:5,billing_method:'口座振替'}),
+      failedPayload.evidence.sourceSignature,JSON.stringify([failedPayload])])).rows[0].receipt
+    assert.equal(failedReceipt.unit_ids.length,1)
+    const failedStored=(await importDb.query('select * from billing_units where source_annual_record_id=5')).rows[0]
+    assert.equal(failedStored.original_method,'direct_debit');assert.equal(failedStored.collection_method,'invoice')
+    assert.equal(failedStored.lifecycle,'issued');assert.equal(failedStored.collection_state,'pending')
     await importDb.exec("alter table annual_records add column maintenance_record text;update annual_records set maintenance_record='保守メモ更新' where id=1")
     assert.equal((await importDb.query('select maintenance_record from annual_records where id=1')).rows[0].maintenance_record,'保守メモ更新')
     await importDb.transaction(async tx=>{

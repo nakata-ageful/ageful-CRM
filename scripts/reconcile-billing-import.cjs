@@ -44,7 +44,8 @@ async function reconcileBillingImport(data,amountApprovals,recipientApproval,imp
     if(u.scheduled_date!==part.scheduled_date||u.issued_on!==part.billing_date||u.received_on!==part.received_date
       ||u.payment_due_on!==(c.originalPaymentIndex===null?record.payment_due_date:null))add('date_mismatch',c.recordId,u.id)
     if(u.lifecycle!==state||u.collection_state!==(part.received_date?'succeeded':'pending'))add('state_mismatch',c.recordId,u.id)
-    if(u.original_method!=='invoice'||u.collection_method!=='invoice')add('outside_invoice_rehearsal_scope',c.recordId,u.id)
+    const expectedOriginalMethod=record.transfer_failed?'direct_debit':'invoice'
+    if(u.original_method!==expectedOriginalMethod||u.collection_method!=='invoice')add('method_mismatch',c.recordId,u.id)
     const approval=amounts.find(a=>a.recordId===c.recordId&&a.paymentIndex===c.originalPaymentIndex&&a.seq===c.seq)
     const expectedItems=c.actual?(approval?approval.lineItems:(c.originalPaymentIndex===null?record.line_items:null)):null
     if(c.actual){
@@ -84,6 +85,8 @@ async function reconcileBillingImport(data,amountApprovals,recipientApproval,imp
       if(p.row.recipient_customer_id!==c.confirmedRecipientId||p.evidence?.recipientBasis!==c.recipientBasis
         ||p.row.frozen_amount!==(c.actual?c.amount:null)||p.evidence?.amountBasis!==c.amountBasis
         ||p.evidence?.datasetId!==audit.datasetId||!same(p.evidence?.sourceRecord,record))add('approval_evidence_mismatch',record.id)
+      if(p.evidence?.methodConfirmation?.originalMethod!==(record.transfer_failed?'direct_debit':'invoice')
+        ||p.evidence?.methodConfirmation?.collectionMethod!=='invoice')add('method_evidence_mismatch',record.id)
       if(!unit||['project_id','contract_id','source_snapshot_hash','occurrence_key','service_year','round_number',
         'recipient_customer_id','recipient_source','scheduled_date','issued_on','received_on','payment_due_on',
         'lifecycle','collection_state','original_method','collection_method','frozen_amount','frozen_line_items']

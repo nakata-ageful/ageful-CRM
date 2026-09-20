@@ -77,12 +77,16 @@ async function main(){
    }
    // Do not infer a historical invoice/debit method from a currently debit-paid contract.
    const historyConfirmation=historyConfirmations.get(record.id)
-   if(real&&c.billing_method!=='請求書'&&historyConfirmation?.method!=='invoice'){unresolvedMethods.push(record.id);continue}
+   const failedDebitToInvoice=record.transfer_failed===true&&!record.payments?.length&&!!record.billing_date
+    &&!record.received_date&&record.status==='請求済'&&c.billing_method==='口座振替'
+   if(real&&c.billing_method!=='請求書'&&historyConfirmation?.method!=='invoice'&&!failedDebitToInvoice){unresolvedMethods.push(record.id);continue}
    const payloads=[]
    for(const candidate of selected){const identity=await identify(audit.datasetId,candidate,record)
     payloads.push(await prepare(audit.datasetId,candidate,record,{projectId:p.id,contractId:c.id,importedAt:'2026-09-09T00:00:00.000Z',
-     methodConfirmation:{sourceSnapshotHash:identity.columns.source_snapshot_hash,originalMethod:'invoice',collectionMethod:'invoice',
-      basis:historyConfirmation?.method==='invoice'?historyConfirmation.basis:real?'LOCAL REHEARSAL ONLY: current invoice setting; historical method not independently verified':'Synthetic invoice confirmation'}}))}
+     methodConfirmation:{sourceSnapshotHash:identity.columns.source_snapshot_hash,
+      originalMethod:failedDebitToInvoice?'direct_debit':'invoice',collectionMethod:'invoice',
+      basis:failedDebitToInvoice?'元年度記録のtransfer_failed=true、請求日、請求済状態と現契約の口座振替設定による振替不能後の請求書切替確認':
+       historyConfirmation?.method==='invoice'?historyConfirmation.basis:real?'LOCAL REHEARSAL ONLY: current invoice setting; historical method not independently verified':'Synthetic invoice confirmation'}}))}
    await db.query('select import_invoice_source($1,$2,$3::jsonb,$4::jsonb,$5,$6::jsonb)',[key(),record.id,JSON.stringify(p),JSON.stringify(c),payloads[0].evidence.sourceSignature,JSON.stringify(payloads)])
   }
   const imported={billing_units:await rows('billing_units'),invoice_import_evidence:(await db.query('select to_jsonb(e) value from invoice_import_evidence e')).rows.map(r=>r.value)}

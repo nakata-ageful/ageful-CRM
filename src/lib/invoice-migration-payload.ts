@@ -13,7 +13,7 @@ export type InvoiceMigrationContext = {
   importedAt: string
   methodConfirmation: {
     sourceSnapshotHash: string
-    originalMethod: 'invoice'
+    originalMethod: 'invoice' | 'direct_debit'
     collectionMethod: 'invoice'
     basis: string
   }
@@ -32,11 +32,16 @@ export async function prepareInvoiceMigrationPayload(
   }
   const source=await identifyBillingMigrationSource(datasetId,c,original)
   const method=ctx.methodConfirmation
+  const failedDebitToInvoice=original.transfer_failed===true
   if (!method || method.sourceSnapshotHash!==source.columns.source_snapshot_hash || !method.basis?.trim()
-    || method.originalMethod!=='invoice' || method.collectionMethod!=='invoice') {
+    || method.collectionMethod!=='invoice'
+    || method.originalMethod!==(failedDebitToInvoice?'direct_debit':'invoice')) {
     throw new Error('元記録に対応した請求方法の確認が必要です。現在の契約からは推測しません')
   }
-  if (original.transfer_failed) throw new Error('振替不能は月・方法の移行設計で扱います')
+  // The legacy UI stores a failed debit and the subsequently issued invoice in one row.
+  // Import only that fully evidenced shape; ambiguous/split failures remain blocked.
+  if (failedDebitToInvoice && (original.payments?.length || !original.billing_date || original.received_date
+    || original.status!=='請求済')) throw new Error('振替不能後の請求書発行状態を確認してください')
   const review=reviewBillingMigration(datasetId,[original])
   const base=review.candidates.find(x=>x.sourceKey===c.sourceKey)
   if (!base || review.recordIssues.length) throw new Error('元記録の状態・各回の対応を確認してください')
@@ -70,7 +75,7 @@ export async function prepareInvoiceMigrationPayload(
       // Source identity, not year/seq alone: same-year annual records stay separate.
       occurrence_key:`legacy:${original.id}:${source.columns.source_payment_index}`,
       service_year:c.year,service_month:null,round_number:c.seq,schedule_slot_id:null,
-      scheduled_date:c.scheduledDate,original_method:'invoice' as const,collection_method:'invoice' as const,
+      scheduled_date:c.scheduledDate,original_method:failedDebitToInvoice?'direct_debit' as const:'invoice' as const,collection_method:'invoice' as const,
       lifecycle:c.receivedOn?'received' as const:c.issuedOn?'issued' as const:'planned' as const,
       collection_state:c.receivedOn?'succeeded' as const:'pending' as const,
       issued_on:c.issuedOn,received_on:c.receivedOn,payment_due_on:c.paymentDueOn,

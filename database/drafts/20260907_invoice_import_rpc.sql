@@ -51,6 +51,7 @@ DECLARE
   seen integer[]:=ARRAY[]::integer[];
   split boolean;
   active boolean;
+  failed_debit_to_invoice boolean;
   state text;
   unit public.billing_units%ROWTYPE;
   ids jsonb:='[]';
@@ -103,10 +104,14 @@ BEGIN
   IF EXISTS(SELECT 1 FROM public.invoice_import_evidence WHERE source_annual_record_id=p_record_id) THEN
     RAISE EXCEPTION 'この元記録は取込済みです';
   END IF;
-  IF coalesce((source->>'transfer_failed')::boolean,false) THEN RAISE EXCEPTION '振替不能は別途対応が必要です'; END IF;
+  failed_debit_to_invoice:=coalesce((source->>'transfer_failed')::boolean,false);
   parts:=coalesce(nullif(source->'payments','null'::jsonb),'[]');
   IF jsonb_typeof(parts) IS DISTINCT FROM 'array' THEN RAISE EXCEPTION '各回の形式が不正です'; END IF;
   split:=jsonb_array_length(parts)>0;
+  IF failed_debit_to_invoice AND (split OR source->>'billing_date' IS NULL OR source->>'received_date' IS NOT NULL
+    OR source->>'status' IS DISTINCT FROM '請求済' OR contract_value->>'billing_method' IS DISTINCT FROM '口座振替') THEN
+    RAISE EXCEPTION '振替不能後の請求書発行状態を確認してください';
+  END IF;
   IF NOT split THEN parts:=jsonb_build_array(jsonb_build_object('seq',null,'scheduled_date',source->'billing_scheduled_date',
     'billing_date',source->'billing_date','received_date',source->'received_date')); END IF;
   IF jsonb_array_length(parts)<>jsonb_array_length(p_payloads) THEN RAISE EXCEPTION '元記録のすべての回を指定してください'; END IF;
@@ -150,7 +155,7 @@ BEGIN
     IF dataset IS NOT NULL AND dataset<>evidence->>'datasetId' THEN RAISE EXCEPTION 'データセットが混在しています'; END IF;
     dataset:=evidence->>'datasetId';
     IF evidence->'methodConfirmation'->>'sourceSnapshotHash' IS DISTINCT FROM source_hash
-      OR evidence->'methodConfirmation'->>'originalMethod' IS DISTINCT FROM 'invoice'
+      OR evidence->'methodConfirmation'->>'originalMethod' IS DISTINCT FROM (CASE WHEN failed_debit_to_invoice THEN 'direct_debit' ELSE 'invoice' END)
       OR evidence->'methodConfirmation'->>'collectionMethod' IS DISTINCT FROM 'invoice'
       OR jsonb_typeof(evidence->'methodConfirmation'->'basis') IS DISTINCT FROM 'string'
       OR length(trim(evidence->'methodConfirmation'->>'basis'))=0
@@ -165,7 +170,8 @@ BEGIN
       OR row_value->>'occurrence_key' IS DISTINCT FROM 'legacy:'||p_record_id::text||':'||expected_index::text
       OR row_value->'service_year' IS DISTINCT FROM source->'year' OR row_value->'round_number' IS DISTINCT FROM part->'seq'
       OR row_value->>'lifecycle' IS DISTINCT FROM state OR row_value->>'recipient_source' IS DISTINCT FROM 'confirmed'
-      OR row_value->>'original_method' IS DISTINCT FROM 'invoice' OR row_value->>'collection_method' IS DISTINCT FROM 'invoice'
+      OR row_value->>'original_method' IS DISTINCT FROM (CASE WHEN failed_debit_to_invoice THEN 'direct_debit' ELSE 'invoice' END)
+      OR row_value->>'collection_method' IS DISTINCT FROM 'invoice'
       OR row_value->>'collection_state' IS DISTINCT FROM (CASE WHEN state='received' THEN 'succeeded' ELSE 'pending' END)
       OR row_value->'revision' IS DISTINCT FROM '0'::jsonb OR row_value->'service_month'<>'null'::jsonb
       OR row_value->'recipient_plan_id'<>'null'::jsonb OR row_value->'schedule_slot_id'<>'null'::jsonb

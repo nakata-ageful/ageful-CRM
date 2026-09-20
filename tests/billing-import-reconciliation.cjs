@@ -23,7 +23,8 @@ async function main(){
     snapshot.billing_units.push(row)
     snapshot.invoice_import_evidence.push({source_annual_record_id:r.id,project_id:1,source_record:r,
       source_snapshot_hash:hash(r),source_signature:canonicalJson(r),project_snapshot:backup.projects[0],contract_snapshot:backup.contracts[0],
-      receipt:{unit_ids:[r.id]},confirmed_payloads:[{row,evidence:{sourceRecord:r,datasetId:expected.datasetId,recipientBasis:c.recipientBasis,amountBasis:c.amountBasis}}]})
+      receipt:{unit_ids:[r.id]},confirmed_payloads:[{row,evidence:{sourceRecord:r,datasetId:expected.datasetId,recipientBasis:c.recipientBasis,amountBasis:c.amountBasis,
+        methodConfirmation:{originalMethod:'invoice',collectionMethod:'invoice'}}}]})
   }
   const initial=JSON.stringify([backup,amounts,recipient,snapshot])
   const result=await reconcile(backup,amounts,recipient,snapshot)

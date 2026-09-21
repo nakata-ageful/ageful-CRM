@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ToastProvider } from './components/Toast'
 import { ErrorBoundary } from './components/ErrorBoundary'
-import { hasSupabaseEnv,billingRuntimePreview } from './lib/supabase'
+import { hasSupabaseEnv,billingAuthCheck,billingRuntimePreview } from './lib/supabase'
 import {
   getDashboard, getCustomers, getProjects, getProjectDetail,
   getCustomerDetail, getMaintenanceResponses, getMaintenanceResponseById,
@@ -88,6 +88,7 @@ function navActive(navKey: ViewKey, currentView: ViewKey): boolean {
 }
 
 export default function App() {
+  if(billingAuthCheck)return <BillingAccessGate><main style={{maxWidth:720,margin:'64px auto',padding:24}}><div className="notice"><strong>ログイン確認に成功しました</strong><br/>本番DBの業務データは読み書きしていません。この画面は開発環境でのみ表示されます。</div></main></BillingAccessGate>
   return billingRuntimeEnabled&&!billingRuntimePreview?<BillingAccessGate><MainApp/></BillingAccessGate>:<MainApp/>
 }
 function MainApp() {

@@ -1,5 +1,8 @@
 .ownership-billing-editor { padding:24px; }
 .ownership-billing-editor h2 { margin:0 0 18px; font-size:20px; }
+.ownership-billing-title { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+.ownership-billing-title span,.ownership-billing-review-title > span { display:block; margin-bottom:4px; color:#2563eb; font-size:10px; font-weight:800; letter-spacing:.08em; }
+.ownership-billing-title > b { padding:6px 10px; border-radius:999px; background:#f1f5f9; color:#475569; font-size:11px; white-space:nowrap; }
 .ownership-billing-owners { display:flex; align-items:center; gap:28px; padding:16px 20px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; color:#64748b; font-size:12px; }
 .ownership-billing-owners strong { display:inline-block; margin-top:4px; font-size:18px; color:#0f172a; }
 .ownership-billing-notice { margin:12px 0 22px; padding:12px; background:#eff6ff; color:#334155; border-radius:6px; font-size:13px; }
@@ -14,5 +17,13 @@
 .ownership-billing-extra textarea { min-height:68px; }
 .ownership-billing-footer { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-top:20px; }
 .ownership-billing-footer span { font-size:12px; color:#64748b; }
+.ownership-billing-review { margin-top:24px; padding:20px; border:2px solid #bfdbfe; border-radius:10px; background:#f8fbff; }
+.ownership-billing-review-title { margin:-20px -20px 16px; padding:16px 20px; border-bottom:1px solid #dbeafe; background:#eff6ff; }
+.ownership-billing-review-title h3 { margin:0 0 5px; color:#1e3a8a; }
+.ownership-billing-review-title p { color:#475569; font-size:12px; }
+.ownership-billing-confirm { margin-top:18px; padding-top:18px; border-top:1px solid #bfdbfe; }
+.ownership-billing-confirm textarea { min-height:76px; }
+.ownership-billing-confirm > p { margin:9px 0 14px; color:#475569; font-size:12px; }
+.ownership-billing-confirm .btn { min-height:42px; width:100%; font-weight:700; }
 @media(max-width:720px) { .ownership-billing-fields { grid-template-columns:repeat(2,minmax(0,1fr)); } .ownership-billing-footer { align-items:stretch; flex-direction:column; } .ownership-billing-editor { padding:16px; } }
 @media(max-width:420px) { .ownership-billing-fields { grid-template-columns:1fr; } }

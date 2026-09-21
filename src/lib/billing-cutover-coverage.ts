@@ -1,5 +1,5 @@
 import type {BillingRow} from '../types'
-import {computeUpcomingInvoices,toIsoDate,withdrawalAmount,invoiceAmount} from './billing'
+import {annualBillableTotalInc,computeUpcomingInvoices,toIsoDate,withdrawalAmount,invoiceAmount} from './billing'
 import {isBillingDate} from './billing-unit'
 import {managementActiveOn,type ManagementEvent} from './management-lifecycle'
 import type {BillingUnit} from './billing-unit'
@@ -8,7 +8,11 @@ import {debitScheduleReminder} from './debit-schedule-reminder'
 type StoredUnit={project_id:number;recipient_customer_id:number;collection_method:string;scheduled_date:string|null;lifecycle:string;planned_amount:number|null}
 export type CoverageCandidate={projectId:number;recipientId:number;method:'invoice'|'direct_debit';date:string;round:number;amount:number;status:'missing'|'matches'|'review';reason?:string}
 export type ScheduleSetupItem=CoverageCandidate&{projectName:string;customerName:string}
-export type ScheduleSetupIssue={projectId:number;projectName:string;reason:string}
+export type ScheduleSetupIssue={
+  projectId:number;projectName:string;reason:string
+  category:'no_billing_candidate'|'action_required'
+  code:'contract_count'|'method_missing_without_amount'|'method_missing_with_amount'|'schedule_missing_with_amount'|'other'
+}
 /** Read-only pre-cutover comparison. Calculated amounts are proposals, NEVER historical actuals.
  * Does not authorize activation, create records or decide ambiguous date/round correspondence.
  */
@@ -80,7 +84,17 @@ export function legacyScheduleSetupReview(rows:readonly BillingRow[],recipients:
   .filter(c=>c.method!=='direct_debit'||debitScheduleReminder(safe.find(r=>r.project_id===c.projectId)!,today))
   .map(c=>{const row=safe.find(r=>r.project_id===c.projectId)!;return {...c,projectName:row.project_name,customerName:row.customer_name}})
   .sort((a,b)=>a.date.localeCompare(b.date)||a.projectId-b.projectId)
- const issues=[...unsafe.map(row=>({projectId:row.project_id,projectName:row.project_name,reason:'契約が複数または未設定のため、請求に使う契約の確認が必要です'})),
-  ...coverage.issues.map(issue=>{const row=safe.find(r=>r.project_id===issue.projectId)!;return {...issue,projectName:row.project_name}})]
+ const issues:ScheduleSetupIssue[]=[...unsafe.map(row=>({projectId:row.project_id,projectName:row.project_name,
+   reason:'契約が複数または未設定のため、請求に使う契約の確認が必要です',category:'action_required' as const,code:'contract_count' as const})),
+  ...coverage.issues.map(issue=>{const row=safe.find(r=>r.project_id===issue.projectId)!,contract=row.contract
+   const hasAmount=annualBillableTotalInc(contract)>0||Object.values(contract?.billing_amount_overrides??{}).some(value=>Number(value)>0)
+   if(issue.reason==='請求方法が未設定')return {...issue,projectName:row.project_name,
+    category:hasAmount?'action_required' as const:'no_billing_candidate' as const,
+    code:hasAmount?'method_missing_with_amount' as const:'method_missing_without_amount' as const,
+    reason:hasAmount?'金額はありますが、請求方法が未設定です':'請求方法も請求対象額も未設定です。自社請求なしの候補ですが、まだ確定していません'}
+   if(issue.reason==='請求予定日が未設定'&&hasAmount)return {...issue,projectName:row.project_name,category:'action_required' as const,code:'schedule_missing_with_amount' as const,
+    reason:'金額はありますが、請求予定日が未設定です'}
+   return {...issue,projectName:row.project_name,category:'action_required' as const,code:'other' as const}
+  })]
  return {items,issues}
 }

@@ -48,7 +48,7 @@ export function OwnershipBillingPlanEditor({projectId,oldOwner,newOwner,units:in
     }catch(e){setError(e instanceof Error?e.message:String(e))}
   }
   return <section className="card ownership-billing-editor">
-    <h2>{saveScope==='ownership'?'所有者変更後の請求予定':'今後の請求予定を確認・変更'}</h2>
+    <div className="ownership-billing-title"><div><span>{saveScope==='ownership'?'STEP 2':'請求予定'}</span><h2>{saveScope==='ownership'?'所有者変更後の請求予定':'今後の請求予定を確認・変更'}</h2></div><b>{drafts.length}回を確認</b></div>
     {saveScope==='ownership'&&<div className="ownership-billing-owners"><span>現在の所有者<br/><strong>{oldOwner.name}</strong></span><span aria-hidden="true">→</span><span>変更後の所有者<br/><strong>{newOwner.name}</strong></span></div>}
     <p>今の予定を表示しています。変更する回だけ、請求先や方法を選び直してください。</p>
     <div className="ownership-billing-notice">発行済み・入金済みなど {units.filter(u=>u.lifecycle!=='planned').length} 件は変更対象外です。自動の日割り計算・請求追加・銀行への振替手配は行いません。</div>
@@ -79,8 +79,8 @@ export function OwnershipBillingPlanEditor({projectId,oldOwner,newOwner,units:in
       {!drafts.length&&<p>変更する予定はありません。新しい請求は自動作成しません。</p>}
       <div className="ownership-billing-footer"><span>予定額の空欄は「金額要確認」です。0円とは区別します。</span><button className="btn btn-main" type="submit">変更内容を確認（保存はしません）</button></div>
     </fieldset></form>
-    {result&&<section aria-label="請求予定の確認結果" style={{marginTop:20}}>
-      <h3>変更内容の確認</h3><p role="status">入力チェック完了。DBには保存していません。</p>
+    {result&&<section className="ownership-billing-review" aria-label="請求予定の確認結果">
+      <div className="ownership-billing-review-title"><span>STEP 3</span><h3>最終確認</h3><p role="status">入力チェック完了。この時点ではまだ保存していません。</p></div>
       {reviewSummary}
       {result.changes.map(c=>{const u=units.find(u=>u.id===c.unitId)!;return <div key={c.unitId} style={{padding:'12px 0',borderBottom:'1px solid #e2e8f0'}}>
         <strong>{u.serviceYear}年 {u.roundLabel}</strong>
@@ -89,7 +89,7 @@ export function OwnershipBillingPlanEditor({projectId,oldOwner,newOwner,units:in
         <p>対象期間：{c.periodStart?`${c.periodStart} ～ ${c.periodEnd}`:'未指定'} ／ 備考：{c.note||'なし'}</p>
       </div>})}
       <p>変更しない記録：{result.preservedUnitIds.length}件</p>
-      {onSave&&<div><label>確認内容・理由<textarea className="form-input" disabled={busy} value={reason} onChange={e=>setReason(e.target.value)}/></label>
+      {onSave&&<div className="ownership-billing-confirm"><label>確認内容・変更理由<textarea className="form-input" placeholder="例：2026年10月1日付で売買のため所有者変更" disabled={busy} value={reason} onChange={e=>setReason(e.target.value)}/></label>
         <p>{saveScope==='ownership'?'所有者・選択した契約情報・請求予定・履歴をまとめて保存します。':'請求予定だけを保存します。所有者・契約情報は変更しません。'}</p>
         <button className="btn btn-main" type="button" disabled={busy} onClick={()=>void save()}>{busy?'保存中…':`${testOnly?'検証用DBで':''}${saveScope==='ownership'?'所有者変更を確定':'予定と履歴を保存'}`}</button></div>}
     </section>}

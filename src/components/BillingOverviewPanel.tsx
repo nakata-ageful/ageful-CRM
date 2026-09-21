@@ -8,6 +8,8 @@ import type {ScheduleSetupIssue,ScheduleSetupItem} from '../lib/billing-cutover-
 /** Read-only shared preview; caller supplies authorized units and a local calendar date. */
 export function BillingOverviewPanel({data,today,onViewDetail,setupItems=[],setupIssues=[]}:{data:BillingHistoryData;today:string;onViewDetail?:(projectId:number)=>void;setupItems?:readonly ScheduleSetupItem[];setupIssues?:readonly ScheduleSetupIssue[]}) {
   const overview=buildBillingOverview(data.units,today)
+  const noBillingCandidates=setupIssues.filter(issue=>issue.category==='no_billing_candidate')
+  const actionRequired=setupIssues.filter(issue=>issue.category==='action_required')
   return <section><h2>請求</h2>
     <button type="button" onClick={()=>downloadBillingUnitCsv(buildBillingUnitCsv(data.units,data.recipientName,data.projectName))}>各回の請求CSVをダウンロード</button><p>全期間の各回を出力します。予定額・確定額は別列で、保存されていない保守期間は要確認とします。</p>
     <p>未入金：{fmtYen(overview.totals.unpaidAmount)} ／ 入金済：{fmtYen(overview.totals.receivedAmount)}（今年度・昨年度）</p>
@@ -25,9 +27,16 @@ export function BillingOverviewPanel({data,today,onViewDetail,setupItems=[],setu
         <td>{item.projectName}</td><td>{item.customerName}</td><td>{item.date}</td><td>{item.method==='invoice'?'請求書':'口座振替'}</td><td>{fmtYen(item.amount)}</td>
         <td>{onViewDetail&&<button type="button" className="btn" onClick={()=>onViewDetail(item.projectId)}>発電所詳細で設定</button>}</td></tr>)}</tbody></table></div>
     </section>}
-    {!!setupIssues.length&&<section className="card" style={{marginTop:20}}><h3>請求設定要確認（{setupIssues.length}件）</h3>
-      <p>推測で契約を選ばず、請求予定を作らずに残しています。</p><ul>{setupIssues.map(issue=><li key={`${issue.projectId}:${issue.reason}`}>
-        {issue.projectName}：{issue.reason} {onViewDetail&&<button type="button" className="btn" onClick={()=>onViewDetail(issue.projectId)}>発電所詳細を開く</button>}</li>)}</ul>
+    {!!setupIssues.length&&<section className="card billing-setup-review" style={{marginTop:20}}><h3>請求設定要確認（{setupIssues.length}件）</h3>
+      <p>勝手に請求方法・金額・契約を決めず、未設定のまま表示しています。公開後に順次確認できます。</p>
+      {!!actionRequired.length&&<details open><summary><strong>請求設定が必要（{actionRequired.length}件）</strong></summary>
+        <p>金額がある、予定日がない、または契約が複数の発電所です。請求前に設定してください。</p><ul>{actionRequired.map(issue=><li key={`${issue.projectId}:${issue.code}`}>
+          <span><strong>{issue.projectName}</strong><br/>{issue.reason}</span>{onViewDetail&&<button type="button" className="btn" onClick={()=>onViewDetail(issue.projectId)}>発電所詳細で確認</button>}</li>)}</ul>
+      </details>}
+      {!!noBillingCandidates.length&&<details><summary><strong>自社請求なし候補（{noBillingCandidates.length}件・未確定）</strong></summary>
+        <p>他社保守などの可能性があります。「請求なし」と自動確定せず、発電所ごとに確認します。</p><ul>{noBillingCandidates.map(issue=><li key={`${issue.projectId}:${issue.code}`}>
+          <span><strong>{issue.projectName}</strong><br/>{issue.reason}</span>{onViewDetail&&<button type="button" className="btn" onClick={()=>onViewDetail(issue.projectId)}>発電所詳細で確認</button>}</li>)}</ul>
+      </details>}
     </section>}
   </section>
 }

@@ -1,0 +1,24 @@
+.billing-history-card { margin-top:20px; padding:22px; }
+.billing-history-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; }
+.billing-history-heading h3 { margin:3px 0 5px; color:#0f172a; font-size:19px; }
+.billing-history-heading p { color:#64748b; font-size:12px; }
+.billing-history-kicker { color:#2563eb; font-size:10px; font-weight:800; letter-spacing:.08em; }
+.billing-history-count { padding:6px 10px; border-radius:999px; background:#f1f5f9; color:#475569; font-size:11px; font-weight:700; }
+.billing-history-summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin:18px 0; }
+.billing-history-summary > div { padding:12px 14px; border:1px solid #e2e8f0; border-radius:8px; background:#f8fafc; }
+.billing-history-summary span { display:block; margin-bottom:5px; color:#64748b; font-size:11px; }
+.billing-history-summary strong { color:#0f172a; font-size:18px; }
+.billing-history-summary .attention { border-color:#fed7aa; background:#fff7ed; }
+.billing-history-summary .attention strong { color:#c2410c; }
+.billing-history-alert { margin:-6px 0 16px; color:#9a3412; font-size:12px; }
+.billing-history-project { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:20px 0 10px; }
+.billing-history-project h4 { margin:0; color:#0f172a; }
+.billing-history-card .data-table td:first-child strong { display:block; font-size:12px; }
+.billing-history-card .data-table td:first-child small { display:block; margin-top:4px; color:#64748b; }
+.billing-unit-status { display:inline-flex; padding:4px 7px; border-radius:999px; background:#f1f5f9; color:#475569; font-size:11px; font-weight:700; }
+.billing-unit-status-received { background:#ecfdf5; color:#047857; }
+.billing-unit-status-issued,.billing-unit-status-fixed { background:#fff7ed; color:#c2410c; }
+.billing-unit-status-planned { background:#eff6ff; color:#1d4ed8; }
+.billing-unit-status-review_required { background:#fef2f2; color:#b91c1c; }
+.billing-unit-warning { color:#b91c1c; font-weight:700; }
+@media(max-width:760px) { .billing-history-summary { grid-template-columns:repeat(2,minmax(0,1fr)); } }

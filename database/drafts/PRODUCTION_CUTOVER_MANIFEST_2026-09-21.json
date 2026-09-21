@@ -1,0 +1,30 @@
+{
+  "status": "prepared_not_authorized",
+  "productionProject": "duoibibtuamilpneysnl",
+  "sourceCapture": "latest-2026-09-21T09-39-06.516Z.json",
+  "sourceCaptureSha256": "fc6c74dc8c8da276ed7075e8e9e985709b4383732e827480bcd5f2c17d5951bc",
+  "expectedImportedUnits": 31,
+  "expectedActualAmount": 4177465,
+  "expectedAcceptedProjects": 87,
+  "futureScheduleCoverageVerified": false,
+  "productionCutoverReady": false,
+  "files": [
+    {"path":"database/drafts/20260907_billing_ownership_foundation.sql","sha256":"1846a3aac74efddf5ad53f047f640af9090f66246518b572738f41d030c31bdf"},
+    {"path":"database/drafts/20260907_invoice_write_rpc.sql","sha256":"0f7d4ae6b2c29997f07ece0d015ae2c404db06814da0f409dafab652493c02bf"},
+    {"path":"database/drafts/20260907_invoice_import_rpc.sql","sha256":"f39f7788b27ab453444e40891f1697bdc235a92f66b3b8c5c50d581f66ec2a68"},
+    {"path":"database/drafts/20260907_preserve_maintenance_source.sql","sha256":"77a5bf2d96694f7f219f04e6f4bd19c224d71f2e4ea5613e2d2963d69253afc9"},
+    {"path":"database/drafts/20260907_invoice_recipient_initialization.sql","sha256":"b5be0d45112892e4cd7e1dcdbe8d2973f378b9d52aeab1753f6c6dde938272f5"},
+    {"path":"database/drafts/20260907_invoice_initialization_inspection.sql","sha256":"c9cbe41cde531c18ac6fb56848074ceb17ab9d4ab667d5ae3fe7194c9480f0e3"},
+    {"path":"database/drafts/20260907_imported_invoice_source_guard.sql","sha256":"8ba809e8aad78616475edd684c4fd1c942c8e5ba8e0587f97144ce1c7ac45d16"},
+    {"path":"database/drafts/20260907_legacy_invoice_creation_guard.sql","sha256":"5f05eead9b203754eccd4d0f5ba02d8e42a2ed5c7d54366b116b15c6c3abcf70"},
+    {"path":"database/drafts/20260907_transfer_detail_choices.sql","sha256":"f4b0efe25c08f5b93c696da74cb163cdb84fed8e6428353cd5b2a5e2bde9aaa5"},
+    {"path":"database/drafts/20260907_manual_billing_plan.sql","sha256":"81be5888bad372f9669ad94d0a7ce1b1537ac2730e07e10273f13d3e5572b38b"},
+    {"path":"database/drafts/20260907_transfer_ownership_manual.sql","sha256":"b1f6c36467b75848300439378acf0e92c080267c66d6421da9f5076dd0db4593"},
+    {"path":"database/drafts/20260907_manual_debit_result.sql","sha256":"c856690679ab56d88345119636c82c4a2bc6c860fa4387eac6e7a3700097dd2d"},
+    {"path":"database/drafts/20260907_create_manual_debit_plan.sql","sha256":"659a7534662077791ededb031ee40085b16d464e0b81a2b0a091541d6827acc7"},
+    {"path":"database/drafts/20260914_management_lifecycle.sql","sha256":"ba22b6a03b3bf62a3faaa9338ea9f2f49b5668e723919c4011d860473b1ca304"},
+    {"path":"database/drafts/20260914_future_schedule.sql","sha256":"0cd7d4038f69db4e0948a8eaf26c0b2b2bd642b4872a20f36712a0d7dce9ec00"},
+    {"path":"database/drafts/20260909_billing_runtime.sql","sha256":"9c0b9b5a17af417957ccda2f5c5de6dcd8bf9e47ed8fae6698f3f1eb0c5731b9"},
+    {"path":"database/drafts/20260914_confirm_imported_round.sql","sha256":"66bf71caa7ea986a03fd76d2a1bc81820a609d7dbc690ef75781924b5ad2de58"}
+  ]
+}

@@ -1,4 +1,4 @@
-import { hasSupabaseEnv, supabase } from './supabase'
+import { billingRuntimePreview, hasSupabaseEnv, supabase } from './supabase'
 import {
   customerStore, projectStore, contractStore, annualRecordStore,
   maintenanceResponseStore, periodicMaintenanceStore, attachmentStore,
@@ -375,7 +375,13 @@ export async function getBillingRows(): Promise<BillingRow[]> {
     const currentYear = new Date().getFullYear()
     return projectStore.getAll().map(p => {
       const c = customerStore.getById(p.customer_id)
-      const contract = contractStore.getByProjectId(p.id)
+      const storedContract = contractStore.getByProjectId(p.id)
+      // The legacy mock data predates per-round schedule days. Keep production
+      // behavior strict, but give the isolated UI preview one representative
+      // near-term item so the cutover/setup panel can be reviewed end to end.
+      const contract = billingRuntimePreview && storedContract && p.id === 5
+        ? { ...storedContract, billing_schedule_days: ['10月25日'] }
+        : storedContract
       const records = contract ? annualRecordStore.getByContractId(contract.id) : []
       const currentYearRecords = records.filter(r => r.year === currentYear)
       const currentYearRecord = currentYearRecords[0] ?? null

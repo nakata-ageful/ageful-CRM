@@ -34,4 +34,12 @@ for(const html of [
  render(Billing,{rows:[setupRow],onReload:noAction,onViewDetail:noAction,billingHistory:emptyHistory,billingToday:'2026-11-15',projectRecipients:new Map([[1,2]])}),
  render(Dashboard,{stats:{totalCustomers:1,totalProjects:1,activeMaintenanceCount:0},maintenanceList:[],billingRows:[setupRow],onNavigate:noAction,onViewMaintenance:noAction,onViewBilling:noAction,billingHistory:emptyHistory,billingToday:'2026-11-15',projectRecipients:new Map([[1,2]])}),
 ]){assert.ok(html.includes('設定待ちの請求予定'));assert.ok(html.includes('2026-12-01'));assert.ok(html.includes('新しい請求回としてはまだ保存していません'));}
-console.log('PASS: normal Billing/Dashboard/CustomerDetail render all three invoice states with saved amounts and payer-based history, including old owner without projects. No App routing, browser clicks, CSV download or production access.');
+const supabaseSource=fs.readFileSync(path.join(root,'src/lib/supabase.ts'),'utf8');
+const runtimeSource=fs.readFileSync(path.join(root,'src/lib/billing-runtime.ts'),'utf8');
+const appSource=fs.readFileSync(path.join(root,'src/App.tsx'),'utf8');
+assert.ok(supabaseSource.includes("import.meta.env.DEV&&import.meta.env.VITE_BILLING_LEDGER_PREVIEW==='true'"),'preview must be development-only');
+assert.ok(supabaseSource.includes('!!(url && key)&&!billingRuntimePreview'),'preview must disconnect Supabase even when env credentials exist');
+assert.ok(runtimeSource.indexOf('if(billingRuntimePreview)return previewSnapshot()')<runtimeSource.indexOf("if(!supabase||!billingRuntimeEnabled)throw Error('新しい請求機能はまだ有効化されていません')"));
+assert.ok(runtimeSource.indexOf("if(billingRuntimePreview)throw Error('確認用モードでは保存しません')")<runtimeSource.indexOf("if(!navigator.locks)throw Error('安全な保存に対応するブラウザーで開いてください')"),'preview save must fail before any persistence path');
+assert.ok(appSource.includes('billingRuntimeEnabled&&!billingRuntimePreview?<BillingAccessGate>'),'preview must not invoke the production access probe');
+console.log('PASS: normal Billing/Dashboard/CustomerDetail render all three invoice states with saved amounts and payer-based history, including old owner without projects; the development-only UI preview disconnects Supabase and rejects saves.');

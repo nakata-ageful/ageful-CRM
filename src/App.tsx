@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ToastProvider } from './components/Toast'
 import { ErrorBoundary } from './components/ErrorBoundary'
-import { hasSupabaseEnv } from './lib/supabase'
+import { hasSupabaseEnv,billingRuntimePreview } from './lib/supabase'
 import {
   getDashboard, getCustomers, getProjects, getProjectDetail,
   getCustomerDetail, getMaintenanceResponses, getMaintenanceResponseById,
@@ -88,7 +88,7 @@ function navActive(navKey: ViewKey, currentView: ViewKey): boolean {
 }
 
 export default function App() {
-  return billingRuntimeEnabled?<BillingAccessGate><MainApp/></BillingAccessGate>:<MainApp/>
+  return billingRuntimeEnabled&&!billingRuntimePreview?<BillingAccessGate><MainApp/></BillingAccessGate>:<MainApp/>
 }
 function MainApp() {
   const initial = parseHash()
@@ -333,6 +333,7 @@ function MainApp() {
             モックデータで表示中 — Supabase に接続するには <code>.env</code> を作成してください
           </div>
         )}
+        {billingRuntimePreview&&<div className="notice"><strong>新しい請求・所有者変更の確認用モード</strong><br/>本番DBは読み書きしません。表示・導線の確認専用です。</div>}
         {error && <div className="notice notice-error">{error}</div>}
 
         {billingRuntimeEnabled&&pendingBilling&&<div className="notice"><p>前回の保存結果が未確認です。端末に一時保存した同じ操作で確認します（契約情報等を含み、確認完了後に削除します）。</p><button className="btn" onClick={()=>void saveRuntime(null).catch(e=>setError(e instanceof Error?e.message:String(e)))}>保存結果を再確認</button></div>}

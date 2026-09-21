@@ -79,6 +79,19 @@ BEGIN
   RETURN result;
 END $$;
 
+-- These write helpers are private implementation details of billing_runtime_write.
+-- The billing tables intentionally have no authenticated table grants or RLS policies,
+-- so each helper must keep the runtime owner's privileges when called by the single
+-- guarded facade below.  EXECUTE remains revoked from PUBLIC/authenticated.
+ALTER FUNCTION public.write_invoice_unit(uuid,bigint,integer,text,jsonb,text) SECURITY DEFINER;
+ALTER FUNCTION public.transfer_ownership_manual(uuid,bigint,bigint,date,jsonb,jsonb,jsonb,jsonb,text,bigint) SECURITY DEFINER;
+ALTER FUNCTION public.write_manual_billing_plan(uuid,bigint,jsonb,text) SECURITY DEFINER;
+ALTER FUNCTION public.record_manual_debit_result(uuid,bigint,integer,text,jsonb,text) SECURITY DEFINER;
+ALTER FUNCTION public.create_manual_debit_plan(uuid,bigint,bigint,bigint,integer,integer,date,bigint,text,text) SECURITY DEFINER;
+ALTER FUNCTION public.create_future_schedule(uuid,bigint,jsonb,jsonb,bigint,jsonb,text) SECURITY DEFINER;
+ALTER FUNCTION public.set_billing_service_period(uuid,bigint,jsonb,jsonb,integer,date,date,text) SECURITY DEFINER;
+ALTER FUNCTION public.write_management_lifecycle(uuid,bigint,bigint,text,text,date,jsonb,text) SECURITY DEFINER;
+
 CREATE FUNCTION public.billing_runtime_write(p_key uuid,p_request jsonb) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
 DECLARE r jsonb:=p_request; v jsonb; action text:=p_request->>'action'; result jsonb;
@@ -186,6 +199,14 @@ REVOKE ALL ON FUNCTION public.billing_runtime_is_owner() FROM PUBLIC;
 DO $$ DECLARE t text; BEGIN
   IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN
     GRANT EXECUTE ON FUNCTION public.billing_runtime_is_owner() TO authenticated;
+    -- PostgREST resolves/reloads the operation and event rows around an RPC call.
+    -- Keep these two tables read-only to the configured owner; all writes still go
+    -- exclusively through billing_runtime_write and its private SECURITY DEFINER helpers.
+    GRANT SELECT ON public.billing_operations,public.billing_unit_events TO authenticated;
+    CREATE POLICY billing_single_owner_operation_read ON public.billing_operations
+      FOR SELECT TO authenticated USING(public.billing_runtime_is_owner());
+    CREATE POLICY billing_single_owner_event_read ON public.billing_unit_events
+      FOR SELECT TO authenticated USING(public.billing_runtime_is_owner());
     FOREACH t IN ARRAY ARRAY['customers','projects','contracts','annual_records','maintenance_responses','periodic_maintenance','prospects','attachments'] LOOP
       IF to_regclass('public.'||t) IS NOT NULL THEN
         EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY',t);

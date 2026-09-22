@@ -5,6 +5,7 @@ import { dateInputRange } from '../lib/utils'
 import { Modal } from '../components/Modal'
 import { createCustomer, createProject, deleteProject } from '../lib/actions'
 import { useToast } from '../components/Toast'
+import { projectMatchesSearch } from '../lib/project-search'
 
 type Props = {
   projects: ProjectRow[]
@@ -121,20 +122,7 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  const filtered = projects.filter(p => {
-    const q = search.toLowerCase().trim()
-    if (!q) return true
-    // search_text（基本情報・設備情報・契約情報を連結）があればそれで検索。
-    // 無い場合（古いデータ等）は従来の主要項目でフォールバック。
-    if (p.search_text != null) return p.search_text.includes(q)
-    return (
-      p.project_name.toLowerCase().includes(q) ||
-      (p.project_no ?? '').toLowerCase().includes(q) ||
-      p.customer_name.toLowerCase().includes(q) ||
-      (p.site_address ?? '').toLowerCase().includes(q) ||
-      (p.site_prefecture ?? '').toLowerCase().includes(q)
-    )
-  })
+  const filtered = projects.filter(p => projectMatchesSearch(p, search))
 
   // 選択された並び順を適用（空の日付・番号は常に末尾へ）
   const sorted = [...filtered].sort((a, b) => {

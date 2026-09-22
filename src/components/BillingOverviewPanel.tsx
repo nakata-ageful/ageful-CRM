@@ -21,10 +21,10 @@ export function BillingOverviewPanel({data,today,onViewDetail,setupItems=[],setu
     {([['表示期間より前の予定',overview.overduePlans],['日付要確認',overview.undatedPlans],['それ以降の予定',overview.laterPlans],
       ['振替予定',overview.debitPlans],['記録要確認',overview.review]] as const).filter(([,units])=>units.length).map(([label,units])=>
       <details key={label}><summary>{label}（{units.length}件）を確認</summary><BillingHistorySection data={{...data,units}} onViewDetail={onViewDetail}/></details>)}
-    {!!setupItems.length&&<section className="card" style={{marginTop:20}}><h3>設定待ちの請求予定（{setupItems.length}件）</h3>
-      <p>現在の契約の「請求予定日」から表示しています。新しい請求回としてはまだ保存していません。請求先・保守期間を確認し、発電所詳細から予定を追加してください。</p>
-      <div style={{overflowX:'auto'}}><table><thead><tr><th>発電所</th><th>現在の顧客</th><th>請求予定日</th><th>請求方法</th><th>予定額（税込）</th><th>操作</th></tr></thead><tbody>{setupItems.map(item=><tr key={`${item.projectId}:${item.date}:${item.round}:${item.method}`}>
-        <td>{item.projectName}</td><td>{item.customerName}</td><td>{item.date}</td><td>{item.method==='invoice'?'請求書':'口座振替'}</td><td>{fmtYen(item.amount)}</td>
+    {!!setupItems.length&&<section className="card" style={{marginTop:20}}><h3>未保存・要確認の請求予定（{setupItems.length}件）</h3>
+      <p>現在の契約の「請求予定日」から表示しています。「未保存」は新しい請求回としてまだ保存していません。「保存内容を確認」は、同日の記録と現在の予定が一致していません。</p>
+      <div style={{overflowX:'auto'}}><table><thead><tr><th>状態</th><th>発電所</th><th>現在の顧客</th><th>請求予定日</th><th>請求方法</th><th>予定額（税込）</th><th>操作</th></tr></thead><tbody>{setupItems.map(item=><tr key={`${item.projectId}:${item.date}:${item.round}:${item.method}`}>
+        <td>{item.status==='review'?<><strong>保存内容を確認</strong><br/><small>{item.reason}</small></>:'未保存'}</td><td>{item.projectName}</td><td>{item.customerName}</td><td>{item.date}</td><td>{item.method==='invoice'?'請求書':'口座振替'}</td><td>{fmtYen(item.amount)}</td>
         <td>{onViewDetail&&<button type="button" className="btn" onClick={()=>onViewDetail(item.projectId)}>発電所詳細で設定</button>}</td></tr>)}</tbody></table></div>
     </section>}
     {!!setupIssues.length&&<section className="card billing-setup-review" style={{marginTop:20}}><h3>請求設定要確認（{setupIssues.length}件）</h3>

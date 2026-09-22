@@ -4,15 +4,27 @@ const manifest=JSON.parse(fs.readFileSync(path.join(root,'database/drafts/PRODUC
 assert.equal(manifest.status,'prepared_not_authorized');
 assert.equal(manifest.productionCutoverReady,false);
 assert.equal(manifest.accessControlVerified,true);
-assert.equal(manifest.futureScheduleCoverageVerified,true);
+assert.equal(manifest.futureScheduleCoverageVerified,false);
+assert.equal(manifest.nearTermScheduleDispositionVerified,true);
 assert.equal(manifest.futureScheduleCreationAuthorized,false);
-assert.deepEqual(manifest.futureScheduleCoverageBasis,{
+assert.equal(manifest.expectedStoredUnitsAfterConfirmedAdjustments,32);
+assert.deepEqual(manifest.separatedDatabaseRehearsal,{
+  passed:true,oldDatabaseChanged:false,newDatabaseMigrationCommitted:true,sourceTablesMatchedAfterMigration:true,
+  storedUnits:32,sourceUnits:31,actualAmount:4177465,plannedAmount:165000,acceptedProjects:87,runtimeEnabled:false,
+});
+assert.equal(manifest.futureSchedule24MonthReview.passed,true);
+assert.equal(manifest.futureSchedule24MonthReview.classifiedProjects,87);
+assert.equal(manifest.futureSchedule24MonthReview.reviewOccurrences,0);
+assert.equal(manifest.futureSchedule24MonthReview.hiddenReviewCandidates,false);
+assert.equal(manifest.futureSchedule24MonthReview.authorizesPerpetualCoverage,false);
+assert.deepEqual(manifest.nearTermScheduleDispositionBasis,{
   totalProjects:87,
   visibleNearTermSetupProjects:2,
   visibleConfigurationIssueProjects:56,
-  noNearTermActionProjects:29,
+  noNearTermActionProjectsBeforeMismatchFix:29,
   configurationIssuesRemainVisible:true,
   guessedSchedulesCreated:false,
+  note:'Three-month operational visibility is not perpetual future coverage. Revalidation after mismatch-display fix is required.',
 });
 assert.equal(manifest.files.length,17);
 assert.equal(new Set(manifest.files.map(file=>file.path)).size,manifest.files.length);
@@ -28,4 +40,4 @@ for(const name of ['write_invoice_unit','transfer_ownership_manual','write_manua
 assert.match(runtime,/GRANT SELECT ON public\.billing_operations,public\.billing_unit_events TO authenticated;/);
 assert.doesNotMatch(runtime,/GRANT (?:INSERT|UPDATE|DELETE|ALL)[^;]*billing_(?:operations|unit_events)[^;]* TO authenticated;/i,
   'ledger/audit writes must remain available only through billing_runtime_write');
-console.log('PASS: the 17-file production cutover order is pinned; access and non-guessing future-schedule disposition are verified, while production authorization remains false.');
+console.log('PASS: the 17-file production cutover order is pinned; access and near-term non-guessing disposition are recorded, while future coverage and production authorization remain false.');

@@ -17,6 +17,12 @@ assert.deepEqual(plain(missing.map(x=>[x.date,x.method,x.amount])),[['2026-09-25
 const stored={id:'1',projectId:1,serviceYear:2026,roundLabel:'第1回',method:'請求書',scheduledDate:'2026-09-25',issuedOn:null,receivedOn:null,
  paymentDueOn:null,recipientId:10,lifecycle:'planned',frozenAmount:null,frozenLineItems:null,frozenAt:null,plannedAmount:60000,revision:0}
 assert.deepEqual(plain(legacyScheduleSetupItems([row],recipients,[stored],'2026-09-20').map(x=>x.date)),['2026-11-25'])
+const mismatched={...stored,plannedAmount:99999}
+const mismatchItems=legacyScheduleSetupItems([row],recipients,[mismatched],'2026-09-20')
+assert.deepEqual(plain(mismatchItems.map(x=>[x.date,x.status,x.amount])),[
+ ['2026-09-25','review',60000],['2026-11-25','missing',60000]
+])
+assert.match(mismatchItems[0].reason,/保存記録/)
 const debit={...row,project_id:2,contract:{...contract,project_id:2,billing_method:'口座振替',billing_schedule_days:['15日']}}
 assert.equal(legacyScheduleSetupItems([debit],new Map([[2,10]]),[],'2026-09-14').length,0,'Future bank execution is not claimed as a reminder')
 const due=legacyScheduleSetupItems([debit],new Map([[2,10]]),[],'2026-09-20')
@@ -35,4 +41,4 @@ assert.equal(missingMethod.issues[0].code,'method_missing_with_amount')
 const missingSchedule=legacyScheduleSetupReview([{...row,contract:{...contract,billing_schedule_days:[]}}],recipients,[],'2026-09-20')
 assert.equal(missingSchedule.issues[0].code,'schedule_missing_with_amount')
 assert.equal(JSON.stringify(row),before)
-console.log('PASS: runtime keeps unmatched near-term invoice reminders visible, hides matched units, and shows only due unhandled debit checks without creating records')
+console.log('PASS: runtime keeps missing and mismatched near-term reminders visible, hides exact matches, and shows only due unhandled debit checks without creating records')

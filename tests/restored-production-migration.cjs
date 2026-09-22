@@ -1,5 +1,6 @@
 // Rehearses the complete source import against a PostgreSQL restore of production.
-// It always rolls back. It never reads .env and cannot be used to mutate production.
+// Default is rollback. Committing is allowed only to the exact disposable local-clone
+// database name and socket checked below. It never reads .env or connects to Supabase.
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm')
 const {execFileSync}=require('node:child_process'),ts=require('typescript'),{webcrypto}=require('node:crypto')
 const root=path.resolve(__dirname,'..'),cache=new Map()
@@ -12,6 +13,7 @@ function load(file){file=path.resolve(root,file);if(cache.has(file))return cache
 const {reviewBillingMigration:review}=load('src/lib/billing-migration-review.ts')
 const {prepareInvoiceMigrationPayload:prepare}=load('src/lib/invoice-migration-payload.ts')
 const {identifyBillingMigrationSource:identify}=load('src/lib/billing-migration-source.ts')
+const {maintenancePeriod}=load('src/lib/maintenance-period-label.ts')
 const {auditBillingBackup,canonicalJson,isMaintenanceOnlyRecord}=require('../scripts/review-billing-backup.cjs')
 const {confirmedBillingHistory}=require('../scripts/confirmed-billing-history.cjs')
 const q=value=>`'${String(value).replaceAll("'","''")}'`
@@ -19,9 +21,14 @@ let sequence=0
 const key=()=>`77777777-7777-4777-8777-${String(++sequence).padStart(12,'0')}`
 
 async function main(){
- const [backupFile,amountFile,payerFile,historyFile,psql,socket,port='55432',database='ageful_restore']=process.argv.slice(2)
+ const [backupFile,amountFile,payerFile,historyFile,psql,socket,port='55432',database='ageful_restore',mode='--rollback']=process.argv.slice(2)
+ const commit=mode==='--commit-local-clone'
  if(!database||!port||!socket||!psql||![backupFile,amountFile,payerFile,historyFile].every(Boolean)){
-  throw Error('Usage: node tests/restored-production-migration.cjs BACKUP AMOUNTS PAYER HISTORY PSQL SOCKET [PORT] [DATABASE]')
+  throw Error('Usage: node tests/restored-production-migration.cjs BACKUP AMOUNTS PAYER HISTORY PSQL SOCKET [PORT] [DATABASE] [--rollback|--commit-local-clone]')
+ }
+ if(!['--rollback','--commit-local-clone'].includes(mode))throw Error('Unknown transaction mode')
+ if(commit&&(!path.resolve(socket).startsWith('/private/tmp/ageful-pg-tools.')||database!=='ageful_new_candidate')){
+  throw Error('Commit is restricted to the disposable local ageful_new_candidate clone')
  }
  const data=JSON.parse(fs.readFileSync(backupFile,'utf8')),amounts=JSON.parse(fs.readFileSync(amountFile,'utf8'))
  const payer=JSON.parse(fs.readFileSync(payerFile,'utf8')),history=confirmedBillingHistory(data,JSON.parse(fs.readFileSync(historyFile,'utf8')))
@@ -74,26 +81,62 @@ async function main(){
   }
   sql.push(`select public.accept_billing_migration(${project.id})`)
  }
+ const roundConfirmations=[...history.values()].filter(c=>c.round!==undefined)
+ for(const confirmation of roundConfirmations){
+  sql.push(`select public.confirm_imported_round(${q(key())}::uuid,
+   (select to_jsonb(u) from public.billing_units u where source_annual_record_id=${confirmation.recordId}),
+   (select to_jsonb(a) from public.annual_records a where id=${confirmation.recordId}),${confirmation.round},${q(confirmation.basis)})`)
+ }
+ const kakogawa=roundConfirmations.find(c=>c.recordId===51&&c.round===1)
+ if(!kakogawa)throw Error('Confirmed Kakogawa round-one mapping is required')
+ const kakogawaRecord=data.annual_records.find(r=>r.id===51),kakogawaContract=kakogawaRecord&&data.contracts.find(c=>c.id===kakogawaRecord.contract_id)
+ const kakogawaProject=kakogawaContract&&data.projects.find(p=>p.id===kakogawaContract.project_id)
+ assert.ok(kakogawaRecord&&kakogawaContract&&kakogawaProject,'Kakogawa source link is missing')
+ assert.equal(kakogawaContract.billing_schedule_days?.[1],'12月1日')
+ const kakogawaPeriod=maintenancePeriod(kakogawaContract.maintenance_start_date,2026)
+ const kakogawaItem={date:'2026-12-01',year:2026,round:2,method:'invoice',recipientId:kakogawaProject.customer_id,amount:165000,...kakogawaPeriod}
+ sql.push(`select public.create_future_schedule(${q(key())}::uuid,${kakogawaProject.id},
+  (select to_jsonb(c) from public.contracts c where id=${kakogawaContract.id}),
+  (select coalesce(jsonb_object_agg(id::text,revision),'{}'::jsonb) from public.billing_units where project_id=${kakogawaProject.id}),
+  (select coalesce(max(id),0) from public.project_management_events where project_id=${kakogawaProject.id}),
+  ${q(JSON.stringify([kakogawaItem]))}::jsonb,
+  ${q('D-029 第2回165,000円。12月1日は既存契約の予定日。未発行・未入金。新DB移行。')})`)
+ const amakusaRecord=data.annual_records.find(r=>r.id===61),amakusaContract=amakusaRecord&&data.contracts.find(c=>c.id===amakusaRecord.contract_id)
+ const amakusaProject=amakusaContract&&data.projects.find(p=>p.id===amakusaContract.project_id)
+ assert.ok(amakusaRecord&&amakusaContract&&amakusaProject,'Amakusa source link is missing')
+ assert.equal(amakusaContract.id,16)
+ sql.push(`select public.set_billing_service_period(${q(key())}::uuid,${amakusaProject.id},
+  (select to_jsonb(c) from public.contracts c where id=${amakusaContract.id}),
+  (select coalesce(jsonb_object_agg(id::text,revision),'{}'::jsonb) from public.billing_units where project_id=${amakusaProject.id}),
+  2026,date '2026-10-27',date '2027-12-31',
+  ${q('最新契約備考に記載された個別保守期間。実額・請求先・発行日・入金日は変更しない。新DB移行。')})`)
+ const expectedStoredUnits=audit.rows.length+1
  sql.push(`DO $$ DECLARE units integer; evidence integer; accepted integer; amount bigint; BEGIN
   SELECT count(*),coalesce(sum(frozen_amount),0) INTO units,amount FROM public.billing_units;
   SELECT count(*) INTO evidence FROM public.invoice_import_evidence;
   SELECT count(*) INTO accepted FROM public.billing_migration_acceptances;
-  IF units<>${audit.rows.length} OR amount<>${audit.knownActualAmount} OR evidence<>${data.annual_records.length} OR accepted<>${data.projects.length} THEN
+  IF units<>${expectedStoredUnits} OR amount<>${audit.knownActualAmount} OR evidence<>${data.annual_records.length} OR accepted<>${data.projects.length} THEN
     RAISE EXCEPTION 'restored migration mismatch units %, amount %, evidence %, accepted %',units,amount,evidence,accepted;
+  END IF;
+  IF (SELECT count(*) FROM public.billing_units WHERE source_annual_record_id IS NOT NULL)<>${audit.rows.length}
+   OR NOT EXISTS(SELECT 1 FROM public.billing_units WHERE project_id=${kakogawaProject.id} AND service_year=2026 AND round_number=2 AND scheduled_date=date '2026-12-01' AND planned_amount=165000 AND lifecycle='planned')
+   OR NOT EXISTS(SELECT 1 FROM public.billing_units WHERE project_id=${amakusaProject.id} AND service_year=2026 AND period_start=date '2026-10-27' AND period_end=date '2027-12-31') THEN
+    RAISE EXCEPTION 'confirmed round, future round or individual service period is missing';
   END IF;
   IF EXISTS(SELECT 1 FROM public.invoice_import_evidence e LEFT JOIN public.annual_records a ON a.id=e.source_annual_record_id WHERE to_jsonb(a) IS DISTINCT FROM e.source_record) THEN
     RAISE EXCEPTION 'source changed during restored migration';
   END IF;
  END $$`)
- sql.push(`select jsonb_build_object('units',count(*),'actual_amount',coalesce(sum(frozen_amount),0),
+ sql.push(`select jsonb_build_object('units',count(*),'source_units',count(*) filter(where source_annual_record_id is not null),
+  'actual_amount',coalesce(sum(frozen_amount),0),'planned_amount',coalesce(sum(planned_amount) filter(where lifecycle='planned'),0),
   'failed_debit_invoice_units',count(*) filter(where original_method='direct_debit' and collection_method='invoice')) report from public.billing_units`)
- sql.push('ROLLBACK')
+ sql.push(commit?'COMMIT':'ROLLBACK')
  const output=execFileSync(psql,[`--host=${socket}`,`--port=${port}`,`--dbname=${database}`,'--no-psqlrc','--set=ON_ERROR_STOP=1','--tuples-only','--no-align'],
   {input:sql.join(';\n')+';\n',encoding:'utf8',maxBuffer:20_000_000})
  const report=output.split('\n').map(x=>x.trim()).filter(x=>x.startsWith('{')&&x.includes('failed_debit_invoice_units')).at(-1)
  assert.ok(report,'Missing restored migration report')
  const parsed=JSON.parse(report)
- assert.deepEqual(parsed,{units:audit.rows.length,actual_amount:audit.knownActualAmount,failed_debit_invoice_units:1})
- console.log(JSON.stringify({passed:true,transaction:'rolled_back',...parsed,sourceRecords:data.annual_records.length,acceptedProjects:data.projects.length},null,2))
+ assert.deepEqual(parsed,{units:expectedStoredUnits,source_units:audit.rows.length,actual_amount:audit.knownActualAmount,planned_amount:165000,failed_debit_invoice_units:1})
+ console.log(JSON.stringify({passed:true,transaction:commit?'committed_to_disposable_local_clone':'rolled_back',...parsed,sourceRecords:data.annual_records.length,acceptedProjects:data.projects.length},null,2))
 }
 main().catch(error=>{console.error(error.message);process.exitCode=1})

@@ -20,7 +20,7 @@ The backup artifacts are private and are not committed to Git. The repository co
 
 1. Apply the 17 files pinned in `PRODUCTION_CUTOVER_MANIFEST_2026-09-21.json` to the isolated restore only.
 2. Re-run the 8-table comparison; DDL must not alter source values.
-3. Run `tests/restored-production-migration.cjs`. It wraps the data migration in one transaction and ends with `ROLLBACK`.
+3. Run `tests/restored-production-migration.cjs`. It wraps the data migration in one transaction and ends with `ROLLBACK` by default. The guarded `--commit-local-clone` mode is restricted to the disposable local database named `ageful_new_candidate`; it also applies the confirmed Kakogawa round mapping/future round and Amakusa individual service period.
 4. Require 31 billing units, 4,177,465 yen actual total, 87 accepted projects, and one direct-debit-failure-to-invoice occurrence for the 2026-09-22 source capture.
 5. After rollback, require every new ledger/event/acceptance table to contain zero rows and re-run the source comparison.
 

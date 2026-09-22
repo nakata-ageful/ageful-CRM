@@ -4,19 +4,47 @@
   "sourceCapture": "latest-2026-09-22T11-43-25.701Z.json",
   "sourceCaptureSha256": "6ea061bd734f7f289ff0aab28e005fe630806627c557efedbbb271897ec76a5c",
   "expectedImportedUnits": 31,
+  "expectedStoredUnitsAfterConfirmedAdjustments": 32,
   "expectedActualAmount": 4177465,
   "expectedAcceptedProjects": 87,
   "accessControlVerified": true,
-  "futureScheduleCoverageVerified": true,
-  "futureScheduleCoverageBasis": {
+  "futureScheduleCoverageVerified": false,
+  "nearTermScheduleDispositionVerified": true,
+  "nearTermScheduleDispositionBasis": {
     "totalProjects": 87,
     "visibleNearTermSetupProjects": 2,
     "visibleConfigurationIssueProjects": 56,
-    "noNearTermActionProjects": 29,
+    "noNearTermActionProjectsBeforeMismatchFix": 29,
     "configurationIssuesRemainVisible": true,
-    "guessedSchedulesCreated": false
+    "guessedSchedulesCreated": false,
+    "note": "Three-month operational visibility is not perpetual future coverage. Revalidation after mismatch-display fix is required."
   },
   "futureScheduleCreationAuthorized": false,
+  "separatedDatabaseRehearsal": {
+    "passed": true,
+    "oldDatabaseChanged": false,
+    "newDatabaseMigrationCommitted": true,
+    "sourceTablesMatchedAfterMigration": true,
+    "storedUnits": 32,
+    "sourceUnits": 31,
+    "actualAmount": 4177465,
+    "plannedAmount": 165000,
+    "acceptedProjects": 87,
+    "runtimeEnabled": false
+  },
+  "futureSchedule24MonthReview": {
+    "passed": true,
+    "totalProjects": 87,
+    "classifiedProjects": 87,
+    "configurationIssueProjects": 56,
+    "projectsWithExpectedSchedules": 31,
+    "expectedOccurrences": 398,
+    "matchingOccurrences": 1,
+    "missingOccurrences": 397,
+    "reviewOccurrences": 0,
+    "hiddenReviewCandidates": false,
+    "authorizesPerpetualCoverage": false
+  },
   "productionCutoverReady": false,
   "files": [
     {"path":"database/drafts/20260907_billing_ownership_foundation.sql","sha256":"1846a3aac74efddf5ad53f047f640af9090f66246518b572738f41d030c31bdf"},

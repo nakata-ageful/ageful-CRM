@@ -38,7 +38,7 @@ const emptyHistory={units:[],recipientName:()=>'',projectName:()=>'',plannedAmou
 for(const html of [
  render(Billing,{rows:[setupRow],onReload:noAction,onViewDetail:noAction,billingHistory:emptyHistory,billingToday:'2026-11-15',projectRecipients:new Map([[1,2]])}),
  render(Dashboard,{stats:{totalCustomers:1,totalProjects:1,activeMaintenanceCount:0},maintenanceList:[],billingRows:[setupRow],onNavigate:noAction,onViewMaintenance:noAction,onViewBilling:noAction,billingHistory:emptyHistory,billingToday:'2026-11-15',projectRecipients:new Map([[1,2]])}),
-]){assert.ok(html.includes('設定待ちの請求予定'));assert.ok(html.includes('2026-12-01'));assert.ok(html.includes('新しい請求回としてはまだ保存していません'));}
+]){assert.ok(html.includes('未保存・要確認の請求予定'));assert.ok(html.includes('2026-12-01'));assert.ok(html.includes('新しい請求回としてまだ保存していません'));}
 const supabaseSource=fs.readFileSync(path.join(root,'src/lib/supabase.ts'),'utf8');
 const runtimeSource=fs.readFileSync(path.join(root,'src/lib/billing-runtime.ts'),'utf8');
 const appSource=fs.readFileSync(path.join(root,'src/App.tsx'),'utf8');

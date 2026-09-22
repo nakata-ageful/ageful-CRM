@@ -80,7 +80,9 @@ export function legacyScheduleSetupReview(rows:readonly BillingRow[],recipients:
  const stored:StoredUnit[]=units.map((u):StoredUnit=>({project_id:u.projectId,recipient_customer_id:u.recipientId??0,
   collection_method:u.method==='請求書'?'invoice':'direct_debit',scheduled_date:u.scheduledDate,lifecycle:u.lifecycle,planned_amount:u.plannedAmount??null}))
  const coverage=inspectFutureBillingCoverage(safe,recipients,stored,startMonth,3)
- const items=coverage.candidates.filter(c=>c.status==='missing'&&(c.method==='invoice'||c.date.startsWith(startMonth)))
+ // A saved row on the expected date is not automatically safe.  Keep amount,
+ // method and recipient mismatches visible instead of silently hiding them.
+ const items=coverage.candidates.filter(c=>c.status!=='matches'&&(c.method==='invoice'||c.date.startsWith(startMonth)))
   .filter(c=>c.method!=='direct_debit'||debitScheduleReminder(safe.find(r=>r.project_id===c.projectId)!,today))
   .map(c=>{const row=safe.find(r=>r.project_id===c.projectId)!;return {...c,projectName:row.project_name,customerName:row.customer_name}})
   .sort((a,b)=>a.date.localeCompare(b.date)||a.projectId-b.projectId)

@@ -1,12 +1,22 @@
 {
   "status": "prepared_not_authorized",
   "productionProject": "duoibibtuamilpneysnl",
-  "sourceCapture": "latest-2026-09-21T09-39-06.516Z.json",
-  "sourceCaptureSha256": "fc6c74dc8c8da276ed7075e8e9e985709b4383732e827480bcd5f2c17d5951bc",
+  "sourceCapture": "latest-2026-09-22T11-43-25.701Z.json",
+  "sourceCaptureSha256": "6ea061bd734f7f289ff0aab28e005fe630806627c557efedbbb271897ec76a5c",
   "expectedImportedUnits": 31,
   "expectedActualAmount": 4177465,
   "expectedAcceptedProjects": 87,
-  "futureScheduleCoverageVerified": false,
+  "accessControlVerified": true,
+  "futureScheduleCoverageVerified": true,
+  "futureScheduleCoverageBasis": {
+    "totalProjects": 87,
+    "visibleNearTermSetupProjects": 2,
+    "visibleConfigurationIssueProjects": 56,
+    "noNearTermActionProjects": 29,
+    "configurationIssuesRemainVisible": true,
+    "guessedSchedulesCreated": false
+  },
+  "futureScheduleCreationAuthorized": false,
   "productionCutoverReady": false,
   "files": [
     {"path":"database/drafts/20260907_billing_ownership_foundation.sql","sha256":"1846a3aac74efddf5ad53f047f640af9090f66246518b572738f41d030c31bdf"},

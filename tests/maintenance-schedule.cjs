@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path'),ts=require('typescript')
 function load(file){const m={exports:{}};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText,{exports:m.exports,require:n=>load(path.resolve(path.dirname(file),n)+'.ts')});return m.exports}
-const {maintenanceSchedule:build}=load(path.resolve(__dirname,'../src/lib/maintenance-schedule.ts'))
+const {maintenanceSchedule:build,selectedMaintenanceScheduleItems:selected}=load(path.resolve(__dirname,'../src/lib/maintenance-schedule.ts'))
 const c={project_id:1,maintenance_start_date:'2022-07-14',billing_method:'請求書',billing_count:2,annual_maintenance_inc:165000}
 const u={projectId:1,serviceYear:2026,roundLabel:'第2回',scheduledDate:null,lifecycle:'planned'}
 let items=build(c,2026,1,[u],[])
@@ -28,4 +28,7 @@ assert.throws(()=>build(c,2027,1,[saved],[]),/重複/)
 assert.equal(build(c,2028,1,[saved],[],{periodStart:'2028-01-01',periodEnd:'2028-12-31'})[0].periodStart,'2028-01-01')
 assert.throws(()=>build(c,2026,1,[saved],[]),/異なります/)
 assert.throws(()=>build(c,2026,1,[],[],{periodStart:'2026-02-30',periodEnd:'2027-12-31'}),/確認/)
+const selectedItems=selected([{...items[0],include:true,exclusion:undefined},{...items[1],include:false}])
+assert.equal(selectedItems.length,1);assert.equal(Object.hasOwn(selectedItems[0],'exclusion'),false)
+assert.doesNotThrow(()=>JSON.stringify(selectedItems))
 console.log('PASS: explicit extended initial period, next January period, overlap and inconsistent same-year rejection')

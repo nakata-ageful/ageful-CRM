@@ -2,7 +2,7 @@ import {useEffect,useState} from 'react'
 import type {BillingRow,Customer} from '../types'
 import type {TransferBillingUnit} from '../lib/ownership-billing-plan'
 import type {ManagementEvent} from '../lib/management-lifecycle'
-import {maintenanceSchedule,type MaintenanceScheduleItem} from '../lib/maintenance-schedule'
+import {maintenanceSchedule,selectedMaintenanceScheduleItems,type MaintenanceScheduleItem} from '../lib/maintenance-schedule'
 import {maintenancePeriodLabel} from '../lib/maintenance-period-label'
 import {isBillingDate} from '../lib/billing-unit'
 import {MaintenancePeriodReview} from './MaintenancePeriodReview'
@@ -26,7 +26,7 @@ export function FutureScheduleEditor({row,customers,units,events,onSave,onPeriod
   setNotice('保守期間ごとの回です。請求予定日は前払いを含め別に指定してください。');setReviewed(false)
  }catch(e){setNotice(e instanceof Error?e.message:String(e));setItems([]);setExcluded([])}}
  function change(index:number,patch:Partial<Item>){setItems(items.map((i,n)=>n===index?{...i,...patch}:i));setReviewed(false)}
- async function save(){setBusy(true);try{await onSave({projectId:row.project_id,contract:row.contract,versions:Object.fromEntries(own.map(u=>[u.id,u.revision])),last:Math.max(0,...events.filter(e=>e.project_id===row.project_id).map(e=>e.id)),items:items.filter(i=>i.include).map(({include,reason,...i})=>i),reason});setItems([]);setReviewed(false);setNotice('確認した請求予定を追加しました。')}catch(e){setNotice(e instanceof Error?e.message:String(e))}finally{setBusy(false)}}
+ async function save(){setBusy(true);try{await onSave({projectId:row.project_id,contract:row.contract,versions:Object.fromEntries(own.map(u=>[u.id,u.revision])),last:Math.max(0,...events.filter(e=>e.project_id===row.project_id).map(e=>e.id)),items:selectedMaintenanceScheduleItems(items),reason});setItems([]);setReviewed(false);setNotice('確認した請求予定を追加しました。')}catch(e){setNotice(e instanceof Error?e.message:String(e))}finally{setBusy(false)}}
  async function savePeriod(){setBusy(true);try{validateIndividualPeriod({periodStart,periodEnd},year,row.project_id,own.filter(u=>u.serviceYear!==year),row.contract?.maintenance_start_date);if(!periodConfirmed||!periodReason.trim()||!onPeriodSave)throw Error('保存済み記録への変更を確認してください');await onPeriodSave({projectId:row.project_id,contract:row.contract,versions:Object.fromEntries(own.map(u=>[u.id,u.revision])),year,periodStart,periodEnd,reason:periodReason});setPeriodConfirmed(false);setItems([]);setNotice('保存済み記録の保守期間のみ更新しました。金額・請求先・入金日は変更していません。')}catch(e){setNotice(e instanceof Error?e.message:String(e))}finally{setBusy(false)}}
  return <section className="card" style={{padding:20,marginTop:16}}><details><summary>今後の請求予定を追加</summary>
   <p>対象の保守期間と第何回かで管理します。請求日が前年でも保守期間は変わりません。請求日・金額は別に確認し、選択した回だけ追加します。発行・銀行手配は行いません。</p>

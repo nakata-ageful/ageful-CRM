@@ -1073,14 +1073,18 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       )}
 
       {/* ── その他タブ ── */}
-      {tab==='請求詳細'&&billingHistory&&<>
-        {onAddDebit&&<ManualDebitPlanCreator recipients={billingHistory.recipients} testOnly={false} onSave={onAddDebit}/>}
+      {tab==='請求詳細'&&billingHistory&&(onAddDebit||(billingUnits&&onSaveBillingPlan))&&<details className="card invoice-exception-tools">
+        <summary>変更・例外対応</summary>
+        <p>振替予定の追加や、今後の請求先・方法をまとめて変更するときだけ使用します。</p>
+        {onAddDebit && (
+          <ManualDebitPlanCreator recipients={billingHistory.recipients} testOnly={false} onSave={onAddDebit}/>
+        )}
         {billingUnits&&onSaveBillingPlan&&<details className="card"><summary>今後の請求先・方法・予定額を変更</summary>
           <OwnershipBillingPlanEditor key={billingUnits.map(u=>`${u.id}:${u.revision}`).join(',')} projectId={project.id}
             oldOwner={{id:customer.id,name:customer.name}} newOwner={{id:customer.id,name:customer.name}}
             recipientOptions={billingHistory.recipients} units={billingUnits} onSave={onSaveBillingPlan} testOnly={false}/>
         </details>}
-      </>}
+      </details>}
       {tab === 'その他' && (
         <div className="card">
           <div className="card-header-row">

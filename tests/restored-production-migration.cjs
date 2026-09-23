@@ -21,14 +21,20 @@ let sequence=0
 const key=()=>`77777777-7777-4777-8777-${String(++sequence).padStart(12,'0')}`
 
 async function main(){
- const [backupFile,amountFile,payerFile,historyFile,psql,socket,port='55432',database='ageful_restore',mode='--rollback']=process.argv.slice(2)
+ const [backupFile,amountFile,payerFile,historyFile,psql,socket,port='55432',database='ageful_restore',mode='--rollback',outputFile,ownerUserId]=process.argv.slice(2)
  const commit=mode==='--commit-local-clone'
+ const emit=mode==='--emit-sql'
  if(!database||!port||!socket||!psql||![backupFile,amountFile,payerFile,historyFile].every(Boolean)){
-  throw Error('Usage: node tests/restored-production-migration.cjs BACKUP AMOUNTS PAYER HISTORY PSQL SOCKET [PORT] [DATABASE] [--rollback|--commit-local-clone]')
+  throw Error('Usage: node tests/restored-production-migration.cjs BACKUP AMOUNTS PAYER HISTORY PSQL SOCKET [PORT] [DATABASE] [--rollback|--commit-local-clone|--emit-sql] [PRIVATE_OUTPUT] [OWNER_UUID]')
  }
- if(!['--rollback','--commit-local-clone'].includes(mode))throw Error('Unknown transaction mode')
+ if(!['--rollback','--commit-local-clone','--emit-sql'].includes(mode))throw Error('Unknown transaction mode')
  if(commit&&(!path.resolve(socket).startsWith('/private/tmp/ageful-pg-tools.')||database!=='ageful_new_candidate')){
   throw Error('Commit is restricted to the disposable local ageful_new_candidate clone')
+ }
+ if(emit){
+  const privateDir='/Users/keigoshoda/Documents/ChatGPT/エイジフル/private-backups'
+  if(!outputFile||path.dirname(path.resolve(outputFile))!==privateDir||!/^[-\w]+\.sql$/.test(path.basename(outputFile)))throw Error('SQL output must be a new private-backups/*.sql file')
+  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ownerUserId??''))throw Error('New Supabase Auth owner UUID is required')
  }
  const data=JSON.parse(fs.readFileSync(backupFile,'utf8')),amounts=JSON.parse(fs.readFileSync(amountFile,'utf8'))
  const payer=JSON.parse(fs.readFileSync(payerFile,'utf8')),history=confirmedBillingHistory(data,JSON.parse(fs.readFileSync(historyFile,'utf8')))
@@ -41,7 +47,24 @@ async function main(){
    ...(approved?{amount:approved.amount,lineItems:approved.lineItems,amountBasis:approved.basis}:{})}
  })
  const candidates=review(audit.datasetId,data.annual_records,confirmations).candidates,sql=[]
- sql.push('BEGIN',"set local timezone='UTC'","set local test.actor='11111111-1111-4111-8111-111111111111'")
+ const actor=emit?ownerUserId:'11111111-1111-4111-8111-111111111111'
+ const importTimestamp=emit?new Date().toISOString():'2026-09-20T00:00:00.000Z'
+ sql.push('BEGIN',"set local timezone='UTC'",`set local test.actor=${q(actor)}`,`set local request.jwt.claim.sub=${q(actor)}`)
+ if(emit)sql.push(`DO $$ BEGIN
+  IF auth.uid() IS DISTINCT FROM ${q(actor)}::uuid THEN RAISE EXCEPTION 'Auth owner mismatch'; END IF;
+  IF (SELECT count(*) FROM public.customers)<>${data.customers.length}
+   OR (SELECT count(*) FROM public.projects)<>${data.projects.length}
+   OR (SELECT count(*) FROM public.contracts)<>${data.contracts.length}
+   OR (SELECT count(*) FROM public.annual_records)<>${data.annual_records.length}
+   OR (SELECT count(*) FROM public.maintenance_responses)<>${data.maintenance_responses.length}
+   OR (SELECT count(*) FROM public.periodic_maintenance)<>${data.periodic_maintenance.length}
+   OR (SELECT count(*) FROM public.prospects)<>${data.prospects.length}
+   OR (SELECT count(*) FROM public.attachments)<>${data.attachments.length}
+   OR EXISTS(SELECT 1 FROM public.billing_units)
+   OR EXISTS(SELECT 1 FROM public.billing_migration_acceptances)
+   OR EXISTS(SELECT 1 FROM public.billing_runtime_control)
+  THEN RAISE EXCEPTION 'New DB is not an untouched source clone'; END IF;
+ END $$`)
  for(const record of data.annual_records){
   const contract=data.contracts.find(c=>c.id===record.contract_id),project=contract&&data.projects.find(p=>p.id===contract.project_id)
   assert.ok(project&&contract,`Invalid source link ${record.id}`)
@@ -59,10 +82,10 @@ async function main(){
   if(contract.billing_method!=='請求書'&&confirmed?.method!=='invoice'&&!failedDebitToInvoice)throw Error(`Unresolved historical method ${record.id}`)
   const payloads=[]
   for(const candidate of selected){const identity=await identify(audit.datasetId,candidate,record)
-   payloads.push(await prepare(audit.datasetId,candidate,record,{projectId:project.id,contractId:contract.id,importedAt:'2026-09-20T00:00:00.000Z',
+   payloads.push(await prepare(audit.datasetId,candidate,record,{projectId:project.id,contractId:contract.id,importedAt:importTimestamp,
     methodConfirmation:{sourceSnapshotHash:identity.columns.source_snapshot_hash,originalMethod:failedDebitToInvoice?'direct_debit':'invoice',collectionMethod:'invoice',
      basis:failedDebitToInvoice?'元年度記録のtransfer_failed=true、請求日、請求済状態と現契約の口座振替設定による振替不能後の請求書切替確認':
-      confirmed?.method==='invoice'?confirmed.basis:'RESTORED COPY REHEARSAL ONLY: current invoice setting; historical method not independently verified'}}))
+      confirmed?.method==='invoice'?confirmed.basis:emit?'移行元の現契約の請求書設定を採用。過去の独立証拠は未照合。':'RESTORED COPY REHEARSAL ONLY: current invoice setting; historical method not independently verified'}}))
   }
   sql.push(`select public.import_invoice_source(${q(key())}::uuid,${record.id},
    (select to_jsonb(p) from public.projects p where id=${project.id}),
@@ -130,7 +153,13 @@ async function main(){
  sql.push(`select jsonb_build_object('units',count(*),'source_units',count(*) filter(where source_annual_record_id is not null),
   'actual_amount',coalesce(sum(frozen_amount),0),'planned_amount',coalesce(sum(planned_amount) filter(where lifecycle='planned'),0),
   'failed_debit_invoice_units',count(*) filter(where original_method='direct_debit' and collection_method='invoice')) report from public.billing_units`)
- sql.push(commit?'COMMIT':'ROLLBACK')
+ sql.push(commit||emit?'COMMIT':'ROLLBACK')
+ if(emit){
+  fs.writeFileSync(outputFile,sql.join(';\n')+';\n',{flag:'wx',mode:0o600})
+  console.log(JSON.stringify({prepared:true,scope:'private SQL; not executed',sourceRecords:data.annual_records.length,sourceUnits:audit.rows.length,
+   storedUnits:expectedStoredUnits,actualAmount:audit.knownActualAmount,acceptedProjects:data.projects.length,output:path.basename(outputFile)}))
+  return
+ }
  const output=execFileSync(psql,[`--host=${socket}`,`--port=${port}`,`--dbname=${database}`,'--no-psqlrc','--set=ON_ERROR_STOP=1','--tuples-only','--no-align'],
   {input:sql.join(';\n')+';\n',encoding:'utf8',maxBuffer:20_000_000})
  const report=output.split('\n').map(x=>x.trim()).filter(x=>x.startsWith('{')&&x.includes('failed_debit_invoice_units')).at(-1)

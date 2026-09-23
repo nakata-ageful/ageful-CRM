@@ -30,12 +30,12 @@ const classifications=[]
 for(const row of rows){
  const issue=row.contract_count!==1?{reason:'契約が複数または未設定'}:coverage.issues.find(i=>i.projectId===row.project_id)
  const candidates=coverage.candidates.filter(c=>c.projectId===row.project_id)
- const state=issue?'configuration_issue':candidates.some(c=>c.status==='review')?'review_required':candidates.some(c=>c.status==='missing')?'unsaved_expected':candidates.some(c=>c.status==='matches')?'saved_match':'no_billable_schedule'
+ const state=issue?'configuration_issue':candidates.some(c=>c.status==='review')?'review_required':candidates.some(c=>c.status==='missing')?'unsaved_expected':candidates.some(c=>c.status==='matches')?'saved_match':candidates.some(c=>c.status==='handled')?'handled':'no_billable_schedule'
  classifications.push({projectId:row.project_id,state,reason:issue?.reason??null,candidateCount:candidates.length})
 }
 assert.equal(classifications.length,data.projects.length)
 assert.equal(new Set(classifications.map(x=>x.projectId)).size,data.projects.length)
-assert.equal(coverage.candidates.length,coverage.summary.matching+coverage.summary.missing+coverage.summary.review)
+assert.equal(coverage.candidates.length,coverage.summary.matching+coverage.summary.handled+coverage.summary.missing+coverage.summary.review)
 const counts=classifications.reduce((r,x)=>(r[x.state]=(r[x.state]??0)+1,r),{})
 const result={passed:true,scope:'read-only 24-month review of committed disposable local clone',startMonth,months:24,totalProjects:data.projects.length,
  classifiedProjects:classifications.length,projectStates:counts,candidateStates:coverage.summary,settingIssues:coverage.issues.length,

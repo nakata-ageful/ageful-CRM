@@ -23,6 +23,11 @@ assert.deepEqual(plain(mismatchItems.map(x=>[x.date,x.status,x.amount])),[
  ['2026-09-25','review',60000],['2026-11-25','missing',60000]
 ])
 assert.match(mismatchItems[0].reason,/保存記録/)
+const wrongRound=legacyScheduleSetupItems([row],recipients,[{...stored,roundLabel:'第2回'}],'2026-09-20')
+assert.equal(wrongRound[0].status,'review','same date with a different round needs review')
+const issued={...stored,lifecycle:'issued',issuedOn:'2026-09-25',frozenAmount:55000,plannedAmount:null}
+assert.deepEqual(plain(legacyScheduleSetupItems([row],recipients,[issued],'2026-09-20').map(x=>x.date)),['2026-11-25'],
+ 'an issued round is handled even when its frozen amount differs from the current contract')
 const debit={...row,project_id:2,contract:{...contract,project_id:2,billing_method:'口座振替',billing_schedule_days:['15日']}}
 assert.equal(legacyScheduleSetupItems([debit],new Map([[2,10]]),[],'2026-09-14').length,0,'Future bank execution is not claimed as a reminder')
 const due=legacyScheduleSetupItems([debit],new Map([[2,10]]),[],'2026-09-20')

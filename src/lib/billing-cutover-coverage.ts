@@ -5,8 +5,8 @@ import {managementActiveOn,type ManagementEvent} from './management-lifecycle'
 import type {BillingUnit} from './billing-unit'
 import {debitScheduleReminder} from './debit-schedule-reminder'
 
-type StoredUnit={project_id:number;recipient_customer_id:number;collection_method:string;scheduled_date:string|null;lifecycle:string;planned_amount:number|null}
-export type CoverageCandidate={projectId:number;recipientId:number;method:'invoice'|'direct_debit';date:string;round:number;amount:number;status:'missing'|'matches'|'review';reason?:string}
+type StoredUnit={project_id:number;recipient_customer_id:number;collection_method:string;scheduled_date:string|null;lifecycle:string;planned_amount:number|null;round_number?:number|null;service_month?:number|null}
+export type CoverageCandidate={projectId:number;recipientId:number;method:'invoice'|'direct_debit';date:string;round:number;amount:number;status:'missing'|'matches'|'handled'|'review';reason?:string}
 export type ScheduleSetupItem=CoverageCandidate&{projectName:string;customerName:string}
 export type ScheduleSetupIssue={
   projectId:number;projectName:string;reason:string
@@ -46,10 +46,12 @@ export function inspectFutureBillingCoverage(rows:readonly BillingRow[],recipien
         let status:CoverageCandidate['status']='missing',reason:string|undefined
         if(matching.length){
           const u=matching[0]
-          if(matching.length===1&&u.lifecycle==='planned'&&u.collection_method===method&&u.recipient_customer_id===recipientId&&u.planned_amount===amount)status='matches'
+          const sameRound=method==='invoice'?u.round_number===item.round:u.service_month===m
+          if(matching.length===1&&sameRound&&['fixed','issued','received'].includes(u.lifecycle))status='handled'
+          else if(matching.length===1&&sameRound&&u.lifecycle==='planned'&&u.collection_method===method&&u.recipient_customer_id===recipientId&&u.planned_amount===amount)status='matches'
           else {status='review';reason='同日の保存記録と予定の金額・方法・請求先・回の対応を照合'}
         }
-        if(maintenanceEnded){status='review';reason='保守終了後の対象費目・前払い期間・個別金額を確認してください（自動日割りなし）'}
+        if(maintenanceEnded&&status!=='handled'){status='review';reason='保守終了後の対象費目・前払い期間・個別金額を確認してください（自動日割りなし）'}
         candidates.push({projectId:row.project_id,recipientId,method,date:item.date,round:item.round,amount,status,reason})
       }
     }
@@ -58,7 +60,7 @@ export function inspectFutureBillingCoverage(rows:readonly BillingRow[],recipien
   for(const c of candidates)if(candidates.filter(other=>other.projectId===c.projectId&&other.date===c.date).length>1){c.status='review';c.reason='同日に複数回があり、回の対応確認が必要'}
   const undated=units.filter(u=>u.lifecycle==='planned'&&!u.scheduled_date).length
   return {startMonth,months,candidates,issues,undatedSavedPlans:undated,
-    summary:{expected:candidates.length,matching:candidates.filter(c=>c.status==='matches').length,missing:candidates.filter(c=>c.status==='missing').length,review:candidates.filter(c=>c.status==='review').length},
+    summary:{expected:candidates.length,matching:candidates.filter(c=>c.status==='matches').length,handled:candidates.filter(c=>c.status==='handled').length,missing:candidates.filter(c=>c.status==='missing').length,review:candidates.filter(c=>c.status==='review').length},
     // A bounded comparison is not proof of perpetual schedule coverage.
     authorizesCutover:false as const}
 }
@@ -78,11 +80,13 @@ export function legacyScheduleSetupReview(rows:readonly BillingRow[],recipients:
  const unsafe=rows.filter(r=>(r.contract_count??(r.contract?1:0))!==1)
  const safe=rows.filter(r=>!unsafe.includes(r))
  const stored:StoredUnit[]=units.map((u):StoredUnit=>({project_id:u.projectId,recipient_customer_id:u.recipientId??0,
-  collection_method:u.method==='請求書'?'invoice':'direct_debit',scheduled_date:u.scheduledDate,lifecycle:u.lifecycle,planned_amount:u.plannedAmount??null}))
+  collection_method:u.method==='請求書'?'invoice':'direct_debit',scheduled_date:u.scheduledDate,lifecycle:u.lifecycle,planned_amount:u.plannedAmount??null,
+  round_number:/^第(\d+)回$/.test(u.roundLabel)?Number(u.roundLabel.slice(1,-1)):null,
+  service_month:/^\d+月分$/.test(u.roundLabel)?Number(u.roundLabel.slice(0,-2)):null}))
  const coverage=inspectFutureBillingCoverage(safe,recipients,stored,startMonth,3)
  // A saved row on the expected date is not automatically safe.  Keep amount,
  // method and recipient mismatches visible instead of silently hiding them.
- const items=coverage.candidates.filter(c=>c.status!=='matches'&&(c.method==='invoice'||c.date.startsWith(startMonth)))
+ const items=coverage.candidates.filter(c=>c.status!=='matches'&&c.status!=='handled'&&(c.method==='invoice'||c.date.startsWith(startMonth)))
   .filter(c=>c.method!=='direct_debit'||debitScheduleReminder(safe.find(r=>r.project_id===c.projectId)!,today))
   .map(c=>{const row=safe.find(r=>r.project_id===c.projectId)!;return {...c,projectName:row.project_name,customerName:row.customer_name}})
   .sort((a,b)=>a.date.localeCompare(b.date)||a.projectId-b.projectId)

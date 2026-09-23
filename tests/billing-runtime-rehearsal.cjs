@@ -214,7 +214,7 @@ async function main(){
     write:async()=>{throw Error('confirmed rollback')},reload:async()=>null,definitelyRejected:e=>e.message==='confirmed rollback'})
    await assert.rejects(rejected.save({action:'transfer'}),/confirmed rollback/);assert.equal(rejectedMap.size,0)
    await assert.rejects(db.query('select billing_runtime_snapshot()'),/利用権限/)
-   await db.query('insert into billing_runtime_control(owner_user_id,enabled) values($1,true)',[actor])
+   await db.query("insert into billing_runtime_control(owner_user_id,enabled,cutover_on) values($1,true,'2026-09-20')",[actor])
    await assert.rejects(db.query('select billing_runtime_snapshot()'),/今後の請求予定/)
    await db.exec('update billing_runtime_control set future_schedule_coverage_verified=true')
    await db.exec('grant select,update,delete on projects,contracts,customers,annual_records to authenticated;set role authenticated')
@@ -227,6 +227,7 @@ async function main(){
    await assert.rejects(db.exec('delete from customers where id=1'),/削除できません/)
    await assert.rejects(db.exec('select * from billing_units'),/permission denied/)
    const before=(await db.query('select billing_runtime_snapshot() value')).rows[0].value
+   assert.equal(before.cutover_on,'2026-09-20','runtime must expose the durable start of overdue invoice review')
    await db.exec('begin')
    await db.exec(`update contracts set billing_item_flags='{"annual_maintenance":false,"land_cost":true}'::jsonb where id=1`)
    assert.deepEqual((await db.query('select billing_runtime_snapshot() value')).rows[0].value.units,before.units,'Fee selection must not change stored occurrences')

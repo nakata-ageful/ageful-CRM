@@ -28,6 +28,19 @@ assert.equal(wrongRound[0].status,'review','same date with a different round nee
 const issued={...stored,lifecycle:'issued',issuedOn:'2026-09-25',frozenAmount:55000,plannedAmount:null}
 assert.deepEqual(plain(legacyScheduleSetupItems([row],recipients,[issued],'2026-09-20').map(x=>x.date)),['2026-11-25'],
  'an issued round is handled even when its frozen amount differs from the current contract')
+const overdue=legacyScheduleSetupItems([row],recipients,[],'2026-12-20','2026-09-20')
+assert.deepEqual(plain(overdue.map(x=>[x.date,x.status])),[['2026-09-25','overdue'],['2026-11-25','overdue']],
+ 'unissued plans since cutover stay visible after their month')
+assert.deepEqual(plain(legacyScheduleSetupItems([row],recipients,[],'2026-12-20','2026-10-01').map(x=>x.date)),['2026-11-25'],
+ 'a pre-cutover date must not be reconstructed as an overdue invoice')
+assert.equal(legacyScheduleSetupItems([row],recipients,[],'2028-12-20','2026-09-20').filter(x=>x.status==='overdue').length,6,
+ 'the overdue review must cross the 24-month comparison boundary without dropping older cutover-era dates')
+assert.deepEqual(plain(legacyScheduleSetupItems([row],recipients,[issued],'2026-12-20','2026-09-20').map(x=>x.date)),['2026-11-25'],
+ 'an issued round stays handled after its month')
+const allEnded={id:1,project_id:1,scope:'all',action:'end',effective_date:'2026-10-01',reason:'終了'}
+assert.deepEqual(plain(legacyScheduleSetupItems([row],recipients,[],'2026-12-20','2026-09-20',[allEnded]).map(x=>x.date)),['2026-09-25'],
+ 'management end prevents new post-end invoice candidates in the normal UI')
+assert.throws(()=>legacyScheduleSetupItems([row],recipients,[],'2026-12-20','2027-01-01'),/切替日/)
 const debit={...row,project_id:2,contract:{...contract,project_id:2,billing_method:'口座振替',billing_schedule_days:['15日']}}
 assert.equal(legacyScheduleSetupItems([debit],new Map([[2,10]]),[],'2026-09-14').length,0,'Future bank execution is not claimed as a reminder')
 const due=legacyScheduleSetupItems([debit],new Map([[2,10]]),[],'2026-09-20')

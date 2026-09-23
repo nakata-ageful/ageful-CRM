@@ -6,7 +6,7 @@ import type {BillingUnit} from './billing-unit'
 import {debitScheduleReminder} from './debit-schedule-reminder'
 
 type StoredUnit={project_id:number;recipient_customer_id:number;collection_method:string;scheduled_date:string|null;lifecycle:string;planned_amount:number|null;round_number?:number|null;service_month?:number|null}
-export type CoverageCandidate={projectId:number;recipientId:number;method:'invoice'|'direct_debit';date:string;round:number;amount:number;status:'missing'|'matches'|'handled'|'review';reason?:string}
+export type CoverageCandidate={projectId:number;recipientId:number;method:'invoice'|'direct_debit';date:string;round:number;amount:number;status:'missing'|'matches'|'handled'|'review'|'overdue';reason?:string}
 export type ScheduleSetupItem=CoverageCandidate&{projectName:string;customerName:string}
 export type ScheduleSetupIssue={
   projectId:number;projectName:string;reason:string
@@ -68,14 +68,17 @@ export function inspectFutureBillingCoverage(rows:readonly BillingRow[],recipien
 /** Keeps legacy-visible near-term reminders visible during per-project schedule setup.
  * Read-only: never creates a ledger occurrence or authorizes cutover by itself.
  */
-export function legacyScheduleSetupItems(rows:readonly BillingRow[],recipients:ReadonlyMap<number,number>,units:readonly BillingUnit[],today:string):ScheduleSetupItem[]{
- return legacyScheduleSetupReview(rows,recipients,units,today).items
+export function legacyScheduleSetupItems(rows:readonly BillingRow[],recipients:ReadonlyMap<number,number>,units:readonly BillingUnit[],today:string,
+ cutoverOn?:string,managementEvents:readonly ManagementEvent[]=[]):ScheduleSetupItem[]{
+ return legacyScheduleSetupReview(rows,recipients,units,today,cutoverOn,managementEvents).items
 }
 
-export function legacyScheduleSetupReview(rows:readonly BillingRow[],recipients:ReadonlyMap<number,number>,units:readonly BillingUnit[],today:string):{
+export function legacyScheduleSetupReview(rows:readonly BillingRow[],recipients:ReadonlyMap<number,number>,units:readonly BillingUnit[],today:string,
+ cutoverOn?:string,managementEvents:readonly ManagementEvent[]=[]):{
  items:ScheduleSetupItem[];issues:ScheduleSetupIssue[]
 }{
  if(!isBillingDate(today))throw Error('集計日が不正です')
+ if(cutoverOn&&(!isBillingDate(cutoverOn)||cutoverOn>today))throw Error('切替日が不正です')
  const startMonth=today.slice(0,7)
  const unsafe=rows.filter(r=>(r.contract_count??(r.contract?1:0))!==1)
  const safe=rows.filter(r=>!unsafe.includes(r))
@@ -83,10 +86,25 @@ export function legacyScheduleSetupReview(rows:readonly BillingRow[],recipients:
   collection_method:u.method==='請求書'?'invoice':'direct_debit',scheduled_date:u.scheduledDate,lifecycle:u.lifecycle,planned_amount:u.plannedAmount??null,
   round_number:/^第(\d+)回$/.test(u.roundLabel)?Number(u.roundLabel.slice(1,-1)):null,
   service_month:/^\d+月分$/.test(u.roundLabel)?Number(u.roundLabel.slice(0,-2)):null}))
- const coverage=inspectFutureBillingCoverage(safe,recipients,stored,startMonth,3)
+ const coverage=inspectFutureBillingCoverage(safe,recipients,stored,startMonth,3,managementEvents)
+ const overdue:CoverageCandidate[]=[]
+ if(cutoverOn){
+  const [fromYear,fromMonth]=cutoverOn.slice(0,7).split('-').map(Number)
+  const [toYear,toMonth]=startMonth.split('-').map(Number)
+  const elapsed=(toYear-fromYear)*12+toMonth-fromMonth
+  for(let offset=0;offset<elapsed;offset+=24){
+   const first=new Date(Date.UTC(fromYear,fromMonth-1+offset,1))
+   const monthKey=`${first.getUTCFullYear()}-${String(first.getUTCMonth()+1).padStart(2,'0')}`
+   const past=inspectFutureBillingCoverage(safe,recipients,stored,monthKey,Math.min(24,elapsed-offset),managementEvents)
+   overdue.push(...past.candidates.filter(c=>c.method==='invoice'&&c.date>=cutoverOn&&c.status!=='matches'&&c.status!=='handled'))
+  }
+ }
+ const overdueReason='切替後の請求予定日を過ぎています。未発行か記録漏れか、別日に変更した回がないか確認してください（自動発行なし）'
+ const candidates=[...overdue,...coverage.candidates].map(c=>c.method==='invoice'&&c.date<today&&cutoverOn!=null&&c.date>=cutoverOn&&c.status==='missing'
+  ?{...c,status:'overdue' as const,reason:overdueReason}:c)
  // A saved row on the expected date is not automatically safe.  Keep amount,
  // method and recipient mismatches visible instead of silently hiding them.
- const items=coverage.candidates.filter(c=>c.status!=='matches'&&c.status!=='handled'&&(c.method==='invoice'||c.date.startsWith(startMonth)))
+ const items=candidates.filter(c=>c.status!=='matches'&&c.status!=='handled'&&(c.method==='invoice'||c.date.startsWith(startMonth)))
   .filter(c=>c.method!=='direct_debit'||debitScheduleReminder(safe.find(r=>r.project_id===c.projectId)!,today))
   .map(c=>{const row=safe.find(r=>r.project_id===c.projectId)!;return {...c,projectName:row.project_name,customerName:row.customer_name}})
   .sort((a,b)=>a.date.localeCompare(b.date)||a.projectId-b.projectId)

@@ -2,6 +2,7 @@ import type { BillingUnit } from '../lib/billing-unit'
 import { customerBillingHistory, summarizeBillingHistory } from '../lib/billing-history'
 import { BillingUnitTable } from './BillingUnitTable'
 import { fmtYen } from '../lib/utils'
+import type { ManagementEvent } from '../lib/management-lifecycle'
 
 export type BillingHistoryData = {
   units: readonly BillingUnit[]
@@ -9,6 +10,8 @@ export type BillingHistoryData = {
   projectName: (id: number) => string
   plannedAmount: (unit: BillingUnit) => number | null
   recipients?: readonly {id:number;name:string}[]
+  cutoverOn?: string
+  managementEvents?: readonly ManagementEvent[]
 }
 
 export function BillingHistorySection({ data, customerId, projectId, onViewDetail }: {

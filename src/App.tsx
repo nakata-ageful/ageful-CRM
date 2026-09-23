@@ -174,6 +174,7 @@ function MainApp() {
 
   const billingHistory:BillingHistoryData|undefined=runtime?{
     units:runtime.units,recipients:customers.map(c=>({id:c.id,name:c.name})),plannedAmount:()=>null,
+    cutoverOn:runtime.cutoverOn,managementEvents:runtime.managementEvents,
     recipientName:id=>customers.find(c=>c.id===id)?.name??`請求先ID ${id}（名前未取得）`,
     projectName:id=>projectRows.find(p=>p.id===id)?.project_name??`発電所ID ${id}`,
   }:undefined

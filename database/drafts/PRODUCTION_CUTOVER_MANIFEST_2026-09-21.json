@@ -62,7 +62,7 @@
     {"path":"database/drafts/20260907_create_manual_debit_plan.sql","sha256":"659a7534662077791ededb031ee40085b16d464e0b81a2b0a091541d6827acc7"},
     {"path":"database/drafts/20260914_management_lifecycle.sql","sha256":"ba22b6a03b3bf62a3faaa9338ea9f2f49b5668e723919c4011d860473b1ca304"},
     {"path":"database/drafts/20260914_future_schedule.sql","sha256":"0cd7d4038f69db4e0948a8eaf26c0b2b2bd642b4872a20f36712a0d7dce9ec00"},
-    {"path":"database/drafts/20260909_billing_runtime.sql","sha256":"c3bf819f0eb4da8841d30000bb15b0dd69ce75da6602b708cdc1376cc984f06a"},
+    {"path":"database/drafts/20260909_billing_runtime.sql","sha256":"ba4c2d257152b28f302b9f905d8f563f092b3a80ff9a666f99e12fd468f242b3"},
     {"path":"database/drafts/20260914_confirm_imported_round.sql","sha256":"66bf71caa7ea986a03fd76d2a1bc81820a609d7dbc690ef75781924b5ad2de58"}
   ]
 }

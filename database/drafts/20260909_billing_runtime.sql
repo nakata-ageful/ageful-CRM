@@ -5,7 +5,9 @@ CREATE TABLE public.billing_runtime_control (
   singleton boolean PRIMARY KEY DEFAULT true CHECK(singleton),
   owner_user_id uuid NOT NULL,
   enabled boolean NOT NULL DEFAULT false,
-  future_schedule_coverage_verified boolean NOT NULL DEFAULT false
+  future_schedule_coverage_verified boolean NOT NULL DEFAULT false,
+  cutover_on date,
+  CHECK (NOT enabled OR cutover_on IS NOT NULL)
 );
 ALTER TABLE public.billing_runtime_control ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.billing_runtime_control FROM PUBLIC;
@@ -72,6 +74,7 @@ DECLARE result jsonb;
 BEGIN
   PERFORM public.assert_billing_runtime_access();
   SELECT jsonb_build_object('version',2,'ready',true,
+    'cutover_on',(SELECT cutover_on::text FROM public.billing_runtime_control WHERE enabled),
     'management_events',(SELECT coalesce(jsonb_agg(to_jsonb(m) ORDER BY id),'[]') FROM public.project_management_events m),
     'units',(SELECT coalesce(jsonb_agg(to_jsonb(u) ORDER BY id),'[]') FROM public.billing_units u),
     'events',(SELECT coalesce(jsonb_agg(to_jsonb(e) ORDER BY id),'[]') FROM public.billing_unit_events e),
@@ -211,6 +214,9 @@ DO $$ DECLARE t text; BEGIN
       IF to_regclass('public.'||t) IS NOT NULL THEN
         EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY',t);
         EXECUTE format('GRANT SELECT,INSERT,UPDATE,DELETE ON public.%I TO authenticated',t);
+        IF pg_get_serial_sequence('public.'||t,'id') IS NOT NULL THEN
+          EXECUTE format('GRANT USAGE ON SEQUENCE %s TO authenticated',pg_get_serial_sequence('public.'||t,'id'));
+        END IF;
         EXECUTE format('CREATE POLICY billing_single_owner_limit ON public.%I AS RESTRICTIVE FOR ALL TO authenticated USING(public.billing_runtime_is_owner()) WITH CHECK(public.billing_runtime_is_owner())',t);
         EXECUTE format('CREATE POLICY billing_single_owner_allow ON public.%I FOR ALL TO authenticated USING(public.billing_runtime_is_owner()) WITH CHECK(public.billing_runtime_is_owner())',t);
         IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='anon') THEN EXECUTE format('REVOKE ALL ON public.%I FROM anon',t); END IF;

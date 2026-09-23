@@ -39,6 +39,10 @@ for(const html of [
  render(Billing,{rows:[setupRow],onReload:noAction,onViewDetail:noAction,billingHistory:emptyHistory,billingToday:'2026-11-15',projectRecipients:new Map([[1,2]])}),
  render(Dashboard,{stats:{totalCustomers:1,totalProjects:1,activeMaintenanceCount:0},maintenanceList:[],billingRows:[setupRow],onNavigate:noAction,onViewMaintenance:noAction,onViewBilling:noAction,billingHistory:emptyHistory,billingToday:'2026-11-15',projectRecipients:new Map([[1,2]])}),
 ]){assert.ok(html.includes('未保存・要確認の請求予定'));assert.ok(html.includes('2026-12-01'));assert.ok(html.includes('新しい請求回としてまだ保存していません'));}
+for(const html of [
+ render(Billing,{rows:[setupRow],onReload:noAction,onViewDetail:noAction,billingHistory:{...emptyHistory,cutoverOn:'2026-09-23'},billingToday:'2027-01-15',projectRecipients:new Map([[1,2]])}),
+ render(Dashboard,{stats:{totalCustomers:1,totalProjects:1,activeMaintenanceCount:0},maintenanceList:[],billingRows:[setupRow],onNavigate:noAction,onViewMaintenance:noAction,onViewBilling:noAction,billingHistory:{...emptyHistory,cutoverOn:'2026-09-23'},billingToday:'2027-01-15',projectRecipients:new Map([[1,2]])}),
+]){assert.ok(html.includes('2026-12-01'));assert.ok(html.includes('期限超過・要確認'),'normal views must retain an unissued invoice after its month');}
 const supabaseSource=fs.readFileSync(path.join(root,'src/lib/supabase.ts'),'utf8');
 const runtimeSource=fs.readFileSync(path.join(root,'src/lib/billing-runtime.ts'),'utf8');
 const appSource=fs.readFileSync(path.join(root,'src/App.tsx'),'utf8');

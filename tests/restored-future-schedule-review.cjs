@@ -26,6 +26,12 @@ const rows=data.projects.map(p=>{const contracts=data.contracts.filter(c=>c.proj
 const safe=rows.filter(r=>r.contract_count===1)
 const coverage=inspectFutureBillingCoverage(safe,recipients,units,startMonth,24,management)
 const nearTerm=legacyScheduleSetupReview(rows,recipients,units.map(u=>billingUnitFromStorage(u)),`${startMonth}-20`)
+const cutoverReview=legacyScheduleSetupReview(rows,recipients,units.map(u=>billingUnitFromStorage(u)),'2026-12-20','2026-09-23',management)
+const expectedOverdue=inspectFutureBillingCoverage(safe,recipients,units,'2026-09',3,management).candidates
+ .filter(c=>c.method==='invoice'&&c.date>='2026-09-23'&&c.status!=='matches'&&c.status!=='handled').length
+const visibleOverdue=cutoverReview.items.filter(c=>c.date<'2026-12-01'&&c.method==='invoice')
+assert.equal(visibleOverdue.length,expectedOverdue,
+ `post-cutover invoice dates must remain visible after their month: ${JSON.stringify(visibleOverdue.map(c=>[c.date,c.status]))}`)
 const classifications=[]
 for(const row of rows){
  const issue=row.contract_count!==1?{reason:'契約が複数または未設定'}:coverage.issues.find(i=>i.projectId===row.project_id)
@@ -41,5 +47,6 @@ const result={passed:true,scope:'read-only 24-month review of committed disposab
  classifiedProjects:classifications.length,projectStates:counts,candidateStates:coverage.summary,settingIssues:coverage.issues.length,
  undatedSavedPlans:coverage.undatedSavedPlans,nearTermVisibleItems:nearTerm.items.length,
  nearTermVisibleReviews:nearTerm.items.filter(i=>i.status==='review').length,nearTermConfigurationIssues:new Set(nearTerm.issues.map(i=>i.projectId)).size,
+ overdueInvoiceCandidatesStillVisible:expectedOverdue,
  hiddenReviewCandidates:false,guessedSchedulesCreated:false,authorizesPerpetualCoverage:false}
 console.log(JSON.stringify(result,null,2))

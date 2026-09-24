@@ -21,7 +21,7 @@ let sequence=0
 const key=()=>`77777777-7777-4777-8777-${String(++sequence).padStart(12,'0')}`
 
 async function main(){
- const [backupFile,amountFile,payerFile,historyFile,psql,socket,port='55432',database='ageful_restore',mode='--rollback',outputFile,ownerUserId]=process.argv.slice(2)
+ const [backupFile,amountFile,payerFile,historyFile,psql,socket,port='55432',database='ageful_restore',mode='--rollback',outputFile,ownerUserId,targetRef]=process.argv.slice(2)
  const commit=mode==='--commit-local-clone'
  const emit=mode==='--emit-sql'
  if(!database||!port||!socket||!psql||![backupFile,amountFile,payerFile,historyFile].every(Boolean)){
@@ -35,6 +35,8 @@ async function main(){
   const privateDir='/Users/keigoshoda/Documents/ChatGPT/エイジフル/private-backups'
   if(!outputFile||path.dirname(path.resolve(outputFile))!==privateDir||!/^[-\w]+\.sql$/.test(path.basename(outputFile)))throw Error('SQL output must be a new private-backups/*.sql file')
   if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ownerUserId??''))throw Error('New Supabase Auth owner UUID is required')
+  if(!/^[a-z]{20}$/.test(targetRef??'')||['duoibibtuamilpneysnl','uyzpmksghwjngqylkwbk'].includes(targetRef))
+   throw Error('Explicit new Supabase project ref is required')
  }
  const data=JSON.parse(fs.readFileSync(backupFile,'utf8')),amounts=JSON.parse(fs.readFileSync(amountFile,'utf8'))
  const payer=JSON.parse(fs.readFileSync(payerFile,'utf8')),history=confirmedBillingHistory(data,JSON.parse(fs.readFileSync(historyFile,'utf8')))
@@ -51,6 +53,8 @@ async function main(){
  const importTimestamp=emit?new Date().toISOString():'2026-09-20T00:00:00.000Z'
  sql.push('BEGIN',"set local timezone='UTC'",`set local test.actor=${q(actor)}`,`set local request.jwt.claim.sub=${q(actor)}`)
  if(emit)sql.push(`DO $$ BEGIN
+  IF to_regclass('public.ageful_migration_target') IS NULL THEN RAISE EXCEPTION 'Missing new-project marker'; END IF;
+  IF (SELECT count(*) FROM public.ageful_migration_target WHERE project_ref=${q(targetRef)})<>1 THEN RAISE EXCEPTION 'Wrong Supabase project'; END IF;
   IF auth.uid() IS DISTINCT FROM ${q(actor)}::uuid THEN RAISE EXCEPTION 'Auth owner mismatch'; END IF;
   IF (SELECT count(*) FROM public.customers)<>${data.customers.length}
    OR (SELECT count(*) FROM public.projects)<>${data.projects.length}

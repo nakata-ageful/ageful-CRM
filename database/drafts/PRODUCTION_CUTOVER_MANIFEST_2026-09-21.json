@@ -46,6 +46,10 @@
     "authorizesPerpetualCoverage": false
   },
   "productionCutoverReady": false,
+  "postMigrationPatches": [
+    {"path":"database/drafts/20260924_read_only_billing_inspection.sql","sha256":"bb93596a22682b469d220d21aaef3d1d6fdedfa555726dc6c1ebc84bfefec13d","newDatabaseApplied":true,"businessRowsChanged":false},
+    {"path":"database/drafts/20260924_transfer_selected_next.sql","sha256":"b817e7f18fe317e183b9895d47f46640fd8d3c1a9aeb118994185348049b413a","newDatabaseApplied":true,"businessRowsChanged":false}
+  ],
   "files": [
     {"path":"database/drafts/20260907_billing_ownership_foundation.sql","sha256":"1846a3aac74efddf5ad53f047f640af9090f66246518b572738f41d030c31bdf"},
     {"path":"database/drafts/20260907_invoice_write_rpc.sql","sha256":"0f7d4ae6b2c29997f07ece0d015ae2c404db06814da0f409dafab652493c02bf"},

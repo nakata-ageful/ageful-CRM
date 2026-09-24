@@ -9,6 +9,8 @@ export type BillingUnit = {
   method: '請求書' | '口座振替'
   scheduledDate: string | null
   recipientId: number | null
+  /** Stored payer decision, not inferred from the current project owner. */
+  recipientSource?: 'default' | 'override' | 'confirmed' | 'unconfirmed'
   lifecycle: 'planned' | 'fixed' | 'issued' | 'received' | 'cancelled' | 'review_required'
   issuedOn: string | null
   receivedOn: string | null

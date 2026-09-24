@@ -5,7 +5,7 @@ import {managementActiveOn,type ManagementEvent} from './management-lifecycle'
 import type {BillingUnit} from './billing-unit'
 import {debitScheduleReminder} from './debit-schedule-reminder'
 
-type StoredUnit={project_id:number;recipient_customer_id:number;collection_method:string;scheduled_date:string|null;lifecycle:string;planned_amount:number|null;round_number?:number|null;service_month?:number|null}
+type StoredUnit={project_id:number;service_year?:number;recipient_customer_id:number;recipient_source?:string;collection_method:string;scheduled_date:string|null;lifecycle:string;planned_amount:number|null;round_number?:number|null;service_month?:number|null}
 export type CoverageCandidate={projectId:number;recipientId:number;method:'invoice'|'direct_debit';date:string;round:number;amount:number;status:'missing'|'matches'|'handled'|'review'|'overdue';reason?:string}
 export type ScheduleSetupItem=CoverageCandidate&{projectName:string;customerName:string}
 export type ScheduleSetupIssue={
@@ -48,8 +48,17 @@ export function inspectFutureBillingCoverage(rows:readonly BillingRow[],recipien
           const u=matching[0]
           const sameRound=method==='invoice'?u.round_number===item.round:u.service_month===m
           if(matching.length===1&&sameRound&&['fixed','issued','received'].includes(u.lifecycle))status='handled'
-          else if(matching.length===1&&sameRound&&u.lifecycle==='planned'&&u.collection_method===method&&u.recipient_customer_id===recipientId&&u.planned_amount===amount)status='matches'
+          else if(matching.length===1&&sameRound&&u.lifecycle==='planned'&&u.collection_method===method
+            &&(u.recipient_customer_id===recipientId||u.recipient_source==='override')&&u.planned_amount===amount)status='matches'
           else {status='review';reason='同日の保存記録と予定の金額・方法・請求先・回の対応を照合'}
+        }else if(method==='invoice'){
+          // A manually moved date cannot be equated with the contract's calendar
+          // date. Keep it visible for human correspondence, but never advertise
+          // it as an unsaved new claim that could be charged twice.
+          const nearby=units.filter(u=>u.project_id===row.project_id&&u.round_number===item.round
+            &&u.scheduled_date&&u.service_year!=null&&[y,y+1].includes(u.service_year)
+            &&Math.abs(Date.parse(`${u.scheduled_date}T00:00:00Z`)-Date.parse(`${item.date}T00:00:00Z`))<300*86400000)
+          if(nearby.length){status='review';reason='別日に保存された同じ回の可能性があります。保守期間・第何回かを確認してください'}
         }
         if(maintenanceEnded&&status!=='handled'){status='review';reason='保守終了後の対象費目・前払い期間・個別金額を確認してください（自動日割りなし）'}
         candidates.push({projectId:row.project_id,recipientId,method,date:item.date,round:item.round,amount,status,reason})
@@ -82,7 +91,7 @@ export function legacyScheduleSetupReview(rows:readonly BillingRow[],recipients:
  const startMonth=today.slice(0,7)
  const unsafe=rows.filter(r=>(r.contract_count??(r.contract?1:0))!==1)
  const safe=rows.filter(r=>!unsafe.includes(r))
- const stored:StoredUnit[]=units.map((u):StoredUnit=>({project_id:u.projectId,recipient_customer_id:u.recipientId??0,
+ const stored:StoredUnit[]=units.map((u):StoredUnit=>({project_id:u.projectId,service_year:u.serviceYear,recipient_customer_id:u.recipientId??0,recipient_source:u.recipientSource,
   collection_method:u.method==='請求書'?'invoice':'direct_debit',scheduled_date:u.scheduledDate,lifecycle:u.lifecycle,planned_amount:u.plannedAmount??null,
   round_number:/^第(\d+)回$/.test(u.roundLabel)?Number(u.roundLabel.slice(1,-1)):null,
   service_month:/^\d+月分$/.test(u.roundLabel)?Number(u.roundLabel.slice(0,-2)):null}))

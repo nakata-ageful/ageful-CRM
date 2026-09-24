@@ -27,6 +27,13 @@ assert.deepEqual(manifest.nearTermScheduleDispositionBasis,{
   note:'Three-month operational visibility is not perpetual future coverage. Revalidation after mismatch-display fix is required.',
 });
 assert.equal(manifest.files.length,17);
+assert.equal(manifest.postMigrationPatches.length,2);
+for(const file of manifest.postMigrationPatches){
+  const body=fs.readFileSync(path.join(root,file.path));
+  assert.equal(crypto.createHash('sha256').update(body).digest('hex'),file.sha256,`${file.path} changed after new-DB application`);
+  assert.equal(file.newDatabaseApplied,true);
+  assert.equal(file.businessRowsChanged,false);
+}
 assert.equal(new Set(manifest.files.map(file=>file.path)).size,manifest.files.length);
 for(const file of manifest.files){
   const body=fs.readFileSync(path.join(root,file.path));

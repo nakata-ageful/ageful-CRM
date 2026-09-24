@@ -487,6 +487,7 @@ function MainApp() {
         {transferOpen&&runtime&&projectDetail?.contract&&<Modal title="所有者を変更" width={1100} onClose={()=>setTransferOpen(false)}>
           <OwnershipTransferEditor project={projectDetail.project} contract={projectDetail.contract} customers={customers}
             units={runtime.units.filter(u=>u.projectId===projectDetail.project.id)}
+            managementEvents={runtime.managementEvents.filter(e=>e.project_id===projectDetail.project.id)}
             onSave={async input=>{await saveRuntime({action:'transfer',value:input});setTransferOpen(false)}}/>
         </Modal>}
       </main>

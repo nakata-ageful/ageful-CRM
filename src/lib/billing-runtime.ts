@@ -16,8 +16,10 @@ export async function loadBillingRuntime():Promise<BillingRuntimeSnapshot>{
   if(data?.version!==2||data?.ready!==true||!isBillingDate(data.cutover_on)||!Array.isArray(data.units)||!Array.isArray(data.transfers)||!Array.isArray(data.events)||!Array.isArray(data.management_events))throw Error('請求データの移行・アクセス保護が未完了です。旧画面へは自動で切り替えません')
   const units:TransferBillingUnit[]=data.units.map((row:Record<string,unknown>)=>{
     if(!['pending','succeeded','failed','not_applicable'].includes(String(row.collection_state)))throw Error('振替状態が不正です')
+    if(!['default','override','confirmed','unconfirmed'].includes(String(row.recipient_source)))throw Error('請求先の確定状態が不正です')
     return {...billingUnitFromStorage(row),collectionState:row.collection_state as TransferBillingUnit['collectionState'],
-      periodStart:row.period_start as string|null,periodEnd:row.period_end as string|null,planNote:row.plan_note as string}
+      periodStart:row.period_start as string|null,periodEnd:row.period_end as string|null,planNote:row.plan_note as string,
+      recipientSource:row.recipient_source as TransferBillingUnit['recipientSource']}
   })
   if(new Set(units.map(u=>u.id)).size!==units.length)throw Error('請求回が重複しています')
   return {units,transfers:data.transfers,events:data.events,managementEvents:data.management_events.map(managementEventFromStorage),cutoverOn:data.cutover_on}

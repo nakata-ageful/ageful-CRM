@@ -38,7 +38,35 @@ const emptyHistory={units:[],recipientName:()=>'',projectName:()=>'',plannedAmou
 for(const html of [
  render(Billing,{rows:[setupRow],onReload:noAction,onViewDetail:noAction,billingHistory:emptyHistory,billingToday:'2026-11-15',projectRecipients:new Map([[1,2]])}),
  render(Dashboard,{stats:{totalCustomers:1,totalProjects:1,activeMaintenanceCount:0},maintenanceList:[],billingRows:[setupRow],onNavigate:noAction,onViewMaintenance:noAction,onViewBilling:noAction,billingHistory:emptyHistory,billingToday:'2026-11-15',projectRecipients:new Map([[1,2]])}),
-]){assert.ok(html.includes('未保存・要確認の請求予定'));assert.ok(html.includes('2026-12-01'));assert.ok(html.includes('新しい請求回としてまだ保存していません'));}
+]){assert.ok(html.includes('今月・来月・再来月の請求予定（1件）'));assert.ok(html.includes('2026-12-01'));assert.ok(html.includes('まだ保存していない予定候補です'));assert.ok(!html.includes('未保存・要確認の請求予定（1件）'),'near-term candidate must not be repeated in a second list');}
+const passedDateHtml=render(Billing,{rows:[setupRow],onReload:noAction,onViewDetail:noAction,billingHistory:emptyHistory,billingToday:'2026-12-15',projectRecipients:new Map([[1,2]])});
+assert.ok(passedDateHtml.includes('予定日経過・要確認'),'a past candidate must not look like an ordinary future plan');
+const savedMatch={...base,id:'saved-match',recipientId:2,lifecycle:'planned',plannedAmount:165000};
+const savedMismatch={...savedMatch,id:'saved-mismatch',plannedAmount:164999};
+for(const [unit,expectedReview] of [[savedMatch,false],[savedMismatch,true]]){
+ const html=render(Billing,{rows:[setupRow],onReload:noAction,onViewDetail:noAction,billingHistory:{...emptyHistory,units:[unit]},billingToday:'2026-11-15',projectRecipients:new Map([[1,2]])});
+ assert.ok(html.includes('今月・来月・再来月の請求予定（1件）'),'a stored plan and a calculated candidate must not count twice');
+ assert.equal(html.includes('保存内容を確認'),expectedReview,'a changed saved plan must stay visible for review');
+}
+const savedOldPayer={...savedMatch,id:'old-payer-next',recipientId:1,recipientSource:'override'};
+const oldPayerHtml=render(Billing,{rows:[setupRow],onReload:noAction,onViewDetail:noAction,
+ billingHistory:{...emptyHistory,units:[savedOldPayer],recipientName:id=>id===1?'旧所有者A':'新所有者B',projectName:()=>setupRow.project_name},
+ billingToday:'2026-11-15',projectRecipients:new Map([[1,2]])});
+assert.ok(oldPayerHtml.includes('今月・来月・再来月の請求予定（1件）'));
+assert.ok(oldPayerHtml.includes('旧所有者A'));
+assert.ok(!oldPayerHtml.includes('保存内容を確認'),'an explicit one-time old payer must not be mistaken for a conflicting current owner');
+const movedOldPayer={...savedOldPayer,scheduledDate:'2026-10-15'};
+const movedHtml=render(Billing,{rows:[setupRow],onReload:noAction,onViewDetail:noAction,
+ billingHistory:{...emptyHistory,units:[movedOldPayer],recipientName:id=>id===1?'旧所有者A':'新所有者B',projectName:()=>setupRow.project_name},
+ billingToday:'2026-11-15',projectRecipients:new Map([[1,2]])});
+assert.ok(movedHtml.includes('別日に保存された同じ回の可能性'),'moved due dates must be flagged for period/round review');
+assert.ok(!movedHtml.includes('まだ保存していない予定候補です'),'a possible moved date must not be advertised as a fresh claim');
+const debitRow={...setupRow,contract:{...setupRow.contract,billing_method:'口座振替',billing_schedule_days:['15日'],billing_count:12}};
+for(const [today,hasCheck] of [['2026-11-14',false],['2026-11-20',true]]){
+ const html=render(Billing,{rows:[debitRow],onReload:noAction,onViewDetail:noAction,billingHistory:emptyHistory,billingToday:today,projectRecipients:new Map([[1,2]])});
+ assert.equal(html.includes('口座振替の結果を確認（1件）'),hasCheck,'the bank check appears only after the due date');
+ if(hasCheck){assert.ok(html.includes('未保存は未払い・振替失敗を意味しません'));assert.ok(!html.includes('未保存・要確認の請求予定（1件）'));}
+}
 for(const html of [
  render(Billing,{rows:[setupRow],onReload:noAction,onViewDetail:noAction,billingHistory:{...emptyHistory,cutoverOn:'2026-09-23'},billingToday:'2027-01-15',projectRecipients:new Map([[1,2]])}),
  render(Dashboard,{stats:{totalCustomers:1,totalProjects:1,activeMaintenanceCount:0},maintenanceList:[],billingRows:[setupRow],onNavigate:noAction,onViewMaintenance:noAction,onViewBilling:noAction,billingHistory:{...emptyHistory,cutoverOn:'2026-09-23'},billingToday:'2027-01-15',projectRecipients:new Map([[1,2]])}),

@@ -62,7 +62,8 @@ async function main(){
    '20260907_preserve_maintenance_source.sql','20260907_invoice_recipient_initialization.sql','20260907_invoice_initialization_inspection.sql',
    '20260907_imported_invoice_source_guard.sql','20260907_legacy_invoice_creation_guard.sql','20260907_transfer_detail_choices.sql',
    '20260907_manual_billing_plan.sql','20260907_transfer_ownership_manual.sql','20260907_manual_debit_result.sql','20260907_create_manual_debit_plan.sql',
-   '20260914_management_lifecycle.sql','20260914_future_schedule.sql','20260909_billing_runtime.sql','20260914_confirm_imported_round.sql'])await tx.exec(fs.readFileSync(path.join(root,'database/drafts',f),'utf8'))})
+   '20260914_management_lifecycle.sql','20260914_future_schedule.sql','20260909_billing_runtime.sql','20260914_confirm_imported_round.sql',
+   '20260924_transfer_selected_next.sql'])await tx.exec(fs.readFileSync(path.join(root,'database/drafts',f),'utf8'))})
   const raw=review(audit.datasetId,data.annual_records)
   const confirmations=raw.candidates.map(c=>{const approval=amounts.find(a=>a.recordId===c.recordId&&a.paymentIndex===c.paymentIndex&&a.seq===c.seq)
    return {sourceKey:c.sourceKey,sourceSignature:c.sourceSignature,recipientId:audit.rows.find(r=>r.recordId===c.recordId&&r.originalPaymentIndex===c.paymentIndex).confirmedRecipientId,recipientBasis:payer.basis,
@@ -236,6 +237,44 @@ async function main(){
    assert.equal(backup.version,2);assert.equal(backup.billing_units.length,before.units.length)
    assert.deepEqual(backup.annual_records,[...fixture.annual_records].sort((a,b)=>canonicalJson(a).localeCompare(canonicalJson(b))))
    const planned=before.units.find(u=>u.lifecycle==='planned'),paid=before.units.find(u=>u.lifecycle==='received')
+   const existingChoice={unitId:String(planned.id),expectedRevision:planned.revision,recipientId:2,method:'請求書',
+    scheduledDate:'2026-12-01',plannedAmount:200,periodStart:null,periodEnd:null,note:'変更後の予定'}
+   const nextOccurrence={year:2028,round:1,method:'invoice',date:'2027-12-01',recipientId:1,amount:100,...maintenancePeriod(contract.maintenance_start_date,2028)}
+   const nextTransfer={action:'transfer',value:{project,contract,newOwner:2,futureRecipient:2,date:'2026-09-01',fields:{contract:{}},
+    choices:[existingChoice,{newOccurrence:nextOccurrence}],reason:'次回A、以後Bを確認'}}
+   await db.exec('begin')
+   const nextKey=key()
+   await db.query('select billing_runtime_write($1,$2::jsonb)',[nextKey,JSON.stringify(nextTransfer)])
+   await db.query('select billing_runtime_write($1,$2::jsonb)',[nextKey,JSON.stringify(nextTransfer)])
+   const nextState=(await db.query('select billing_runtime_snapshot() value')).rows[0].value
+   assert.equal(nextState.transfers.length,1)
+   assert.equal(nextState.units.filter(u=>u.occurrence_key==='maintenance:2028:round:1').length,1)
+   assert.equal(nextState.units.find(u=>u.occurrence_key==='maintenance:2028:round:1').recipient_customer_id,1)
+   await db.exec('reset role')
+   assert.equal((await db.query('select default_recipient_customer_id from billing_recipient_plans where retired_at is null')).rows[0].default_recipient_customer_id,2)
+   await db.exec('set role authenticated')
+   assert.equal(nextState.units.find(u=>u.id===paid.id).frozen_amount,paid.frozen_amount)
+   await db.exec('rollback')
+   assert.deepEqual((await db.query('select billing_runtime_snapshot() value')).rows[0].value,before,'Rolled-back transfer must preserve all prior state')
+   for(const [contractMethod,nextMethod] of [['請求書','direct_debit'],['口座振替','invoice'],['口座振替','direct_debit']]){
+    await db.exec('begin')
+    const variant={...nextTransfer,value:{...nextTransfer.value,fields:{contract:contractMethod==='口座振替'?debitFields:{}},
+     choices:[existingChoice,{newOccurrence:{...nextOccurrence,method:nextMethod}}]}}
+    await db.query('select billing_runtime_write($1,$2::jsonb)',[key(),JSON.stringify(variant)])
+    const state=(await db.query('select billing_runtime_snapshot() value')).rows[0].value
+    const saved=state.units.find(u=>u.occurrence_key==='maintenance:2028:round:1')
+    assert.equal(saved.collection_method,nextMethod)
+    assert.equal(saved.recipient_customer_id,1)
+    assert.equal(state.transfers[0].contract_after.billing_method,contractMethod)
+    await db.exec('rollback')
+   }
+   assert.deepEqual((await db.query('select billing_runtime_snapshot() value')).rows[0].value,before,'All method-pair rehearsals must leave the original state intact')
+   await db.exec('begin;savepoint failed_transfer')
+   await assert.rejects(db.query('select billing_runtime_write($1,$2::jsonb)',[key(),JSON.stringify({...nextTransfer,value:{...nextTransfer.value,
+    choices:[existingChoice,{newOccurrence:{...nextOccurrence,year:2026,periodStart:'2026-01-14',periodEnd:'2027-01-13'}}]}})]),/二重作成|対応確認/)
+   await db.exec('rollback to savepoint failed_transfer;rollback')
+   assert.deepEqual((await db.query('select billing_runtime_snapshot() value')).rows[0].value,before,'Failed next occurrence must roll back the owner, plans and contract')
+   console.log('PASS: transfer and one confirmed next occurrence are atomic; next A/default B, replay and failed-insert rollback')
    const request={action:'transfer',value:{project,contract,newOwner:2,futureRecipient:1,date:'2026-09-01',fields:{contract:debitFields},choices:[{
     unitId:String(planned.id),expectedRevision:planned.revision,recipientId:2,method:'口座振替',scheduledDate:'2026-12-01',plannedAmount:200,periodStart:null,periodEnd:null,note:'移転後の予定'}],reason:'一括移転の確認'}}
    const storageMap=new Map(),storage={getItem:k=>storageMap.get(k)??null,setItem:(k,v)=>storageMap.set(k,v),removeItem:k=>storageMap.delete(k)}

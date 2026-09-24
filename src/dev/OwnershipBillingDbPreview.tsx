@@ -14,6 +14,7 @@ import {OwnershipTransferEditor,type OwnershipTransferInput} from '../components
 import {contractFieldKinds,projectFieldKinds} from '../lib/ownership-field-selection'
 import type {Contract,Project,Customer} from '../types'
 import futureSql from '../../database/drafts/20260914_future_schedule.sql?raw'
+import selectedNextSql from '../../database/drafts/20260924_transfer_selected_next.sql?raw'
 import {FutureScheduleEditor} from '../components/FutureScheduleEditor'
 import managementSql from '../../database/drafts/20260914_management_lifecycle.sql?raw'
 import {ManagementLifecycleEditor} from '../components/ManagementLifecycleEditor'
@@ -50,7 +51,7 @@ export function OwnershipBillingDbPreview({normalScreens=false}:{normalScreens?:
           for(const [key,kind] of Object.entries(kinds))if(!present.has(key))await tx.exec(`alter table ${table} add column ${key} ${kind==='number'?'numeric':kind==='boolean'?'boolean':kind==='date'?'date':['flags','amounts','strings'].includes(kind)?'jsonb':'text'}`)
         }
         await tx.exec("update projects set project_name='サンプル発電所'; update contracts set maintenance_start_date='2022-01-14',billing_count=1,billing_schedule_days='[\"6月15日\"]',annual_maintenance_inc=82500;")
-        await tx.exec(manualPlan);await tx.exec(detailChoices);await tx.exec(transfer);await tx.exec(createDebit);await tx.exec(managementSql);await tx.exec(futureSql)})
+        await tx.exec(manualPlan);await tx.exec(detailChoices);await tx.exec(transfer);await tx.exec(createDebit);await tx.exec(managementSql);await tx.exec(futureSql);await tx.exec(selectedNextSql)})
       let parent:{project:Record<string,unknown>;contract:Record<string,unknown>}
       async function reload(){
         const rows=await db.query<{unit:Record<string,unknown>}>('select to_jsonb(u) as unit from billing_units u order by scheduled_date,id')
@@ -111,7 +112,7 @@ export function OwnershipBillingDbPreview({normalScreens=false}:{normalScreens?:
     <div hidden={normalScreens&&screen!=='detail'}>
     {units&&<ManagementLifecycleEditor key={`management-${version}`} projectId={1} events={managementEvents} units={units} onSave={async r=>{if(!managementRef.current)throw Error('準備中です');await managementRef.current(r)}}/>}
     {units&&parents&&<FutureScheduleEditor key={`future-${version}`} row={{project_id:1,project_name:'サンプル発電所',customer_name:'顧客A',company_name:null,contract:parents.contract,records:[],currentYearRecord:null,currentYearRecords:[],currentYear:2026}} customers={[{id:1,name:'顧客A'},{id:2,name:'顧客B'}] as Customer[]} units={units} events={managementEvents} onPeriodSave={async r=>{if(!periodRef.current)throw Error('準備中です');await periodRef.current(r)}} onSave={async r=>{if(!futureRef.current)throw Error('準備中です');await futureRef.current(r)}}/>}
-    {units&&parents&&<OwnershipTransferEditor key={`transfer-${transferCount}`} {...parents} customers={[{id:1,name:'顧客A'},{id:2,name:'顧客B'}]} units={units} testOnly onSave={async input=>{if(!saveRef.current)throw Error('準備中です');await saveRef.current(input)}}/>}
+    {units&&parents&&<OwnershipTransferEditor key={`transfer-${transferCount}`} {...parents} customers={[{id:1,name:'顧客A'},{id:2,name:'顧客B'}]} units={units} managementEvents={managementEvents} testOnly onSave={async input=>{if(!saveRef.current)throw Error('準備中です');await saveRef.current(input)}}/>}
     {units&&owner===2&&<InvoiceLedgerDetail data={{units,recipientName:id=>id===1?'顧客A':'顧客B',projectName:()=> 'サンプル発電所',plannedAmount:()=>null,recipients:[{id:1,name:'顧客A'},{id:2,name:'顧客B'}]}} projectId={1}
       onSave={async r=>{if(!writeRef.current)throw Error('準備中です');return writeRef.current(r)}}/>}
     {units&&owner===2&&<><ManualDebitPlanCreator onSave={async v=>{if(!addRef.current)throw Error('準備中です');await addRef.current(v)}}/>

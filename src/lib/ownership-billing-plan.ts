@@ -1,6 +1,6 @@
 import { isBillingDate, type BillingUnit } from './billing-unit'
 
-export type TransferBillingUnit = BillingUnit & { collectionState: 'pending' | 'succeeded' | 'failed' | 'not_applicable'; periodStart?:string|null; periodEnd?:string|null; planNote?:string }
+export type TransferBillingUnit = BillingUnit & { collectionState: 'pending' | 'succeeded' | 'failed' | 'not_applicable'; periodStart?:string|null; periodEnd?:string|null; planNote?:string; recipientSource?:'default'|'override'|'confirmed'|'unconfirmed' }
 export type TransferBillingChoice = {
   unitId: string
   expectedRevision: number

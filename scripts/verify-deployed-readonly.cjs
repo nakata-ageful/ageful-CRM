@@ -35,6 +35,14 @@ async function main(){
   const actual=(data.units||[]).reduce((n,u)=>n+Number(u.frozen_amount||0),0);
   const planned=(data.units||[]).reduce((n,u)=>n+Number(u.planned_amount||0),0);
   if(counts.customers!==84||counts.projects!==87||counts.contracts!==90||counts.units!==32||actual!==4177465||planned!==165000)throw Error('New DB reconciliation mismatch');
-  console.log(JSON.stringify({signIn:true,runtimeStatus:snapshot.status,runtimeReady:snap.ready===true,inspection:true,counts,actual,planned,futureCoverage:data.future_schedule_coverage_verified}));
+  const write=await fetch(`${base}/rest/v1/rpc/billing_runtime_write`,{method:'POST',headers,body:JSON.stringify({p_key:'ed8b1f7a-61fa-4b9b-ae0d-c22609172600',p_request:{action:'invoice',value:{}}})});
+  if(write.status!==403)throw Error(`Stopped runtime write was not rejected (${write.status})`);
+  const outputIndex=process.argv.indexOf('--inspection-out');
+  if(outputIndex>=0){
+    const fs=require('node:fs'),path=require('node:path'),output=process.argv[outputIndex+1],dir='/Users/keigoshoda/Documents/ChatGPT/エイジフル/private-backups';
+    if(!output||path.dirname(path.resolve(output))!==dir||!/^[-\w]+\.json$/.test(path.basename(output)))throw Error('Private inspection output required');
+    fs.writeFileSync(output,JSON.stringify(data),{flag:'wx',mode:0o600});
+  }
+  console.log(JSON.stringify({signIn:true,runtimeStatus:snapshot.status,runtimeReady:snap.ready===true,inspection:true,counts,actual,planned,futureCoverage:data.future_schedule_coverage_verified,stoppedWriteRejected:write.status===403}));
 }
 main().catch(e=>{console.error(e.message);process.exitCode=1});

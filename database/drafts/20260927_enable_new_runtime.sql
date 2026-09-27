@@ -1,8 +1,10 @@
--- NOT APPLIED: auto-review blocked activation pending explicit approval of the
--- A-plan reminder-only operation with 397 unsaved candidates and 56 setup issues.
+-- Specific user approval received 2026-09-27: keep 397 unsaved reminder candidates
+-- and 56 setup issues visible; no guessing or bulk invoicing; enable the new DB only.
 -- New DB only; no grants, DDL, invoices or business-row edits.
 BEGIN;
-SET LOCAL timezone='Asia/Tokyo';
+-- Fingerprint was obtained in UTC. Keep timestamp serialization identical;
+-- cutover_on is the explicit Japan calendar date below, not CURRENT_DATE.
+SET LOCAL timezone='UTC';
 SET LOCAL statement_timeout='60s';
 SET LOCAL lock_timeout='5s';
 LOCK TABLE public.customers,public.projects,public.contracts,public.annual_records,public.maintenance_responses,public.periodic_maintenance,public.prospects,public.attachments,public.billing_units,public.billing_operations,public.billing_recipient_plans,public.billing_recipient_plan_overrides,public.billing_unit_events,public.ownership_transfers,public.invoice_import_evidence,public.invoice_recipient_initializations,public.billing_migration_acceptances,public.billing_runtime_control,public.project_management_events,public.ageful_migration_target IN SHARE ROW EXCLUSIVE MODE;

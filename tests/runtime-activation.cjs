@@ -8,6 +8,7 @@ async function main(){
   await db.exec("CREATE TABLE ageful_migration_target(project_ref text);INSERT INTO ageful_migration_target VALUES('ufawaiddntqqbjhycbxn');CREATE TABLE IF NOT EXISTS auth.users(id uuid PRIMARY KEY,email text);INSERT INTO auth.users(id,email)VALUES('9a4b877c-d73d-4c37-a902-40c521240d06','admin@ageful.co.jp') ON CONFLICT DO NOTHING;CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$");
   const names=[...tables,...ledger],expr=`jsonb_build_object(${names.map(t=>`'${t}',(SELECT coalesce(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text),'[]'::jsonb) FROM public.${t} t)`).join(',')})`;
   const read=async()=>(await db.query(`SELECT ${expr} AS v`)).rows[0].v;
+  await db.exec("SET timezone='UTC'");
   const before=await read(),hash=(await db.query(`SELECT encode(sha256(convert_to((${expr})::text,'UTF8')),'hex') AS h`)).rows[0].h;
   const hostSql=fs.readFileSync(require('node:path').join(__dirname,'../database/drafts/20260927_enable_new_runtime.sql'),'utf8');
   const sql=hostSql.replace('aeb7f0ae0b80cebf64bd794ef786500a06d40de5b46a89625b9b0a3f8223a487',hash);

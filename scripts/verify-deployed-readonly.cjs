@@ -28,7 +28,19 @@ async function main(){
   const auth=await login.json();if(!login.ok||!auth.access_token)throw Error(`Sign-in rejected (${login.status}, ${auth.error_code||auth.code||'unknown'})`);
   headers.Authorization=`Bearer ${auth.access_token}`;
   const snapshot=await fetch(`${base}/rest/v1/rpc/billing_runtime_snapshot`,{method:'POST',headers,body:'{}'});
-  const snap=await snapshot.json();if(snapshot.ok&&snap.ready)throw Error('Runtime unexpectedly enabled');
+  const snap=await snapshot.json();
+  if(process.argv.includes('--enabled')){
+    if(!snapshot.ok||snap.version!==2||snap.ready!==true||snap.cutover_on!=='2026-09-27'||!Array.isArray(snap.units))throw Error('Enabled runtime verification failed');
+    const counts={};
+    for(const table of ['customers','projects','contracts']){
+      const r=await fetch(`${base}/rest/v1/${table}?select=id&order=id.asc&limit=1000`,{headers:{...headers,Prefer:'count=exact'}});
+      const rows=await r.json();if(!r.ok||!Array.isArray(rows)||Number(r.headers.get('content-range')?.split('/')[1])!==rows.length)throw Error(`Owner read failed: ${table}`);counts[table]=rows.length;
+    }
+    const actual=snap.units.reduce((n,u)=>n+Number(u.frozen_amount||0),0),planned=snap.units.reduce((n,u)=>n+Number(u.planned_amount||0),0);
+    if(counts.customers!==84||counts.projects!==87||counts.contracts!==90||snap.units.length!==32||actual!==4177465||planned!==165000)throw Error('Enabled reconciliation mismatch');
+    console.log(JSON.stringify({signIn:true,runtimeStatus:snapshot.status,runtimeReady:true,cutoverOn:snap.cutover_on,counts,units:snap.units.length,actual,planned,readOnly:true}));return;
+  }
+  if(snapshot.ok&&snap.ready)throw Error('Runtime unexpectedly enabled');
   const inspect=await fetch(`${base}/rest/v1/rpc/billing_runtime_inspection_snapshot`,{method:'POST',headers,body:'{}'});
   const data=await inspect.json();if(!inspect.ok)throw Error(`Inspection rejected (${inspect.status})`);
   const counts={customers:data.customers?.length,projects:data.projects?.length,contracts:data.contracts?.length,units:data.units?.length};

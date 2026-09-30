@@ -22,6 +22,12 @@ export function BillingOverviewPanel({data,today,onViewDetail,setupItems=[],setu
     <button type="button" onClick={()=>downloadBillingUnitCsv(buildBillingUnitCsv(data.units,data.recipientName,data.projectName))}>各回の請求CSVをダウンロード</button><p>全期間の各回を出力します。予定額・確定額は別列で、保存されていない保守期間は要確認とします。</p>
     <p>未入金：{fmtYen(overview.totals.unpaidAmount)} ／ 入金済：{fmtYen(overview.totals.receivedAmount)}（今年度・昨年度）</p>
     {!!overview.totals.unknownActualCount&&<p role="status">金額要確認：{overview.totals.unknownActualCount}件。金額不明分は合計に含みません。</p>}
+    {!!overview.olderUnpaid.length&&<section className="card" role="status" style={{marginBottom:20,borderColor:'#f59e0b'}}>
+      <h3>古い未入金（{overview.olderUnpaid.length}件）</h3>
+      <p>今年度・昨年度より前の未入金です。入金を記録するまで警告に残します。確認できている金額：{fmtYen(overview.olderUnpaidTotals.unpaidAmount)}（上の今年度・昨年度の合計には含みません）。</p>
+      {!!overview.olderUnpaidTotals.unknownActualCount&&<p>金額要確認：{overview.olderUnpaidTotals.unknownActualCount}件。金額不明分は合計に含みません。</p>}
+      <BillingHistorySection data={{...data,units:overview.olderUnpaid}} onViewDetail={onViewDetail}/>
+    </section>}
     <div><h3>今月・来月・再来月の請求予定（{overview.upcoming.length+nearTermCandidates.length}件）</h3>
       {!!overview.upcoming.length&&<BillingHistorySection data={{...data,units:overview.upcoming}} onViewDetail={onViewDetail} />}
       {!!nearTermCandidates.length&&<div className="card" style={{overflowX:'auto'}}><p>まだ保存していない予定候補です。日付・請求先・金額は発行前に確認してください。</p>

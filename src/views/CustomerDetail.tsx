@@ -55,6 +55,7 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject, bi
   })
 
   const [projectModal, setProjectModal] = useState(false)
+  const projectCreationKey=useRef<string|null>(null)
   const [projectForm, setProjectForm] = useState<Omit<ProjectInput, 'customer_id'>>(emptyProject)
 
   // ── PDF アップロード ──
@@ -84,7 +85,9 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject, bi
     if (!projectForm.project_name.trim()) { setError('案件名は必須です'); return }
     setSaving(true)
     try {
-      await createProject({ ...projectForm, customer_id: customer.id })
+      projectCreationKey.current??=crypto.randomUUID()
+      await createProject({ ...projectForm, customer_id: customer.id },projectCreationKey.current)
+      projectCreationKey.current=null
       setProjectModal(false)
       onReload()
       toast('案件を追加しました')

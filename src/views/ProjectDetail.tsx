@@ -12,6 +12,7 @@ import type {TransferBillingChoice,TransferBillingUnit} from '../lib/ownership-b
 import { getBillingDetail } from '../lib/data'
 import { hasSupabaseEnv } from '../lib/supabase'
 import { BASIC_NOTE_KEYS } from '../lib/project-basic-notes'
+import { contractSectionPatch } from '../lib/contract-section-patch'
 import { BILLING_ITEMS, annualBillableTotalInc } from '../lib/billing'
 import { StatusBadge } from '../components/StatusBadge'
 import { Modal } from '../components/Modal'
@@ -500,7 +501,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
         has_transfer_fee: contractForm.has_transfer_fee,
         transfer_fee_ex: toNum(contractForm.transfer_fee_ex),
         transfer_fee_inc: toNum(contractForm.transfer_fee_inc),
-        billing_schedule_days: contractForm.billing_method === '口座振替' ? ['25日'] : (contractForm.billing_schedule_days.length > 0 ? contractForm.billing_schedule_days : null),
+        billing_schedule_days: contractForm.billing_schedule_days.length > 0 ? contractForm.billing_schedule_days : null,
         billing_amount_overrides: Object.keys(contractForm.billing_amount_overrides).length > 0 ? contractForm.billing_amount_overrides : null,
         billing_item_flags: Object.keys(contractForm.billing_item_flags).length > 0 ? contractForm.billing_item_flags : null,
         transfer_fee: toNum(contractForm.transfer_fee),
@@ -684,7 +685,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
         })
       }
       if (writesContract && contract) {
-        await updateContract(contract.id, {
+        await updateContract(contract.id, contractSectionPatch(editSection, {
           billing_method: contractForm.billing_method || null,
           billing_due_day: contractForm.billing_due_day || null,
           billing_amount_ex: toNum(contractForm.billing_amount_ex),
@@ -731,10 +732,10 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           has_transfer_fee: contractForm.has_transfer_fee,
           transfer_fee_ex: toNum(contractForm.transfer_fee_ex),
           transfer_fee_inc: toNum(contractForm.transfer_fee_inc),
-          billing_schedule_days: contractForm.billing_method === '口座振替' ? ['25日'] : (contractForm.billing_schedule_days.length > 0 ? contractForm.billing_schedule_days : null),
+          billing_schedule_days: contractForm.billing_schedule_days.length > 0 ? contractForm.billing_schedule_days : null,
           billing_amount_overrides: Object.keys(contractForm.billing_amount_overrides).length > 0 ? contractForm.billing_amount_overrides : null,
           billing_item_flags: Object.keys(contractForm.billing_item_flags).length > 0 ? contractForm.billing_item_flags : null,
-        })
+        }))
       }
       setEditSection(null)
       onReload()
@@ -2099,7 +2100,8 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                 </label>
                 <label className="form-label">
                   所有権移転日
-                  <input className="form-input" type="date" {...dateInputRange()} value={contractForm.ownership_transfer_date} onChange={e => setContractForm(f => ({ ...f, ownership_transfer_date: e.target.value }))} />
+                  <input className="form-input" type="date" {...dateInputRange()} value={contractForm.ownership_transfer_date} readOnly disabled />
+                  <small>「所有者を変更」から登録します。</small>
                 </label>
                 <label className="form-label" style={{ gridColumn: '1/-1' }}>
                   備考
@@ -2516,7 +2518,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                     <p style={{ gridColumn: '1/-1', margin: '8px 0 4px', fontWeight: 600, fontSize: 13, color: '#475569' }}>── 口座振替の設定</p>
                     <label className="form-label">
                       毎月の引落日
-                      <input className="form-input" value="25日" readOnly disabled style={{ background: '#f1f5f9', color: '#475569' }} />
+                      <input className="form-input" value={contractForm.billing_schedule_days.join('、') || '未設定'} readOnly disabled style={{ background: '#f1f5f9', color: '#475569' }} />
                     </label>
                     <label className="form-label">
                       振替手数料

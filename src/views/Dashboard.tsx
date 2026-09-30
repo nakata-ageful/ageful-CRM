@@ -30,10 +30,10 @@ export function Dashboard({ stats, maintenanceList, billingRows, onNavigate, onV
   const currentYear = new Date().getFullYear()
   const activeList = maintenanceList.filter(m => m.status === '対応中')
 
-  // 未入金アラート: 請求タブと同一ロジック（回ごと・今年度＋昨年度）で算出
+  // 未入金アラート: 請求タブと同一ロジック。新台帳では古い未入金も含める。
   const unpaidUnits = (billingHistory ? [] : computeUnpaidUnits(billingRows, currentYear))
     .sort((a, b) => (a.payment?.billing_date ?? a.record.billing_date ?? '').localeCompare(b.payment?.billing_date ?? b.record.billing_date ?? ''))
-  const unpaidTotal = overview?.totals.unpaidAmount ?? unpaidUnits.reduce((sum, u) => sum + (unpaidUnitAmount(u) ?? 0), 0)
+  const unpaidTotal = overview?.allUnpaidTotals.unpaidAmount ?? unpaidUnits.reduce((sum, u) => sum + (unpaidUnitAmount(u) ?? 0), 0)
 
   // 口座振替で振替日を過ぎているが入金確認がない案件（今年度＋昨年度の全記録を対象）
   const transferOverdueRows = (billingHistory ? [] : billingRows).filter(r => debitScheduleReminder(r,today))
@@ -61,8 +61,9 @@ export function Dashboard({ stats, maintenanceList, billingRows, onNavigate, onV
         </div>
         <div className="kpi-card kpi-card--info">
           <div className="kpi-label">未入金アラート</div>
-          <div className="kpi-value">{overview?.unpaid.length ?? unpaidUnits.length}</div>
-          {!!overview?.totals.unknownActualCount && <div>金額要確認：{overview.totals.unknownActualCount}件</div>}
+          <div className="kpi-value">{overview?.allUnpaid.length ?? unpaidUnits.length}</div>
+          {!!overview?.olderUnpaid.length && <div>古い未入金：{overview.olderUnpaid.length}件を含む</div>}
+          {!!overview?.allUnpaidTotals.unknownActualCount && <div>金額要確認：{overview.allUnpaidTotals.unknownActualCount}件</div>}
           {unpaidTotal > 0 && (
             <div style={{ fontSize: 12, color: '#dc2626', fontWeight: 700, marginBottom: 4 }}>{fmtYen(unpaidTotal)}</div>
           )}

@@ -232,7 +232,7 @@ function projectPayload(input: Omit<ProjectInput, 'customer_id'>): Omit<Project,
   }
 }
 
-export async function createProject(input: ProjectInput): Promise<Project> {
+export async function createProject(input: ProjectInput, operationKey?: string): Promise<Project> {
   const payload = { customer_id: input.customer_id, ...projectPayload(input) }
   if (!hasSupabaseEnv) {
     const created = projectStore.create(payload)
@@ -240,12 +240,13 @@ export async function createProject(input: ProjectInput): Promise<Project> {
     contractStore.create({ project_id: created.id } as Parameters<typeof contractStore.create>[0])
     return created
   }
-  const { data, error } = await db().from('projects').insert(payload).select().single()
+  const {customer_id,...project}=payload
+  const {data,error}=await db().rpc('create_project_with_contract',{
+    p_key:operationKey??crypto.randomUUID(),p_customer_id:customer_id,p_project:project,
+  })
   if (error) throw error
-  const project = data as Project
-  // 「契約なし」状態を作らない設計。空の contract を同時作成
-  await db().from('contracts').insert({ project_id: project.id })
-  return project
+  if(!data||!Number.isSafeInteger(data.id)||data.customer_id!==customer_id)throw new Error('案件追加の保存結果を確認できません。同じ内容で再確認してください。')
+  return data as Project
 }
 
 export async function updateProject(id: number, input: Omit<ProjectInput, 'customer_id'>): Promise<Project> {

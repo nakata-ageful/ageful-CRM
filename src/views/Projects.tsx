@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { ProjectRow, Customer, CustomerInput } from '../types'
 import type { ProjectInput } from '../lib/actions'
 import { dateInputRange } from '../lib/utils'
@@ -100,6 +100,8 @@ type SortKey = typeof SORT_OPTIONS[number]['key']
 
 export function Projects({ projects, customers, onReload, onViewDetail }: Props) {
   const toast = useToast()
+  const projectCreationKey=useRef<string|null>(null)
+  const createdCustomer=useRef<{signature:string;id:number}|null>(null)
   const [search, setSearchState] = useState(() => sessionStorage.getItem('projects_search') ?? '')
   const setSearch = (s: string) => {
     setSearchState(s)
@@ -169,11 +171,15 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
         customerId = selectedCustomerId
       } else {
         if (!customerForm.name.trim()) { setError('顧客名は必須です'); setSaving(false); return }
-        const newCustomer = await createCustomer(customerForm)
-        customerId = newCustomer.id
+        const signature=JSON.stringify(customerForm)
+        if(createdCustomer.current?.signature!==signature)createdCustomer.current={signature,id:(await createCustomer(customerForm)).id}
+        customerId = createdCustomer.current.id
       }
       // project_name は DB上 NOT NULL のため、発電所名と同期
-      await createProject({ ...projectForm, project_name: projectForm.plant_name, customer_id: customerId })
+      projectCreationKey.current??=crypto.randomUUID()
+      await createProject({ ...projectForm, project_name: projectForm.plant_name, customer_id: customerId },projectCreationKey.current)
+      projectCreationKey.current=null
+      createdCustomer.current=null
       setModal(false)
       onReload()
       toast('案件を追加しました')

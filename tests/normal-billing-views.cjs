@@ -31,6 +31,26 @@ const detailHistory={units:[old,{...base,id:'current',roundLabel:'第2回',recip
 const detailHtml=render(InvoiceLedgerDetail,{data:detailHistory,projectId:1,onSave:async()=>{}});
 for(const text of ['今回・次回の請求','82,500','新所有者B','請求予定日','2026-12-01','請求日','2026-12-03','入金予定日','2026-12-31','請求明細','保守料','過去の請求・入金記録','旧所有者A','165,000','入金日を記録'])assert.ok(detailHtml.includes(text),`billing detail missing ${text}`);
 assert.ok(!detailHtml.includes('この発電所の操作'),'old all-actions block must not return');
+// Year rollover must move an unpaid occurrence to a warning, not make it disappear.
+const {buildBillingOverview}=load('src/lib/billing-overview.ts');
+const unpaid2025={...old,id:'unpaid-2025',serviceYear:2025,lifecycle:'issued',receivedOn:null,frozenAmount:82500,issuedOn:'2025-12-02'};
+const unknown2024={...unpaid2025,id:'unknown-2024',serviceYear:2024,frozenAmount:null,frozenLineItems:null};
+const cancelled2024={...unpaid2025,id:'cancelled-2024',serviceYear:2024,lifecycle:'cancelled'};
+const paid2024={...old,id:'paid-2024',serviceYear:2024};
+const warnings={units:[unpaid2025,unknown2024,cancelled2024,paid2024],recipientName:()=> '当時の請求先',projectName:()=> '未入金の発電所',plannedAmount:()=>999999};
+const originalWarningUnits=JSON.stringify(warnings.units);
+const december=buildBillingOverview(warnings.units,'2026-12-31'),january=buildBillingOverview(warnings.units,'2027-01-01');
+assert.equal(december.unpaid.length,1);assert.equal(january.unpaid.length,0);assert.equal(january.olderUnpaid.length,2);
+assert.equal(january.allUnpaid.length,2);assert.equal(january.olderUnpaidTotals.unpaidAmount,82500);assert.equal(january.allUnpaidTotals.unknownActualCount,1);
+for(const html of [
+ render(Billing,{rows:[],onReload:noAction,onViewDetail:noAction,billingHistory:warnings,billingToday:'2027-01-01'}),
+ render(Dashboard,{stats:{totalCustomers:1,totalProjects:1,activeMaintenanceCount:0},maintenanceList:[],billingRows:[],onNavigate:noAction,onViewMaintenance:noAction,onViewBilling:noAction,billingHistory:warnings,billingToday:'2027-01-01'}),
+]){assert.ok(html.includes('古い未入金（2件）'));assert.ok(html.includes('当時の請求先'));assert.ok(html.includes('82,500'));assert.ok(!html.includes('999,999'))}
+const rolloverDashboard=render(Dashboard,{stats:{totalCustomers:1,totalProjects:1,activeMaintenanceCount:0},maintenanceList:[],billingRows:[],onNavigate:noAction,onViewMaintenance:noAction,onViewBilling:noAction,billingHistory:warnings,billingToday:'2027-01-01'});
+assert.ok(rolloverDashboard.includes('古い未入金：2件を含む'));
+const collected=warnings.units.map(u=>u.id==='unpaid-2025'?{...u,lifecycle:'received',receivedOn:'2027-01-02'}:u);
+assert.equal(buildBillingOverview(collected,'2027-01-02').olderUnpaid.length,1);
+assert.equal(JSON.stringify(warnings.units),originalWarningUnits);
 const setupRow={project_id:1,project_name:'設定待ち発電所',customer_name:'現在の顧客',company_name:null,currentYear:2026,
  currentYearRecord:null,currentYearRecords:[],records:[],contract:{project_id:1,billing_method:'請求書',billing_schedule_days:['12月1日'],annual_maintenance_inc:165000,
   billing_item_flags:{annual_maintenance:true,land_cost:false,insurance:false,local_association:false,communication:false,other:false}}};

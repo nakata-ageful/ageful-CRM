@@ -17,10 +17,14 @@ export function buildBillingOverview(source: readonly BillingUnit[], today: stri
   const active=units.filter(u=>u.serviceYear>=year-1&&u.serviceYear<=year&&u.lifecycle!=='cancelled'&&u.lifecycle!=='review_required')
   const received=active.filter(u=>u.lifecycle==='received'||!!u.receivedOn)
   const unpaid=active.filter(u=>!u.receivedOn&&u.lifecycle!=='received'&&(u.lifecycle==='issued'||u.lifecycle==='fixed'||!!u.issuedOn))
+  const olderUnpaid=units.filter(u=>u.serviceYear<year-1&&!u.receivedOn&&u.lifecycle!=='received'
+    &&u.lifecycle!=='cancelled'&&u.lifecycle!=='review_required'&&(u.lifecycle==='issued'||u.lifecycle==='fixed'||!!u.issuedOn))
+  const allUnpaid=[...unpaid,...olderUnpaid]
   return { months, upcoming: invoices.filter(u=>u.scheduledDate&&months.includes(u.scheduledDate.slice(0,7))),
     overduePlans:invoices.filter(u=>u.scheduledDate&&u.scheduledDate<`${months[0]}-01`),
     undatedPlans:invoices.filter(u=>!u.scheduledDate), laterPlans:invoices.filter(u=>u.scheduledDate&&u.scheduledDate.slice(0,7)>months[2]),
-    debitPlans:planned.filter(u=>u.method==='口座振替'), received, unpaid,
+    debitPlans:planned.filter(u=>u.method==='口座振替'), received, unpaid, olderUnpaid, allUnpaid,
     review:units.filter(u=>u.lifecycle==='review_required'),
-    totals:summarizeBillingHistory([...received,...unpaid]) }
+    totals:summarizeBillingHistory([...received,...unpaid]),
+    olderUnpaidTotals:summarizeBillingHistory(olderUnpaid), allUnpaidTotals:summarizeBillingHistory(allUnpaid) }
 }

@@ -23,9 +23,14 @@ assert.ok(!html.includes('請求履歴')&&!html.includes('billing-history-summar
 assert.ok(html.indexOf('未入金（2件）')<html.indexOf('今月・来月・再来月の請求予定（25件）'))
 assert.equal((html.match(/data-candidate-key=/g)||[]).length,24,'No display truncation, including more than 12 on one date')
 for(const title of ['口座振替（1件）','入金済（1件）','請求設定要確認（1件）']){
- const prefix=html.slice(0,html.indexOf(title)),opening=prefix.slice(prefix.lastIndexOf('<details'),prefix.lastIndexOf('<summary'))
- assert.ok(!opening.includes(' open'),'Secondary section must start collapsed: '+title)
+ const escaped=title.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')
+ assert.ok(new RegExp('<details class="card billing-overview-section [^"]+"><summary><span>'+escaped+'</span>').test(html),
+   'Secondary section must be an actual closed disclosure: '+title)
 }
+const setupOnly=render(Panel,{...props,setupIssues:[{projectId:51,projectName:'自社請求なし候補発電所',category:'no_billing_candidate',code:'other',reason:'他社保守の可能性'}]})
+assert.ok(setupOnly.includes('<details class="card billing-overview-section amber"><summary><span>請求設定要確認（1件）</span>'),
+ 'Setup review remains collapsible even without action-required issues')
+assert.ok(html.includes('要設定発電所')&&setupOnly.includes('自社請求なし候補発電所'),'Collapsing must preserve all issue contents')
 assert.ok(html.includes('古い未入金（1件）')&&html.includes('¥0'),'Old unpaid is visible and zero remains a known actual')
 for(const text of ['金額要確認','参考額','現在の顧客・請求先未確定','旧所有者A','新所有者B','82,500','165,000','入金日を記録','発行'])assert.ok(html.includes(text),text)
 assert.ok(!html.includes('999,999'),'Contract fallback may not overwrite saved actual/plan amounts')

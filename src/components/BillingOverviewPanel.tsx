@@ -75,7 +75,7 @@ export function BillingOverviewPanel({ data, today, onViewDetail, setupItems = [
       <BillingOverviewTable {...tableProps} candidates={remainingItems} mode="review" />
       {remainingItems.filter(item => item.reason).map(item => <p className="billing-overview-help" key={`${item.projectId}:${item.date}:${item.round}:${item.method}`}>{item.projectName}（{item.date}）：{item.reason}</p>)}
     </OverviewSection>}
-    {!!setupIssues.length && <OverviewSection title="請求設定要確認" count={setupIssues.length} color="amber" collapsed={!actionRequired.length}>
+    {!!setupIssues.length && <OverviewSection title="請求設定要確認" count={setupIssues.length} color="amber" collapsed>
       <p className="billing-overview-help">請求方法・日付・金額を未設定のまま表示しています。自動で「請求なし」と確定しません。</p>
       {!!actionRequired.length && <><h4 className="billing-overview-subtitle">請求設定が必要（{actionRequired.length}件）</h4>{issueList(actionRequired)}</>}
       {!!noBillingCandidates.length && <details className="billing-overview-secondary"><summary>自社請求なし候補（{noBillingCandidates.length}件・未確定）</summary><p className="billing-overview-help">他社保守などの可能性があります。発電所ごとに確認します。</p>{issueList(noBillingCandidates)}</details>}

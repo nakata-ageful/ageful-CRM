@@ -8,6 +8,8 @@ import { useToast } from '../components/Toast'
 import { BillingOverviewPanel } from '../components/BillingOverviewPanel'
 import type { BillingHistoryData } from '../components/BillingHistorySection'
 import {legacyScheduleSetupReview} from '../lib/billing-cutover-coverage'
+import type { InvoiceWriteRequest } from '../lib/invoice-write-session'
+import { managementActiveOn } from '../lib/management-lifecycle'
 
 type Props = {
   rows: BillingRow[]
@@ -16,6 +18,7 @@ type Props = {
   billingHistory?: BillingHistoryData
   billingToday?: string
   projectRecipients?: ReadonlyMap<number,number>
+  onSaveInvoice?: (request: InvoiceWriteRequest) => Promise<unknown>
 }
 
 // 日付ヘルパー・金額計算・未入金判定は lib/billing.ts に共通化（ダッシュボードと共有）
@@ -26,10 +29,16 @@ export function Billing(props: Props) {
     const today = props.billingToday ?? `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
     const setup=legacyScheduleSetupReview(props.rows,props.projectRecipients??new Map(),props.billingHistory.units,today,
       props.billingHistory.cutoverOn,props.billingHistory.managementEvents)
-    return <><p role="status">各回に保存した請求先・金額を表示しています。発行・入金・予定の変更は「請求詳細を開く」から行えます。</p>
-      <BillingOverviewPanel data={props.billingHistory} today={today} onViewDetail={props.onViewDetail}
-        setupItems={setup.items} setupIssues={setup.issues} />
-    </>
+    const events = props.billingHistory.managementEvents ?? []
+    const debitProjects = props.rows.filter(row => row.contract?.billing_method === '口座振替'
+      && (row.contract_count ?? 1) === 1 && managementActiveOn(events, row.project_id, 'all', today)).map(row => {
+        const contract = managementActiveOn(events, row.project_id, 'maintenance', today) ? row.contract
+          : {...row.contract!, billing_item_flags: {...row.contract?.billing_item_flags, annual_maintenance: false}}
+        return { projectId: row.project_id, projectName: row.project_name, customerName: row.customer_name,
+          days: (row.contract?.billing_schedule_days ?? []).join('・'), amount: withdrawalAmount(contract, Number(today.slice(5, 7))) }
+      })
+    return <BillingOverviewPanel data={props.billingHistory} today={today} onViewDetail={props.onViewDetail}
+      setupItems={setup.items} setupIssues={setup.issues} debitProjects={debitProjects} onSave={props.onSaveInvoice} />
   }
   return <LegacyBilling {...props} />
 }

@@ -450,6 +450,7 @@ function MainApp() {
             {view === 'billing' && (
               <Billing
                 billingHistory={billingHistory}
+                onSaveInvoice={billingHistory?request=>saveRuntime({action:'invoice',value:request}):undefined}
                 projectRecipients={new Map(projectRows.map(p=>[p.id,p.customer_id]))}
                 rows={billingRows}
                 onReload={loadAll}

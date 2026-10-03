@@ -1,4 +1,5 @@
 @import './components/BillingHistorySection.css';
+@import './components/BillingOverviewPanel.css';
 
 /* ── Toast animation ───────────────────────────────────── */
 @keyframes toast-in {

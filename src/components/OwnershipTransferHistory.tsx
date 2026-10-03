@@ -6,7 +6,7 @@ export function OwnershipTransferHistory({transfers,events,recipientName,expande
   return <details open={expanded} className="card" style={{padding:16}}><summary>所有者変更・請求の変更履歴</summary>
     {transfers.length===0&&<p>所有者変更の履歴はありません。</p>}
     {[...transfers].reverse().map(t=>{
-      const before=t.contract_before as Record<string,unknown>,after=t.contract_after as Record<string,unknown>
+      const before=(t.contract_before??{}) as Record<string,unknown>,after=(t.contract_after??{}) as Record<string,unknown>
       return <section key={String(t.id)}><h3>{String(t.transfer_date)}：{recipientName(Number(t.from_customer_id))} → {recipientName(Number(t.to_customer_id))}</h3>
         <p>確認内容：{String((t.field_decisions as Record<string,unknown>)?.reason??'記録なし')}</p>
         <details><summary>このときの契約情報（変更前 → 変更後）</summary><p>参照専用です。過去の請求額の計算には使いません。</p>
@@ -15,7 +15,7 @@ export function OwnershipTransferHistory({transfers,events,recipientName,expande
       </section>
     })}
     <h3>請求の変更履歴</h3>{[...events].reverse().map(e=>{
-      const before=e.before_value as Record<string,unknown>|null,after=e.after_value as Record<string,unknown>
+      const before=e.before_value as Record<string,unknown>|null,after=(e.after_value??{}) as Record<string,unknown>
       const method=(v:unknown)=>v==='invoice'?'請求書':v==='direct_debit'?'口座振替':'未設定'
       const amount=(v:Record<string,unknown>|null)=>v?.frozen_amount??v?.planned_amount??'金額要確認'
       return <details key={String(e.id)}><summary>{String(e.recorded_at).slice(0,10)}：{String(e.reason??'請求記録の保存')}</summary>

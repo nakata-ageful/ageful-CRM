@@ -5,8 +5,8 @@ import type {BillingHistoryData} from '../components/BillingHistorySection'
 import type {InvoiceWriteRequest} from '../lib/invoice-write-session'
 import type {SavedMaintenancePeriodChange} from '../lib/saved-maintenance-period'
 import type {AddBillingOccurrence} from '../components/BillingOccurrenceCreator'
-import {ManualDebitPlanCreator,type NewDebitPlan} from '../components/ManualDebitPlanCreator'
-import {OwnershipBillingPlanEditor} from '../components/OwnershipBillingPlanEditor'
+import type {NewDebitPlan} from '../components/ManualDebitPlanCreator'
+import {BillingExceptionActions} from '../components/BillingExceptionActions'
 import type {TransferBillingChoice,TransferBillingUnit} from '../lib/ownership-billing-plan'
 import { getBillingDetail } from '../lib/data'
 import { hasSupabaseEnv } from '../lib/supabase'
@@ -1076,19 +1076,9 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       )}
 
       {/* ── その他タブ ── */}
-      {tab==='管理設定'&&<div className="project-management-tab standard-editor">{managementTools}
-      {billingHistory&&(onAddDebit||(billingUnits&&onSaveBillingPlan))&&<section className="card">
-        <h3 className="section-title">請求予定の変更・例外対応</h3>
-        <p>振替予定の追加や、今後の請求先・方法をまとめて変更するときだけ使用します。</p>
-        {onAddDebit && (
-          <ManualDebitPlanCreator recipients={billingHistory.recipients} testOnly={false} onSave={onAddDebit}/>
-        )}
-        {billingUnits&&onSaveBillingPlan&&<details className="card"><summary>今後の請求先・方法・予定額を変更</summary>
-          <OwnershipBillingPlanEditor key={billingUnits.map(u=>`${u.id}:${u.revision}`).join(',')} projectId={project.id}
-            oldOwner={{id:customer.id,name:customer.name}} newOwner={{id:customer.id,name:customer.name}}
-            recipientOptions={billingHistory.recipients} units={billingUnits} onSave={onSaveBillingPlan} testOnly={false}/>
-        </details>}
-      </section>}
+      {tab==='管理設定'&&<div className="project-management-tab">{managementTools}
+      {billingHistory&&(onAddDebit||(billingUnits&&onSaveBillingPlan))&&<BillingExceptionActions key={project.id} projectId={project.id} owner={customer}
+        recipients={billingHistory.recipients} units={billingUnits} onAddDebit={onAddDebit} onSavePlan={onSaveBillingPlan}/>}
       </div>}
       {tab==='変更履歴'&&<div className="project-history-tab">{changeHistory}</div>}
       {tab === 'その他' && (

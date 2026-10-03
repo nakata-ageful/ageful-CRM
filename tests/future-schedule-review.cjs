@@ -14,5 +14,5 @@ assert.match(review([candidate],[{...unit,roundLabel:'1月分'}])[0].exclusion,/
 assert.match(review([{...candidate,method:'direct_debit',round:6}],[unit])[0].exclusion,/対応確認/)
 const before=JSON.stringify({candidate,unit});review([candidate],[unit]);assert.equal(JSON.stringify({candidate,unit}),before)
 const app=fs.readFileSync(path.join(root,'src/App.tsx'),'utf8')
-assert.ok(app.includes('row={{...row,contract:projectDetail.contract}}'),'Pass plain contract, not joined annual_records, to snapshot comparison')
+assert.ok(app.includes('<ProjectManagementActions')&&app.includes('contract:projectDetail.contract'),'Pass plain contract, not joined annual_records, through the management panel to snapshot comparison')
 console.log('PASS: duplicate dates, moved/cancelled rounds, cross-method ambiguity, undated plans, project isolation and unjoined contract payload')

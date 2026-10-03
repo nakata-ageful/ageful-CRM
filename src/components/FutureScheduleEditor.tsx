@@ -10,7 +10,7 @@ import {MaintenancePeriodReview} from './MaintenancePeriodReview'
 import {validateIndividualPeriod} from '../lib/individual-maintenance-period'
 
 type Item=MaintenanceScheduleItem&{include:boolean;reason?:string}
-export function FutureScheduleEditor({row,customers,units,events,onSave,onPeriodSave}:{row:BillingRow;customers:Customer[];units:TransferBillingUnit[];events:ManagementEvent[];onSave:(value:Record<string,unknown>)=>Promise<unknown>;onPeriodSave?:(value:Record<string,unknown>)=>Promise<unknown>}){
+export function FutureScheduleEditor({row,customers,units,events,onSave,onPeriodSave,expanded=false}:{row:BillingRow;customers:Customer[];units:TransferBillingUnit[];events:ManagementEvent[];onSave:(value:Record<string,unknown>)=>Promise<unknown>;onPeriodSave?:(value:Record<string,unknown>)=>Promise<unknown>;expanded?:boolean}){
  const [year,setYear]=useState(new Date().getFullYear())
  const [individual,setIndividual]=useState(false),[periodStart,setPeriodStart]=useState(''),[periodEnd,setPeriodEnd]=useState('')
  const [periodReason,setPeriodReason]=useState(''),[periodConfirmed,setPeriodConfirmed]=useState(false)
@@ -29,7 +29,8 @@ export function FutureScheduleEditor({row,customers,units,events,onSave,onPeriod
  function change(index:number,patch:Partial<Item>){setItems(items.map((i,n)=>n===index?{...i,...patch}:i));setReviewed(false)}
  async function save(){setBusy(true);try{await onSave({projectId:row.project_id,contract:row.contract,versions:Object.fromEntries(own.map(u=>[u.id,u.revision])),last:Math.max(0,...events.filter(e=>e.project_id===row.project_id).map(e=>e.id)),items:selectedMaintenanceScheduleItems(items),reason});setItems([]);setReviewed(false);setNotice('確認した請求予定を追加しました。')}catch(e){setNotice(e instanceof Error?e.message:String(e))}finally{setBusy(false)}}
  async function savePeriod(){setBusy(true);try{validateIndividualPeriod({periodStart,periodEnd},year,row.project_id,own.filter(u=>u.serviceYear!==year),row.contract?.maintenance_start_date);if(!periodConfirmed||!periodReason.trim()||!onPeriodSave)throw Error('保存済み記録への変更を確認してください');await onPeriodSave({projectId:row.project_id,contract:row.contract,versions:Object.fromEntries(own.map(u=>[u.id,u.revision])),year,periodStart,periodEnd,reason:periodReason});setPeriodConfirmed(false);setItems([]);setNotice('保存済み記録の保守期間のみ更新しました。金額・請求先・入金日は変更していません。')}catch(e){setNotice(e instanceof Error?e.message:String(e))}finally{setBusy(false)}}
- return <section className="card" style={{padding:20,marginTop:16}}><details><summary>今後の請求予定を追加</summary>
+ const EditorBody=expanded?'div':'details'
+ return <section className="card" style={{padding:20,marginTop:16}}><EditorBody>{!expanded&&<summary>今後の請求予定を追加</summary>}
   <p>対象の保守期間と第何回かで管理します。請求日が前年でも保守期間は変わりません。請求日・金額は別に確認し、選択した回だけ追加します。発行・銀行手配は行いません。</p>
   <MaintenancePeriodReview startDate={row.contract?.maintenance_start_date??null} units={own}/>
   <fieldset disabled={busy} style={{border:0,padding:0}}>
@@ -53,5 +54,5 @@ export function FutureScheduleEditor({row,customers,units,events,onSave,onPeriod
   {!!items.length&&<><label>確認内容・備考 <input value={reason} onChange={e=>{setReason(e.target.value);setReviewed(false)}}/></label>{' '}
    <button disabled={!reason.trim()||!items.some(i=>i.include)||items.some(i=>i.include&&(!isBillingDate(i.date)||i.amount===null||!Number.isSafeInteger(i.amount)||i.amount<0))} onClick={()=>setReviewed(true)}>追加内容を確認</button>
    {reviewed&&<p>{items.filter(i=>i.include).length}件、予定額合計 {items.filter(i=>i.include).reduce((s,i)=>s+(i.amount??0),0).toLocaleString()}円。保存済みの記録は変更しません。 <button onClick={()=>void save()}>確認した予定を追加</button></p>}</>}
-  </fieldset></details></section>
+  </fieldset></EditorBody></section>
 }

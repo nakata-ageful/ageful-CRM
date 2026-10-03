@@ -11,9 +11,10 @@ export function ManagementLifecycleEditor({projectId,events,units,onSave,expande
  const allActive=managementActiveOn(events,projectId,'all',today),maintenanceActive=managementActiveOn(events,projectId,'maintenance',today)
  const request:ManagementRequest={projectId,expectedLast:Math.max(0,...events.filter(e=>e.project_id===projectId).map(e=>e.id)),scope,action,date,choices,reason}
  function patch(i:number,c:Partial<ManagementChoice>){setChoices(rows=>rows.map((r,index)=>index===i?{...r,...c}:r));setReviewed(false)}
+ const EditorBody=expanded?'div':'details'
  return <section className="card"><h3 className="section-title">管理の終了・再開</h3>
    <p>現在：{!allActive?'全取引終了':!maintenanceActive?'保守終了（その他の費用は継続可）':'継続中'}</p>
-   <details open={expanded}><summary>終了・再開を記録する</summary>
+   <EditorBody>{!expanded&&<summary>終了・再開を記録する</summary>}
    <p>発電所・保守記録・過去の請求・未入金は削除しません。返金・残期間の精算や残作業は備考に記録してください。</p>
    <fieldset disabled={busy} onChange={()=>setReviewed(false)} style={{border:0,padding:0}}>
     <label>対象<select className="form-input" value={scope} onChange={e=>setScope(e.target.value as ManagementRequest['scope'])}><option value="maintenance">保守だけ</option><option value="all">すべての取引</option></select></label>
@@ -37,8 +38,8 @@ export function ManagementLifecycleEditor({projectId,events,units,onSave,expande
       {choices.filter(c=>c.action==='amount').map(c=><p key={c.unitId}>請求回ID {c.unitId}：{fmtYen(plans.find(u=>u.id===c.unitId)?.plannedAmount)} → {fmtYen(c.amount)}</p>)}
       <button type="button" className="btn btn-main" onClick={async()=>{if(busy)return;setBusy(true);try{validateManagementRequest(request,events,units);await onSave(request)}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setBusy(false)}}}>確認した内容を一括保存</button>
     </div>}
-   </fieldset></details>
+   </fieldset></EditorBody>
    {error&&<p role="alert">{error}</p>}
-   <details><summary>終了・再開の履歴（{events.length}件）</summary>{[...events].reverse().map(e=><p key={e.id}>{e.effective_date}：{e.scope==='all'?'全取引':'保守'}{e.action==='end'?'終了':'再開'} ／ {e.reason}</p>)}</details>
+   {!expanded&&<details><summary>終了・再開の履歴（{events.length}件）</summary>{[...events].reverse().map(e=><p key={e.id}>{e.effective_date}：{e.scope==='all'?'全取引':'保守'}{e.action==='end'?'終了':'再開'} ／ {e.reason}</p>)}</details>}
  </section>
 }

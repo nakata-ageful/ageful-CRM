@@ -31,8 +31,7 @@ import {billingRuntimeEnabled,loadBillingRuntime,saveBillingRuntime,hasPendingBi
 import type {BillingHistoryData} from './components/BillingHistorySection'
 import {Modal} from './components/Modal'
 import {OwnershipTransferHistory} from './components/OwnershipTransferHistory'
-import {ManagementLifecycleEditor} from './components/ManagementLifecycleEditor'
-import {FutureScheduleEditor} from './components/FutureScheduleEditor'
+import {ProjectManagementActions} from './components/ProjectManagementActions'
 
 type ViewKey =
   | 'dashboard'
@@ -366,16 +365,13 @@ function MainApp() {
             )}
             {view === 'project-detail' && projectDetail && (
               <ProjectDetailView
-                managementTools={runtime?<>
-                  <ManagementLifecycleEditor expanded key={`${projectDetail.project.id}:${JSON.stringify(runtime.managementEvents)}:${runtime.units.map(u=>`${u.id}:${u.revision}`).join(',')}`}
-                    projectId={projectDetail.project.id} events={runtime.managementEvents.filter(e=>e.project_id===projectDetail.project.id)} units={runtime.units}
-                    onSave={async request=>{await saveRuntime({action:'management',value:request})}}/>
-                  {projectDetail.contract&&billingRows.filter(r=>r.project_id===projectDetail.project.id).map(row=><FutureScheduleEditor
-                    key={`${row.project_id}:${JSON.stringify(runtime)}:${JSON.stringify(projectDetail.contract)}`} row={{...row,contract:projectDetail.contract}} customers={customers} units={runtime.units} events={runtime.managementEvents}
-                    onPeriodSave={value=>saveRuntime({action:'service_period',value})} onSave={value=>saveRuntime({action:'future_schedule',value})}/>)}
-                </>:undefined}
+                managementTools={runtime?<ProjectManagementActions key={projectDetail.project.id} projectId={projectDetail.project.id}
+                  row={projectDetail.contract&&billingRows.find(r=>r.project_id===projectDetail.project.id)?{...billingRows.find(r=>r.project_id===projectDetail.project.id)!,contract:projectDetail.contract}:undefined}
+                  customers={customers} units={runtime.units} events={runtime.managementEvents}
+                  onManagementSave={async request=>{await saveRuntime({action:'management',value:request})}}
+                  onPeriodSave={value=>saveRuntime({action:'service_period',value})} onScheduleSave={value=>saveRuntime({action:'future_schedule',value})}/>:undefined}
                 changeHistory={runtime&&billingHistory?<OwnershipTransferHistory expanded
-                  transfers={runtime.transfers.filter(t=>t.project_id===projectDetail.project.id)} events={runtime.events.filter(e=>e.project_id===projectDetail.project.id)} recipientName={billingHistory.recipientName}/>:undefined}
+                  key={projectDetail.project.id} managementEvents={runtime.managementEvents.filter(e=>e.project_id===projectDetail.project.id)} transfers={runtime.transfers.filter(t=>t.project_id===projectDetail.project.id)} events={runtime.events.filter(e=>e.project_id===projectDetail.project.id)} recipientName={billingHistory.recipientName}/>:undefined}
                 billingHistory={billingHistory}
                 onSaveInvoice={billingHistory?request=>saveRuntime({action:'invoice',value:request}):undefined}
                 onAddSchedule={runtime&&projectDetail.contract?async(item,reason)=>{await saveRuntime({action:'future_schedule',value:{projectId:projectDetail.project.id,contract:projectDetail.contract,

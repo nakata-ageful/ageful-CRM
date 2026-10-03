@@ -28,7 +28,7 @@ export function Billing(props: Props) {
     const now = new Date()
     const today = props.billingToday ?? `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
     const setup=legacyScheduleSetupReview(props.rows,props.projectRecipients??new Map(),props.billingHistory.units,today,
-      props.billingHistory.cutoverOn,props.billingHistory.managementEvents)
+      props.billingHistory.cutoverOn,props.billingHistory.managementEvents,props.billingHistory.cycleRules)
     const events = props.billingHistory.managementEvents ?? []
     const debitProjects = props.rows.filter(row => row.contract?.billing_method === '口座振替'
       && (row.contract_count ?? 1) === 1 && managementActiveOn(events, row.project_id, 'all', today)).map(row => {

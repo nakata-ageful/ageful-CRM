@@ -4,10 +4,11 @@ import type {TransferBillingUnit} from './ownership-billing-plan'
 import {durableBillingOperation} from './durable-billing-operation'
 import {managementEventFromStorage,type ManagementEvent} from './management-lifecycle'
 import {isBillingDate} from './billing-unit'
+import {cycleRuleFromStorage,type BillingCycleRule} from './billing-cycle'
 
 // Deployment opt-in AND authenticated server readiness. Never silently fall back to old writers.
 export {billingRuntimeEnabled}
-export type BillingRuntimeSnapshot={units:TransferBillingUnit[];transfers:Record<string,unknown>[];events:Record<string,unknown>[];managementEvents:ManagementEvent[];cutoverOn:string}
+export type BillingRuntimeSnapshot={units:TransferBillingUnit[];transfers:Record<string,unknown>[];events:Record<string,unknown>[];managementEvents:ManagementEvent[];cutoverOn:string;cycleRules?:BillingCycleRule[];cycleRulesReady?:boolean}
 export async function loadBillingRuntime():Promise<BillingRuntimeSnapshot>{
   if(billingRuntimePreview)return previewSnapshot()
   if(!supabase||!billingRuntimeEnabled)throw Error('新しい請求機能はまだ有効化されていません')
@@ -22,7 +23,9 @@ export async function loadBillingRuntime():Promise<BillingRuntimeSnapshot>{
       recipientSource:row.recipient_source as TransferBillingUnit['recipientSource']}
   })
   if(new Set(units.map(u=>u.id)).size!==units.length)throw Error('請求回が重複しています')
-  return {units,transfers:data.transfers,events:data.events,managementEvents:data.management_events.map(managementEventFromStorage),cutoverOn:data.cutover_on}
+  if(data.cycle_rules_ready===true&&!Array.isArray(data.cycle_rules))throw Error('請求の繰り返し設定を取得できません')
+  return {units,transfers:data.transfers,events:data.events,managementEvents:data.management_events.map(managementEventFromStorage),cutoverOn:data.cutover_on,
+    cycleRules:Array.isArray(data.cycle_rules)?data.cycle_rules.map(cycleRuleFromStorage):[],cycleRulesReady:data.cycle_rules_ready===true}
 }
 async function operation<T>(reload:()=>Promise<T>){
   if(!supabase||!billingRuntimeEnabled)throw Error('新しい請求機能は無効です')

@@ -3,7 +3,7 @@ import type {ManagementEvent} from './management-lifecycle'
 
 export type HistoryKind='ownership'|'billing'|'management'
 export type HistoryEntry={key:string;kind:HistoryKind;date:string;title:string;reason:string;record:Record<string,unknown>}
-const eventLabels:Record<string,string>={created:'請求予定を追加',plan_changed:'請求予定を変更',fixed:'請求額を確認',issued:'請求日を登録',collection_recorded:'入金・振替結果を登録',corrected:'請求・入金記録を訂正',cancelled:'請求予定を取りやめ'}
+const eventLabels:Record<string,string>={cycle_rule_changed:'保守期間・請求の繰り返しを変更',created:'請求予定を追加',plan_changed:'請求予定を変更',fixed:'請求額を確認',issued:'請求日を登録',collection_recorded:'入金・振替結果を登録',corrected:'請求・入金記録を訂正',cancelled:'請求予定を取りやめ'}
 export const historyKindLabels:Record<HistoryKind,string>={ownership:'所有者変更',billing:'請求の変更',management:'終了・再開'}
 const record=(value:unknown):Record<string,unknown>=>value&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:{}
 export function buildChangeHistory(transfers:readonly Record<string,unknown>[],events:readonly Record<string,unknown>[],management:readonly ManagementEvent[]):HistoryEntry[]{
@@ -22,10 +22,11 @@ export function historyFields(before:unknown,after:unknown,kind:'contract'|'bill
   const a=record(before),b=record(after),labels:Record<string,string>=kind==='contract'?contractTransferLabels:billingLabels
   const keys=[...new Set([...Object.keys(labels),...Object.keys(a),...Object.keys(b)])]
   const technical=['id','project_id','contract_id','revision','updated_at','created_at','frozen_at','recipient_plan_id','schema_version']
-  return keys.filter(k=>(k in a||k in b)&&(all||!technical.includes(k)&&canonical(a[k])!==canonical(b[k]))).map(key=>({key,label:labels[key]??`追加項目（${key}）`,before:a[key],after:b[key]}))
+  return keys.filter(k=>(k in a||k in b)&&(all||!technical.includes(k)&&canonical(a[k])!==canonical(b[k]))).map(key=>({key,label:labels[key]??({mode:'繰り返し方法',effective_year:'適用開始年',reason:'確認内容',recorded_at:'記録日時',actor_user_id:'記録者ID',operation_key:'操作ID'} as Record<string,string>)[key]??`追加項目（${key}）`,before:a[key],after:b[key]}))
 }
 export function historyValue(key:string,value:unknown,recipientName:(id:number)=>string):string{
   if(value==null)return '未記入'
+  if(key==='mode'&&['calendar_prepaid','anniversary'].includes(String(value)))return value==='calendar_prepaid'?'毎年1月〜12月／前年12月1日に翌年分を請求':'当初の保守開始日を基準に1年間'
   if(key==='recipient_customer_id')return Number.isSafeInteger(value)&&Number(value)>0?recipientName(Number(value)):'請求先要確認'
   const enums:Record<string,string>={invoice:'請求書',direct_debit:'口座振替',planned:'予定',fixed:'金額確認済み',issued:'発行済み',received:'入金済み',cancelled:'取りやめ',review_required:'要確認',pending:'未確認',succeeded:'入金・振替済み',failed:'振替不能',not_applicable:'対象外',default:'基本の請求先',override:'個別指定',confirmed:'確認済み',unconfirmed:'未確認',source_record:'過去の保存記録',operator_confirmed:'担当者が確認',contract_calculation:'契約からの計算'}
   if(['collection_method','original_method','lifecycle','collection_state','recipient_source','amount_basis'].includes(key))return enums[String(value)]??String(value)

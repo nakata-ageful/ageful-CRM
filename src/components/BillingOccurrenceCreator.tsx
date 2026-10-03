@@ -3,7 +3,7 @@ import {CustomerPicker} from './CustomerPicker'
 import type {CustomerChoice} from '../lib/customer-search'
 import type {Contract} from '../types'
 import type {BillingUnit} from '../lib/billing-unit'
-import {maintenancePeriod} from '../lib/maintenance-period-label'
+import {futureMaintenancePeriod,cycleInvoiceDate,type BillingCycleRule} from '../lib/billing-cycle'
 import {detailPlanCount,validateDetailPlan,type DetailPlanCandidate} from '../lib/billing-detail-plan'
 import type {MaintenanceScheduleItem} from '../lib/maintenance-schedule'
 import {fmtYen} from '../lib/utils'
@@ -11,9 +11,10 @@ import {fmtYen} from '../lib/utils'
 export type AddBillingOccurrence=(item:MaintenanceScheduleItem,reason:string)=>Promise<unknown>
 
 /** One reviewed occurrence, using the existing atomic insert-only schedule writer. */
-export function BillingOccurrenceCreator({candidate,contract,units,recipients,onSave,onClose}:{
+export function BillingOccurrenceCreator({candidate,contract,units,recipients,onSave,onClose,cycleRules=[]}:{
   candidate:DetailPlanCandidate;contract:Contract;units:readonly BillingUnit[];
   recipients:readonly CustomerChoice[];onSave:AddBillingOccurrence;onClose:()=>void
+  cycleRules?:readonly BillingCycleRule[]
 }){
   const [year,setYear]=useState(String(candidate.year)),[round,setRound]=useState(String(candidate.round))
   const [start,setStart]=useState(candidate.periodStart??''),[end,setEnd]=useState(candidate.periodEnd??'')
@@ -26,18 +27,18 @@ export function BillingOccurrenceCreator({candidate,contract,units,recipients,on
   const years=(value:string)=>{
     changeCoverage(setYear,value)
     const stored=units.find(u=>u.serviceYear===Number(value)&&u.periodStart&&u.periodEnd)
-    try{const period=stored?{periodStart:stored.periodStart!,periodEnd:stored.periodEnd!}:maintenancePeriod(contract.maintenance_start_date,Number(value));setStart(period.periodStart);setEnd(period.periodEnd)}catch{setStart('');setEnd('')}
+    try{const period=stored?{periodStart:stored.periodStart!,periodEnd:stored.periodEnd!}:futureMaintenancePeriod(contract,Number(value),cycleRules);setStart(period.periodStart);setEnd(period.periodEnd);const prepaid=cycleInvoiceDate(contract,Number(value),cycleRules);if(prepaid)setDate(prepaid)}catch{setStart('');setEnd('')}
   }
   function review(e:React.FormEvent){e.preventDefault();setError('');setConfirmed(null)
     try{
       if(!/^\d+$/.test(amount)||!recipients.some(r=>r.id===Number(recipient))||!/^\d{4}$/.test(year)||Number(round)>detailPlanCount(contract))throw Error('請求先・予定額・対象の回を確認してください')
       const item:MaintenanceScheduleItem={year:Number(year),round:Number(round),periodStart:start,periodEnd:end,date,recipientId:Number(recipient),amount:Number(amount),method:candidate.method}
       if(!contract.maintenance_start_date)throw Error('「保守情報」で保守開始日を設定してください')
-      validateDetailPlan(item,units,contract.project_id,reason,contract.maintenance_start_date);setConfirmed(item)
+      validateDetailPlan(item,units,contract.project_id,reason,contract.maintenance_start_date,cycleRules,contract);setConfirmed(item)
     }catch(e){setError(e instanceof Error?e.message:String(e))}
   }
   async function save(){if(!confirmed||lock.current)return;lock.current=true;setBusy(true);setError('')
-    try{validateDetailPlan(confirmed,units,contract.project_id,reason,contract.maintenance_start_date);await onSave(confirmed,reason.trim());onClose()}
+    try{validateDetailPlan(confirmed,units,contract.project_id,reason,contract.maintenance_start_date,cycleRules,contract);await onSave(confirmed,reason.trim());onClose()}
     catch(e){setError(e instanceof Error?e.message:String(e))}finally{lock.current=false;setBusy(false)}
   }
   return <section>

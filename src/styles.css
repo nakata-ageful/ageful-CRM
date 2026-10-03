@@ -957,3 +957,7 @@ input[type="number"] {
 .customer-picker [role="option"]:hover, .customer-picker [role="option"].active, .customer-picker [role="option"]:focus-visible { background: #f1f5f9; }
 .customer-picker [role="option"][aria-selected="true"] { background: #eef2ff; color: #3730a3; font-weight: 600; }
 .customer-picker-empty { padding: 10px 12px; margin: 0; font-size: 12px; color: #64748b; }
+.billing-cycle-settings { margin-top:16px; }
+.billing-cycle-settings p { color:#475569; line-height:1.7; }
+.billing-cycle-settings .standard-editor label { display:block; margin:12px 0; }
+.billing-cycle-settings .standard-editor .form-input { margin-top:6px; width:100%; }

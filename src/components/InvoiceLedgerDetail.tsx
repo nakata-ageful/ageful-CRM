@@ -82,7 +82,7 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
   const first = initialUnit(units)
   const [focusedId, setFocusedId] = useState<string | null>(null)
   const [editor, setEditor] = useState<{ unitId: string; mode: EditorMode } | null>(null)
-  const candidate=contract&&currentRecipientId?detailPlanCandidate(contract,currentRecipientId,units,today??new Date().toLocaleDateString('sv-SE'),data.managementEvents):null
+  const candidate=contract&&currentRecipientId?detailPlanCandidate(contract,currentRecipientId,units,today??new Date().toLocaleDateString('sv-SE'),data.managementEvents,data.cycleRules):null
   const canCreate=!!onAddSchedule&&!!data.recipients&&isBillingDate(contract?.maintenance_start_date??'')
   const active=first&&!['received','cancelled'].includes(first.lifecycle)
   const focused = units.find(unit => unit.id === focusedId) ?? (active||!candidate?first:undefined)
@@ -204,7 +204,7 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
       </div><p className="invoice-history-help">各回を選ぶと、左側で明細の確認・記録の訂正ができます。請求日が期間外でも、対象の保守期間にまとめます。</p>
     </aside>
     </div>
-    {adding&&candidate&&contract&&onAddSchedule&&data.recipients&&<Modal title="請求・振替予定を追加" width={720} onClose={()=>setAdding(null)}><div className="standard-editor"><BillingOccurrenceCreator key={`${projectId}:${JSON.stringify(candidate)}:${units.map(u=>u.id+':'+u.revision).join(',')}`} candidate={candidate} contract={contract} units={units} recipients={data.recipients}
+    {adding&&candidate&&contract&&onAddSchedule&&data.recipients&&<Modal title="請求・振替予定を追加" width={720} onClose={()=>setAdding(null)}><div className="standard-editor"><BillingOccurrenceCreator key={`${projectId}:${JSON.stringify(candidate)}:${units.map(u=>u.id+':'+u.revision).join(',')}`} candidate={candidate} contract={contract} units={units} recipients={data.recipients} cycleRules={data.cycleRules}
       onSave={async(item,reason)=>{await onAddSchedule(item,reason);setCreated({projectId,item,after:adding.after})}} onClose={()=>setAdding(null)}/></div></Modal>}
     {!!units.length&&maintenanceStartDate!==undefined&&<div className="card" style={{padding:20,marginTop:16}}>
       <h3>保守期間の確認・修正</h3>

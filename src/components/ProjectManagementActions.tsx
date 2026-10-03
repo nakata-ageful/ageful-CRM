@@ -5,11 +5,13 @@ import type {TransferBillingUnit} from '../lib/ownership-billing-plan'
 import {ManagementLifecycleEditor} from './ManagementLifecycleEditor'
 import {FutureScheduleEditor} from './FutureScheduleEditor'
 import {Modal} from './Modal'
+import type {BillingCycleRule} from '../lib/billing-cycle'
 
-export function ProjectManagementActions({projectId,row,customers,units,events,onManagementSave,onScheduleSave,onPeriodSave}:{
+export function ProjectManagementActions({projectId,row,customers,units,events,onManagementSave,onScheduleSave,onPeriodSave,cycleRules=[]}:{
   projectId:number;row?:BillingRow;customers:Customer[];units:TransferBillingUnit[];events:ManagementEvent[];
   onManagementSave:(request:ManagementRequest)=>Promise<void>;onScheduleSave:(value:Record<string,unknown>)=>Promise<unknown>;
   onPeriodSave?:(value:Record<string,unknown>)=>Promise<unknown>
+  cycleRules?:readonly BillingCycleRule[]
 }){
   const [editing,setEditing]=useState<'management'|'schedule'|null>(null),[busy,setBusy]=useState(false),[notice,setNotice]=useState('')
   const now=new Date(),today=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
@@ -29,7 +31,7 @@ export function ProjectManagementActions({projectId,row,customers,units,events,o
     {editing&&<Modal title={editing==='management'?'管理の終了・再開':'今後の請求予定を追加'} width={820} onClose={close}><div className="standard-editor">
       {editing==='management'?<ManagementLifecycleEditor expanded key={`${projectId}:${JSON.stringify(events)}:${units.map(u=>`${u.id}:${u.revision}`).join(',')}`} projectId={projectId} events={events.filter(e=>e.project_id===projectId)} units={units}
         onSave={async request=>{setBusy(true);try{await onManagementSave(request);setNotice('管理の終了・再開を保存しました。');setEditing(null)}finally{setBusy(false)}}}/>
-        :row&&<FutureScheduleEditor expanded key={`${row.project_id}:${JSON.stringify(units)}:${JSON.stringify(events)}:${JSON.stringify(row.contract)}`} row={row} customers={customers} units={units} events={events}
+        :row&&<FutureScheduleEditor expanded key={`${row.project_id}:${JSON.stringify(units)}:${JSON.stringify(events)}:${JSON.stringify(row.contract)}:${JSON.stringify(cycleRules)}`} row={row} customers={customers} units={units} events={events} cycleRules={cycleRules}
           onSave={async value=>{setBusy(true);try{const result=await onScheduleSave(value);setNotice('確認した請求予定を追加しました。');setEditing(null);return result}finally{setBusy(false)}}}
           onPeriodSave={onPeriodSave?async value=>{setBusy(true);try{const result=await onPeriodSave(value);setNotice('保存済み記録の保守期間だけを保存しました。');setEditing(null);return result}finally{setBusy(false)}}:undefined}/>}
     </div></Modal>}

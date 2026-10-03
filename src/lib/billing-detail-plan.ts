@@ -5,6 +5,7 @@ import {maintenancePeriod} from './maintenance-period-label'
 import type {MaintenanceScheduleItem} from './maintenance-schedule'
 import {managementActiveOn,managementBillingContract,type ManagementEvent} from './management-lifecycle'
 import {validateIndividualPeriod} from './individual-maintenance-period'
+import {futureMaintenancePeriod,cycleInvoiceDate,cycleRuleForYear,validateCycleOccurrence,type BillingCycleRule} from './billing-cycle'
 
 export type DetailPlanCandidate = Omit<MaintenanceScheduleItem,'periodStart'|'periodEnd'> & {periodStart:string|null;periodEnd:string|null}
 
@@ -13,14 +14,14 @@ export function detailPlanCount(contract:Contract):number {
 }
 
 /** A reference only. No inferred payer/amount/date is written until the operator confirms. */
-export function detailPlanCandidate(contract:Contract,recipientId:number,units:readonly BillingUnit[],today:string,events:readonly ManagementEvent[]=[]):DetailPlanCandidate|null {
+export function detailPlanCandidate(contract:Contract,recipientId:number,units:readonly BillingUnit[],today:string,events:readonly ManagementEvent[]=[],rules:readonly BillingCycleRule[]=[]):DetailPlanCandidate|null {
   if(!isBillingDate(today)||!['請求書','口座振替'].includes(contract.billing_method??''))return null
   const count=detailPlanCount(contract)
   if(!Number.isInteger(count)||count<1||count>96)return null
   const debit=contract.billing_method==='口座振替'
   const calendarYear=Number(today.slice(0,4)),calendarMonth=Number(today.slice(5,7))
   let year=calendarYear
-  try{if(today<maintenancePeriod(contract.maintenance_start_date,year).periodStart)year--}catch{/* No guessed maintenance anchor. */}
+  try{if(today<futureMaintenancePeriod(contract,year,rules).periodStart)year--}catch{/* No guessed maintenance anchor. */}
   const options:{year:number;round:number;date:string;month:number}[]=[]
   if(debit){
     const rawDay=parseScheduleDay(contract.billing_schedule_days?.[0]??'').day
@@ -36,10 +37,12 @@ export function detailPlanCandidate(contract:Contract,recipientId:number,units:r
     }
   }else{
     for(let serviceYear=year;serviceYear<=year+2;serviceYear++){
+      const prepaidDate=cycleInvoiceDate(contract,serviceYear,rules)
+      if(prepaidDate){options.push({year:serviceYear,round:1,date:prepaidDate,month:12});continue}
       for(let round=1;round<=count;round++){
         const {month,day}=parseScheduleDay(contract.billing_schedule_days?.[round-1]??'')
         let cy=serviceYear
-        try{const period=maintenancePeriod(contract.maintenance_start_date,serviceYear)
+        try{const period=futureMaintenancePeriod(contract,serviceYear,rules)
           if(month&&day&&`${cy}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`<period.periodStart)cy++
         }catch{/* Year is only a reference until the operator chooses coverage. */}
         const date=month&&day?`${cy}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`:''
@@ -51,7 +54,7 @@ export function detailPlanCandidate(contract:Contract,recipientId:number,units:r
   const next=options.find(o=>!own.some(u=>u.serviceYear===o.year&&(u.roundLabel===`第${o.round}回`||u.roundLabel==='保存済み単回記録'||u.roundLabel.endsWith('月分'))))
   if(!next)return null
   let period:{periodStart:string|null;periodEnd:string|null}={periodStart:null,periodEnd:null}
-  try{period=maintenancePeriod(contract.maintenance_start_date,next.year)}catch{/* No saved period inferred. */}
+  try{period=futureMaintenancePeriod(contract,next.year,rules)}catch{if(cycleRuleForYear(rules,contract.project_id,next.year)?.mode==='calendar_prepaid')return null}
   const sameYear=own.filter(u=>u.serviceYear===next.year)
   const stored=sameYear.find(u=>u.periodStart&&u.periodEnd)
   if(stored)period={periodStart:stored.periodStart!,periodEnd:stored.periodEnd!}
@@ -63,7 +66,7 @@ export function detailPlanCandidate(contract:Contract,recipientId:number,units:r
 }
 
 /** Mirrors the existing insert-only RPC's correspondence boundary, including cancelled/legacy records. */
-export function validateDetailPlan(item:MaintenanceScheduleItem,units:readonly BillingUnit[],projectId:number,reason:string,startDate?:string|null):void {
+export function validateDetailPlan(item:MaintenanceScheduleItem,units:readonly BillingUnit[],projectId:number,reason:string,startDate?:string|null,rules:readonly BillingCycleRule[]=[],contract?:Contract):void {
   if(!reason.trim()||!isBillingDate(item.date)||!isBillingDate(item.periodStart)||!isBillingDate(item.periodEnd)
     ||item.periodStart>item.periodEnd||Number(item.periodStart.slice(0,4))!==item.year||item.year<2000||item.year>2199
     ||!Number.isSafeInteger(item.round)||item.round<1||item.round>96||!Number.isSafeInteger(item.recipientId)||item.recipientId<1
@@ -74,4 +77,5 @@ export function validateDetailPlan(item:MaintenanceScheduleItem,units:readonly B
   if(own.some(u=>u.serviceYear===item.year&&u.periodStart&&u.periodEnd&&(u.periodStart!==item.periodStart||u.periodEnd!==item.periodEnd)))
     throw Error('同じ期間の保存済み記録と保守期間が異なります')
   if(startDate!==undefined)validateIndividualPeriod(item,item.year,projectId,own,startDate)
+  if(contract)validateCycleOccurrence(contract,item.year,item.periodEnd,rules)
 }

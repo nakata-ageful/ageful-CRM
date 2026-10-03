@@ -4,14 +4,14 @@ import type {BillingRow,Customer} from '../types'
 import type {TransferBillingUnit} from '../lib/ownership-billing-plan'
 import type {ManagementEvent} from '../lib/management-lifecycle'
 import {maintenanceSchedule,selectedMaintenanceScheduleItems,type MaintenanceScheduleItem} from '../lib/maintenance-schedule'
-import {maintenancePeriodLabel} from '../lib/maintenance-period-label'
+import {futureMaintenancePeriod,cycleInvoiceDate,type BillingCycleRule} from '../lib/billing-cycle'
 import {isBillingDate} from '../lib/billing-unit'
 import {MaintenancePeriodReview} from './MaintenancePeriodReview'
 import {validateIndividualPeriod} from '../lib/individual-maintenance-period'
 
 type Item=MaintenanceScheduleItem&{include:boolean;reason?:string}
-export function FutureScheduleEditor({row,customers,units,events,onSave,onPeriodSave,expanded=false}:{row:BillingRow;customers:Customer[];units:TransferBillingUnit[];events:ManagementEvent[];onSave:(value:Record<string,unknown>)=>Promise<unknown>;onPeriodSave?:(value:Record<string,unknown>)=>Promise<unknown>;expanded?:boolean}){
- const [year,setYear]=useState(new Date().getFullYear())
+export function FutureScheduleEditor({row,customers,units,events,onSave,onPeriodSave,expanded=false,cycleRules=[]}:{row:BillingRow;customers:Customer[];units:TransferBillingUnit[];events:ManagementEvent[];onSave:(value:Record<string,unknown>)=>Promise<unknown>;onPeriodSave?:(value:Record<string,unknown>)=>Promise<unknown>;expanded?:boolean;cycleRules?:readonly BillingCycleRule[]}){
+ const [year,setYear]=useState(()=>{const y=new Date().getFullYear();return row.contract&&cycleInvoiceDate(row.contract,y+1,cycleRules)?y+1:y})
  const [individual,setIndividual]=useState(false),[periodStart,setPeriodStart]=useState(''),[periodEnd,setPeriodEnd]=useState('')
  const [periodReason,setPeriodReason]=useState(''),[periodConfirmed,setPeriodConfirmed]=useState(false)
  useEffect(()=>setPeriodConfirmed(false),[year,periodStart,periodEnd,periodReason,individual,units])
@@ -21,7 +21,7 @@ export function FutureScheduleEditor({row,customers,units,events,onSave,onPeriod
  function preview(){try{
   if(!recipient)throw Error('今回追加する予定の請求先を選択してください')
   if(!row.contract)throw Error('契約が未設定です')
-  const candidates=maintenanceSchedule(row.contract,year,Number(recipient),own,events,individual?{periodStart,periodEnd}:undefined)
+  const candidates=maintenanceSchedule(row.contract,year,Number(recipient),own,events,individual?{periodStart,periodEnd}:undefined,cycleRules)
   setExcluded(candidates.filter(c=>c.exclusion).map(c=>({date:`${c.periodStart} ～ ${c.periodEnd}`,round:c.round,reason:c.exclusion!})))
   setItems(candidates.filter(c=>!c.exclusion).map(c=>({...c,include:false})))
   setNotice('保守期間ごとの回です。請求予定日は前払いを含め別に指定してください。');setReviewed(false)
@@ -35,9 +35,9 @@ export function FutureScheduleEditor({row,customers,units,events,onSave,onPeriod
   <MaintenancePeriodReview startDate={row.contract?.maintenance_start_date??null} units={own}/>
   <fieldset disabled={busy} style={{border:0,padding:0}}>
   <label>保守期間の開始年 <input type="number" min={2000} max={2199} value={year} onChange={e=>{setYear(Number(e.target.value));setItems([]);setExcluded([]);setReviewed(false)}}/></label>
-  {!individual&&<p>{maintenancePeriodLabel(row.contract?.maintenance_start_date,year)}</p>}
+  {!individual&&<p>{(()=>{try{if(!row.contract)throw Error('契約未設定');const p=futureMaintenancePeriod(row.contract,year,cycleRules);return `保守期間：${p.periodStart} ～ ${p.periodEnd}`}catch(e){return e instanceof Error?e.message:'保守期間要確認'}})()}</p>}
   <label><input type="checkbox" checked={individual} onChange={e=>{setIndividual(e.target.checked);setItems([]);setReviewed(false)}}/>保守期間を個別指定する</label>
-  {individual&&<div><label>個別の保守開始日 <input type="date" value={periodStart} onChange={e=>{setPeriodStart(e.target.value);setYear(Number(e.target.value.slice(0,4)));setItems([]);setReviewed(false)}}/></label><label>個別の保守終了日 <input type="date" value={periodEnd} onChange={e=>{setPeriodEnd(e.target.value);setItems([]);setReviewed(false)}}/></label><p>翌期も必要に応じて個別指定してください。予定の追加では過去の請求期間を変更しません。保存済み記録への適用は、下の専用確認から行います。</p></div>}
+  {individual&&<div><label>個別の保守開始日 <input type="date" value={periodStart} onChange={e=>{setPeriodStart(e.target.value);setYear(Number(e.target.value.slice(0,4)));setItems([]);setReviewed(false)}}/></label><label>個別の保守終了日 <input type="date" value={periodEnd} onChange={e=>{setPeriodEnd(e.target.value);setItems([]);setReviewed(false)}}/></label><p>この追加分だけの個別期間です。翌年以降の標準期間は「請求情報」の繰り返し設定で変更できます。予定の追加では過去の請求期間を変更しません。</p></div>}
   <CustomerPicker label="追加分の請求先" value={recipient} onChange={value=>{setRecipient(value);setItems([]);setReviewed(false)}} customers={customers}/>{' '}<button onClick={preview}>不足分の候補を表示</button>
   {individual&&onPeriodSave&&own.some(u=>u.serviceYear===year)&&<section><p>{year}年の保存済み{own.filter(u=>u.serviceYear===year).length}回すべてに、この保守期間を指定します。発行・入金済みも含みますが、金額・請求先・入金日・元記録は変更しません。</p><label>期間変更の確認理由 <input value={periodReason} onChange={e=>setPeriodReason(e.target.value)}/></label><label><input type="checkbox" checked={periodConfirmed} onChange={e=>setPeriodConfirmed(e.target.checked)}/>上記の保存済み記録に適用することを確認しました</label><button disabled={!periodConfirmed||!periodReason.trim()||!isBillingDate(periodStart)||!isBillingDate(periodEnd)} onClick={()=>void savePeriod()}>保存済み記録の保守期間だけを保存</button></section>}
   {notice&&<p role="status">{notice}</p>}

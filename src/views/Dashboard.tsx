@@ -26,7 +26,7 @@ export function Dashboard({ stats, maintenanceList, billingRows, onNavigate, onV
   const today = billingToday ?? `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
   const overview = billingHistory ? buildBillingOverview(billingHistory.units, today) : null
   const setup=billingHistory?legacyScheduleSetupReview(billingRows,projectRecipients??new Map(),billingHistory.units,today,
-    billingHistory.cutoverOn,billingHistory.managementEvents):{items:[],issues:[]}
+    billingHistory.cutoverOn,billingHistory.managementEvents,billingHistory.cycleRules):{items:[],issues:[]}
   const currentYear = new Date().getFullYear()
   const activeList = maintenanceList.filter(m => m.status === '対応中')
 

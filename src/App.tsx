@@ -32,6 +32,7 @@ import type {BillingHistoryData} from './components/BillingHistorySection'
 import {Modal} from './components/Modal'
 import {OwnershipTransferHistory} from './components/OwnershipTransferHistory'
 import {ProjectManagementActions} from './components/ProjectManagementActions'
+import {BillingCycleSettings} from './components/BillingCycleSettings'
 
 type ViewKey =
   | 'dashboard'
@@ -173,7 +174,7 @@ function MainApp() {
 
   const billingHistory:BillingHistoryData|undefined=runtime?{
     units:runtime.units,recipients:customers,plannedAmount:()=>null,
-    cutoverOn:runtime.cutoverOn,managementEvents:runtime.managementEvents,
+    cutoverOn:runtime.cutoverOn,managementEvents:runtime.managementEvents,cycleRules:runtime.cycleRules,
     recipientName:id=>customers.find(c=>c.id===id)?.name??`請求先ID ${id}（名前未取得）`,
     projectName:id=>projectRows.find(p=>p.id===id)?.project_name??`発電所ID ${id}`,
   }:undefined
@@ -365,18 +366,24 @@ function MainApp() {
             )}
             {view === 'project-detail' && projectDetail && (
               <ProjectDetailView
+                billingCycleSettings={runtime&&projectDetail.contract?<BillingCycleSettings key={`${projectDetail.project.id}:${JSON.stringify(runtime.cycleRules)}`} contract={projectDetail.contract} units={runtime.units} rules={runtime.cycleRules??[]}
+                  onSave={runtime.cycleRulesReady?async value=>{await saveRuntime({action:'cycle_rule',value:{projectId:projectDetail.project.id,contract:projectDetail.contract,
+                    versions:Object.fromEntries(runtime.units.filter(u=>u.projectId===projectDetail.project.id).map(u=>[u.id,u.revision])),
+                    expectedRule:Math.max(0,...(runtime.cycleRules??[]).filter(r=>r.project_id===projectDetail.project.id).map(r=>r.id)),...value}})}:undefined}/>:undefined}
                 managementTools={runtime?<ProjectManagementActions key={projectDetail.project.id} projectId={projectDetail.project.id}
                   row={projectDetail.contract&&billingRows.find(r=>r.project_id===projectDetail.project.id)?{...billingRows.find(r=>r.project_id===projectDetail.project.id)!,contract:projectDetail.contract}:undefined}
                   customers={customers} units={runtime.units} events={runtime.managementEvents}
                   onManagementSave={async request=>{await saveRuntime({action:'management',value:request})}}
-                  onPeriodSave={value=>saveRuntime({action:'service_period',value})} onScheduleSave={value=>saveRuntime({action:'future_schedule',value})}/>:undefined}
+                  cycleRules={runtime.cycleRules} onPeriodSave={value=>saveRuntime({action:'service_period',value})} onScheduleSave={value=>saveRuntime({action:'future_schedule',value:{...value,
+                    ...(runtime.cycleRulesReady?{cycleRevision:Math.max(0,...(runtime.cycleRules??[]).filter(r=>r.project_id===projectDetail.project.id).map(r=>r.id))}:{})}})}/>:undefined}
                 changeHistory={runtime&&billingHistory?<OwnershipTransferHistory expanded
                   key={projectDetail.project.id} managementEvents={runtime.managementEvents.filter(e=>e.project_id===projectDetail.project.id)} transfers={runtime.transfers.filter(t=>t.project_id===projectDetail.project.id)} events={runtime.events.filter(e=>e.project_id===projectDetail.project.id)} recipientName={billingHistory.recipientName}/>:undefined}
                 billingHistory={billingHistory}
                 onSaveInvoice={billingHistory?request=>saveRuntime({action:'invoice',value:request}):undefined}
                 onAddSchedule={runtime&&projectDetail.contract?async(item,reason)=>{await saveRuntime({action:'future_schedule',value:{projectId:projectDetail.project.id,contract:projectDetail.contract,
                   versions:Object.fromEntries(runtime.units.filter(u=>u.projectId===projectDetail.project.id).map(u=>[u.id,u.revision])),
-                  last:Math.max(0,...runtime.managementEvents.filter(e=>e.project_id===projectDetail.project.id).map(e=>e.id)),items:[item],reason}})}:undefined}
+                  last:Math.max(0,...runtime.managementEvents.filter(e=>e.project_id===projectDetail.project.id).map(e=>e.id)),items:[item],reason,
+                  ...(runtime.cycleRulesReady?{cycleRevision:Math.max(0,...(runtime.cycleRules??[]).filter(r=>r.project_id===projectDetail.project.id).map(r=>r.id))}:{})}})}:undefined}
                 onSavePeriod={runtime&&projectDetail.contract?async change=>{await saveRuntime({action:'service_period',value:{projectId:projectDetail.project.id,contract:projectDetail.contract,versions:Object.fromEntries(runtime.units.filter(u=>u.projectId===projectDetail.project.id).map(u=>[u.id,u.revision])),...change}})}:undefined}
                 onOwnershipTransfer={billingHistory?()=>setTransferOpen(true):undefined}
                 billingUnits={runtime?.units.filter(u=>u.projectId===projectDetail.project.id)}

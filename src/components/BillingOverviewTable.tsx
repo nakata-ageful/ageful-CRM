@@ -31,7 +31,7 @@ export function BillingOverviewTable({ data, units = [], candidates = [], mode, 
       const amount = unit ? resolveUnitAmount(unit) : { amount: candidate!.amount, basis: '参考額' }
       const status = candidate ? candidate.status === 'review' ? '保存内容を確認' : candidate.status === 'overdue' ? '期限超過・要確認'
         : candidate.date < today ? '予定日経過・要確認' : '未保存・要確認' : billingUnitStatusLabel(unit!)
-      const period = unit?.periodStart && unit.periodEnd ? `${unit.periodStart} ～ ${unit.periodEnd}` : unit ? `${unit.serviceYear}年（保守期間未確認）` : '対象の保守期間は登録前に確認してください'
+      const period = unit?.periodStart && unit.periodEnd ? `${unit.periodStart} ～ ${unit.periodEnd}` : unit ? `${unit.serviceYear}年（保守期間未確認）` : candidate?.periodStart&&candidate.periodEnd?`${candidate.periodStart} ～ ${candidate.periodEnd}（参考）`:'対象の保守期間は登録前に確認してください'
       const canIssue = unit && isEditableInvoicePlan(unit) && unit.recipientId != null
       const canCollect = unit?.method === '請求書' && unit.lifecycle === 'issued' && !unit.receivedOn
       const canDebit = unit?.method === '口座振替' && unit.lifecycle === 'planned' && !unit.receivedOn && unit.frozenAmount === null && unit.recipientId != null
@@ -41,7 +41,7 @@ export function BillingOverviewTable({ data, units = [], candidates = [], mode, 
         <td>{candidate ? <>{candidate.customerName}<small className="billing-overview-warning">現在の顧客・請求先未確定</small></>
           : unit!.recipientId == null ? <span className="billing-overview-warning">請求先要確認</span> : data.recipientName(unit!.recipientId)}</td>
         <td title={`保守期間：${period}`}>{candidate ? `第${candidate.round}回` : unit!.roundLabel === '保存済み単回記録' ? '回数未確認' : unit!.roundLabel}
-          {unit && <small>{unit.serviceYear}年</small>}</td>
+          {unit && <small>{unit.serviceYear}年</small>}{candidate?.serviceYear&&<small>{candidate.serviceYear}年分（参考）</small>}</td>
         <td className="billing-overview-date-value">{mode === 'unpaid' || mode === 'received' ? unit?.issuedOn ?? '—' : unit?.scheduledDate ?? candidate?.date ?? '日付要確認'}</td>
         <td className={mode === 'unpaid' || mode === 'received' ? 'billing-overview-date-value' : undefined}>{mode === 'unpaid' ? unit?.paymentDueOn ?? '—' : mode === 'received' ? unit?.receivedOn ?? '—'
           : <span className={candidate ? 'billing-overview-warning' : ''} title={candidate?.reason}>{status}</span>}</td>

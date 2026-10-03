@@ -12,6 +12,7 @@ export function OwnershipTransferHistory({transfers,events,recipientName,managem
   const summary=(e:HistoryEntry)=>{
     if(e.kind==='ownership')return `${recipientName(Number(e.record.from_customer_id))} → ${recipientName(Number(e.record.to_customer_id))}`
     if(e.kind==='management')return `適用日：${String(e.record.effective_date)}`
+    if(e.record.event_type==='cycle_rule_changed'){const {after}=values(e);return `${after.effective_year}年分から：${display('mode',after.mode)}`}
     const {before,after}=values(e),payerBefore=display('recipient_customer_id',before.recipient_customer_id),payerAfter=display('recipient_customer_id',after.recipient_customer_id)
     const amountText=(v:Record<string,unknown>)=>`${v.frozen_amount!=null?'確定額':'予定額'}：${v.frozen_amount==null&&v.planned_amount==null?'金額要確認':display(v.frozen_amount!=null?'frozen_amount':'planned_amount',v.frozen_amount??v.planned_amount)}`
     const amountBefore=amountText(before),amountAfter=amountText(after)
@@ -20,6 +21,7 @@ export function OwnershipTransferHistory({transfers,events,recipientName,managem
   const target=(e:HistoryEntry)=>{
     if(e.kind==='ownership')return `所有者の変更日：${String(e.record.transfer_date??'未記入')}`
     if(e.kind!=='billing')return null
+    if(e.record.event_type==='cycle_rule_changed')return '保存済みの請求・入金・金額・期間は変更していません。'
     const {after}=values(e),round=after.service_month!=null?`${after.service_month}月分`:after.round_number!=null?`第${after.round_number}回`:'回数未登録'
     return `${after.period_start&&after.period_end?`${after.period_start} ～ ${after.period_end}`:after.service_year?`${after.service_year}年（保守期間未記入）`:'保守期間未記入'} ／ ${round} ／ 請求回ID ${String(e.record.billing_unit_id??after.id??'未記入')}`
   }

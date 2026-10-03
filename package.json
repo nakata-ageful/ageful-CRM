@@ -12,6 +12,7 @@
     "test:project-search": "node tests/project-search.cjs",
     "test:ui-layout": "node tests/ui-layout.cjs && node tests/billing-detail-periods.cjs && node tests/billing-overview-layout.cjs && node tests/customer-picker.cjs && node tests/management-history-layout.cjs",
     "test:maintenance-period": "node tests/maintenance-period-label.cjs && node tests/maintenance-period-review.cjs && node tests/maintenance-schedule.cjs && node tests/saved-maintenance-period.cjs",
+    "test:billing-cycle": "node tests/billing-cycle.cjs && node tests/billing-cycle-postgres.mjs",
     "test:operational-fixes": "node tests/operational-save-regressions.cjs && node tests/atomic-project-create-postgres.mjs && node tests/normal-billing-views.cjs",
     "test:billing-runtime": "node tests/ownership-field-selection.cjs && node tests/billing-item-selection.cjs && node tests/management-lifecycle.cjs && node tests/maintenance-schedule.cjs && node tests/maintenance-period-label.cjs && node tests/maintenance-period-review.cjs && node tests/saved-maintenance-period.cjs && node tests/future-schedule-review.cjs && node tests/legacy-schedule-setup.cjs && node tests/normal-billing-views.cjs && node tests/cutover-manifest.cjs && node tests/billing-runtime-rehearsal.cjs && node tests/project-search.cjs"
   },

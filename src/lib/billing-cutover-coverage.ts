@@ -4,9 +4,10 @@ import {isBillingDate} from './billing-unit'
 import {managementActiveOn,type ManagementEvent} from './management-lifecycle'
 import type {BillingUnit} from './billing-unit'
 import {debitScheduleReminder} from './debit-schedule-reminder'
+import {cycleRuleForYear,cycleCompatibility,type BillingCycleRule} from './billing-cycle'
 
 type StoredUnit={project_id:number;service_year?:number;recipient_customer_id:number;recipient_source?:string;collection_method:string;scheduled_date:string|null;lifecycle:string;planned_amount:number|null;round_number?:number|null;service_month?:number|null}
-export type CoverageCandidate={projectId:number;recipientId:number;method:'invoice'|'direct_debit';date:string;round:number;amount:number;status:'missing'|'matches'|'handled'|'review'|'overdue';reason?:string}
+export type CoverageCandidate={projectId:number;recipientId:number;method:'invoice'|'direct_debit';date:string;round:number;amount:number;status:'missing'|'matches'|'handled'|'review'|'overdue';reason?:string;serviceYear?:number;periodStart?:string;periodEnd?:string}
 export type ScheduleSetupItem=CoverageCandidate&{projectName:string;customerName:string}
 export type ScheduleSetupIssue={
   projectId:number;projectName:string;reason:string
@@ -16,7 +17,7 @@ export type ScheduleSetupIssue={
 /** Read-only pre-cutover comparison. Calculated amounts are proposals, NEVER historical actuals.
  * Does not authorize activation, create records or decide ambiguous date/round correspondence.
  */
-export function inspectFutureBillingCoverage(rows:readonly BillingRow[],recipients:ReadonlyMap<number,number>,units:readonly StoredUnit[],startMonth:string,months:number,managementEvents:readonly ManagementEvent[]=[]){
+export function inspectFutureBillingCoverage(rows:readonly BillingRow[],recipients:ReadonlyMap<number,number>,units:readonly StoredUnit[],startMonth:string,months:number,managementEvents:readonly ManagementEvent[]=[],rules:readonly BillingCycleRule[]=[]){
   if(!/^\d{4}-\d{2}$/.test(startMonth)||!isBillingDate(`${startMonth}-01`)||!Number.isInteger(months)||months<1||months>24)throw Error('比較対象の年月と期間を確認してください')
   const [year,month]=startMonth.split('-').map(Number),candidates:CoverageCandidate[]=[],issues:{projectId:number;reason:string}[]=[]
   for(const row of rows){
@@ -25,11 +26,17 @@ export function inspectFutureBillingCoverage(rows:readonly BillingRow[],recipien
     if(!recipientId){issues.push({projectId:row.project_id,reason:'請求先が不明'});continue}
     if(!['請求書','口座振替'].includes(c.billing_method??'')){issues.push({projectId:row.project_id,reason:'請求方法が未設定'});continue}
     const days=c.billing_schedule_days??[]
-    if(!days.length){issues.push({projectId:row.project_id,reason:'請求予定日が未設定'});continue}
+    const hasCycle=rules.some(r=>r.project_id===row.project_id&&r.mode==='calendar_prepaid')
+    if(!days.length&&!hasCycle){issues.push({projectId:row.project_id,reason:'請求予定日が未設定'});continue}
     if(c.billing_method==='口座振替'&&days.length!==1){issues.push({projectId:row.project_id,reason:'振替日の設定が複数ある'});continue}
     for(let offset=0;offset<months;offset++){
       const date=new Date(Date.UTC(year,month-1+offset,1)),y=date.getUTCFullYear(),m=date.getUTCMonth()+1
-      const expected=c.billing_method==='請求書'
+      const prepaid=cycleRuleForYear(rules,row.project_id,y+1)?.mode==='calendar_prepaid'
+      if(prepaid&&!cycleCompatibility(c)){issues.push({projectId:row.project_id,reason:'繰り返し設定は「請求書・年1回」です。請求情報と設定を確認してください'});break}
+      if(!prepaid&&!days.length){issues.push({projectId:row.project_id,reason:'請求予定日が未設定'});break}
+      const expected:{date:string|null;round:number;amount:number;serviceYear?:number}[]=prepaid
+        ?m===12?[{date:`${y}-12-01`,round:1,amount:invoiceAmount(c,1,1),serviceYear:y+1}]:[]
+        :c.billing_method==='請求書'
         ?computeUpcomingInvoices([row],new Map([[m,y]])).map(i=>({date:i.scheduledDateISO,round:i.round,amount:i.amount}))
         :[{date:toIsoDate(y,days[0],m),round:m,amount:withdrawalAmount(c,m)}]
       for(const item of expected){
@@ -40,13 +47,13 @@ export function inspectFutureBillingCoverage(rows:readonly BillingRow[],recipien
         let amount=item.amount
         if(maintenanceEnded){
           const withoutMaintenance={...c,billing_item_flags:{...c.billing_item_flags,annual_maintenance:false}}
-          amount=method==='invoice'?invoiceAmount(withoutMaintenance,item.round,days.length):withdrawalAmount(withoutMaintenance,m)
+          amount=method==='invoice'?invoiceAmount(withoutMaintenance,item.round,item.serviceYear==null?days.length:1):withdrawalAmount(withoutMaintenance,m)
         }
         const matching=units.filter(u=>u.project_id===row.project_id&&u.scheduled_date===item.date)
         let status:CoverageCandidate['status']='missing',reason:string|undefined
         if(matching.length){
           const u=matching[0]
-          const sameRound=method==='invoice'?u.round_number===item.round:u.service_month===m
+          const sameRound=(method==='invoice'?u.round_number===item.round:u.service_month===m)&&(item.serviceYear==null||u.service_year===item.serviceYear)
           if(matching.length===1&&sameRound&&['fixed','issued','received'].includes(u.lifecycle))status='handled'
           else if(matching.length===1&&sameRound&&u.lifecycle==='planned'&&u.collection_method===method
             &&(u.recipient_customer_id===recipientId||u.recipient_source==='override')&&u.planned_amount===amount)status='matches'
@@ -56,12 +63,13 @@ export function inspectFutureBillingCoverage(rows:readonly BillingRow[],recipien
           // date. Keep it visible for human correspondence, but never advertise
           // it as an unsaved new claim that could be charged twice.
           const nearby=units.filter(u=>u.project_id===row.project_id&&u.round_number===item.round
-            &&u.scheduled_date&&u.service_year!=null&&[y,y+1].includes(u.service_year)
+            &&u.scheduled_date&&u.service_year!=null&&(item.serviceYear==null?[y,y+1].includes(u.service_year):u.service_year===item.serviceYear)
             &&Math.abs(Date.parse(`${u.scheduled_date}T00:00:00Z`)-Date.parse(`${item.date}T00:00:00Z`))<300*86400000)
           if(nearby.length){status='review';reason='別日に保存された同じ回の可能性があります。保守期間・第何回かを確認してください'}
         }
         if(maintenanceEnded&&status!=='handled'){status='review';reason='保守終了後の対象費目・前払い期間・個別金額を確認してください（自動日割りなし）'}
-        candidates.push({projectId:row.project_id,recipientId,method,date:item.date,round:item.round,amount,status,reason})
+        candidates.push({projectId:row.project_id,recipientId,method,date:item.date,round:item.round,amount,status,reason,
+          ...(item.serviceYear==null?{}:{serviceYear:item.serviceYear,periodStart:`${item.serviceYear}-01-01`,periodEnd:`${item.serviceYear}-12-31`})})
       }
     }
   }
@@ -78,12 +86,12 @@ export function inspectFutureBillingCoverage(rows:readonly BillingRow[],recipien
  * Read-only: never creates a ledger occurrence or authorizes cutover by itself.
  */
 export function legacyScheduleSetupItems(rows:readonly BillingRow[],recipients:ReadonlyMap<number,number>,units:readonly BillingUnit[],today:string,
- cutoverOn?:string,managementEvents:readonly ManagementEvent[]=[]):ScheduleSetupItem[]{
- return legacyScheduleSetupReview(rows,recipients,units,today,cutoverOn,managementEvents).items
+ cutoverOn?:string,managementEvents:readonly ManagementEvent[]=[],rules:readonly BillingCycleRule[]=[]):ScheduleSetupItem[]{
+ return legacyScheduleSetupReview(rows,recipients,units,today,cutoverOn,managementEvents,rules).items
 }
 
 export function legacyScheduleSetupReview(rows:readonly BillingRow[],recipients:ReadonlyMap<number,number>,units:readonly BillingUnit[],today:string,
- cutoverOn?:string,managementEvents:readonly ManagementEvent[]=[]):{
+ cutoverOn?:string,managementEvents:readonly ManagementEvent[]=[],rules:readonly BillingCycleRule[]=[]):{
  items:ScheduleSetupItem[];issues:ScheduleSetupIssue[]
 }{
  if(!isBillingDate(today))throw Error('集計日が不正です')
@@ -95,7 +103,7 @@ export function legacyScheduleSetupReview(rows:readonly BillingRow[],recipients:
   collection_method:u.method==='請求書'?'invoice':'direct_debit',scheduled_date:u.scheduledDate,lifecycle:u.lifecycle,planned_amount:u.plannedAmount??null,
   round_number:/^第(\d+)回$/.test(u.roundLabel)?Number(u.roundLabel.slice(1,-1)):null,
   service_month:/^\d+月分$/.test(u.roundLabel)?Number(u.roundLabel.slice(0,-2)):null}))
- const coverage=inspectFutureBillingCoverage(safe,recipients,stored,startMonth,3,managementEvents)
+ const coverage=inspectFutureBillingCoverage(safe,recipients,stored,startMonth,3,managementEvents,rules)
  const overdue:CoverageCandidate[]=[]
  if(cutoverOn){
   const [fromYear,fromMonth]=cutoverOn.slice(0,7).split('-').map(Number)
@@ -104,7 +112,7 @@ export function legacyScheduleSetupReview(rows:readonly BillingRow[],recipients:
   for(let offset=0;offset<elapsed;offset+=24){
    const first=new Date(Date.UTC(fromYear,fromMonth-1+offset,1))
    const monthKey=`${first.getUTCFullYear()}-${String(first.getUTCMonth()+1).padStart(2,'0')}`
-   const past=inspectFutureBillingCoverage(safe,recipients,stored,monthKey,Math.min(24,elapsed-offset),managementEvents)
+   const past=inspectFutureBillingCoverage(safe,recipients,stored,monthKey,Math.min(24,elapsed-offset),managementEvents,rules)
    overdue.push(...past.candidates.filter(c=>c.method==='invoice'&&c.date>=cutoverOn&&c.status!=='matches'&&c.status!=='handled'))
   }
  }

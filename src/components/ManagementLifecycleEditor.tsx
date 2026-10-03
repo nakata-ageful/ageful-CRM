@@ -2,7 +2,7 @@ import {useState} from 'react'
 import type {TransferBillingUnit} from '../lib/ownership-billing-plan'
 import {managementActiveOn,validateManagementRequest,type ManagementEvent,type ManagementChoice,type ManagementRequest} from '../lib/management-lifecycle'
 import {fmtYen} from '../lib/utils'
-export function ManagementLifecycleEditor({projectId,events,units,onSave}:{projectId:number;events:readonly ManagementEvent[];units:readonly TransferBillingUnit[];onSave:(r:ManagementRequest)=>Promise<void>}){
+export function ManagementLifecycleEditor({projectId,events,units,onSave,expanded=false}:{projectId:number;events:readonly ManagementEvent[];units:readonly TransferBillingUnit[];onSave:(r:ManagementRequest)=>Promise<void>;expanded?:boolean}){
  const [scope,setScope]=useState<ManagementRequest['scope']>('maintenance'),[action,setAction]=useState<ManagementRequest['action']>('end')
  const [date,setDate]=useState(''),[reason,setReason]=useState(''),[reviewed,setReviewed]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('')
  const [plans]=useState(()=>units.filter(u=>u.projectId===projectId&&u.lifecycle==='planned').map(u=>({...u})))
@@ -13,7 +13,7 @@ export function ManagementLifecycleEditor({projectId,events,units,onSave}:{proje
  function patch(i:number,c:Partial<ManagementChoice>){setChoices(rows=>rows.map((r,index)=>index===i?{...r,...c}:r));setReviewed(false)}
  return <section className="card"><h3 className="section-title">管理の終了・再開</h3>
    <p>現在：{!allActive?'全取引終了':!maintenanceActive?'保守終了（その他の費用は継続可）':'継続中'}</p>
-   <details><summary>終了・再開を記録する</summary>
+   <details open={expanded}><summary>終了・再開を記録する</summary>
    <p>発電所・保守記録・過去の請求・未入金は削除しません。返金・残期間の精算や残作業は備考に記録してください。</p>
    <fieldset disabled={busy} onChange={()=>setReviewed(false)} style={{border:0,padding:0}}>
     <label>対象<select className="form-input" value={scope} onChange={e=>setScope(e.target.value as ManagementRequest['scope'])}><option value="maintenance">保守だけ</option><option value="all">すべての取引</option></select></label>

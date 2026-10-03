@@ -9,6 +9,7 @@ import type { BillingHistoryData } from './BillingHistorySection'
 import { fmtYen } from '../lib/utils'
 import {MaintenancePeriodReview} from './MaintenancePeriodReview'
 import type {SavedMaintenancePeriodChange} from '../lib/saved-maintenance-period'
+import {Modal} from './Modal'
 
 type EditorMode = 'invoice' | 'plan' | 'debit' | 'correction'
 
@@ -126,7 +127,7 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
           </aside>
         </div>
 
-        {editingUnit && onSave && <div className="invoice-editor-area">
+        {editingUnit && onSave && <Modal title={editor?.mode==='correction'?'請求・入金記録を訂正':editor?.mode==='plan'?'請求予定を編集':editor?.mode==='debit'?'振替結果を記録':editingUnit.lifecycle==='issued'?'入金日を記録':'請求内容を入力して発行'} width={720} onClose={closeEditor}><div className="standard-editor">
           {editor?.mode === 'correction' && data.recipients
             ? <InvoiceCorrectionEditor key={`correction-${editingUnit.id}`} unit={editingUnit} recipients={data.recipients} onSave={onSave} onClose={closeEditor} />
             : editor?.mode === 'debit'
@@ -134,7 +135,7 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
               : editor?.mode === 'plan' && data.recipients
                 ? <InvoicePlanEditor key={`plan-${editingUnit.id}`} unit={editingUnit} recipients={data.recipients} onSave={onSave} onClose={closeEditor} />
                 : <InvoiceUnitEditor key={editingUnit.id} unit={editingUnit} recipientName={data.recipientName} onSave={onSave} onClose={closeEditor} />}
-        </div>}
+        </div></Modal>}
       </>
     })()}
     {!!units.length&&maintenanceStartDate!==undefined&&<div className="card" style={{padding:20,marginTop:16}}>

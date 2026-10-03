@@ -1,9 +1,9 @@
 import type {Contract} from '../types'
 import {contractTransferLabels} from '../lib/contract-transfer-form'
 
-export function OwnershipTransferHistory({transfers,events,recipientName}:{transfers:readonly Record<string,unknown>[];events:readonly Record<string,unknown>[];recipientName:(id:number)=>string}){
+export function OwnershipTransferHistory({transfers,events,recipientName,expanded=false}:{transfers:readonly Record<string,unknown>[];events:readonly Record<string,unknown>[];recipientName:(id:number)=>string;expanded?:boolean}){
   const display=(v:unknown)=>v==null?'未記入':typeof v==='boolean'?(v?'あり':'なし'):typeof v==='object'?JSON.stringify(v):String(v)
-  return <details className="card" style={{padding:16}}><summary>所有者変更・請求の変更履歴</summary>
+  return <details open={expanded} className="card" style={{padding:16}}><summary>所有者変更・請求の変更履歴</summary>
     {transfers.length===0&&<p>所有者変更の履歴はありません。</p>}
     {[...transfers].reverse().map(t=>{
       const before=t.contract_before as Record<string,unknown>,after=t.contract_after as Record<string,unknown>

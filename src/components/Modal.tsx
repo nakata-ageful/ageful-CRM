@@ -18,12 +18,15 @@ export function Modal({ title, onClose, children, width = 540 }: Props) {
     <div className="modal-overlay" onClick={onClose}>
       <div
         className="modal-box"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
         style={{ maxWidth: width }}
         onClick={e => e.stopPropagation()}
       >
         <div className="modal-header">
           <h2 className="modal-title">{title}</h2>
-          <button className="modal-close" onClick={onClose}>✕</button>
+          <button type="button" className="modal-close" aria-label="閉じる" onClick={onClose}>✕</button>
         </div>
         <div className="modal-body">{children}</div>
       </div>

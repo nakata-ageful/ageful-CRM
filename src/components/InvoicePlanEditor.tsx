@@ -29,8 +29,7 @@ export function InvoicePlanEditor({unit:initialUnit,recipients,onSave,onClose}:{
       <label>請求予定日<input type="date" value={date} onChange={e=>setDate(e.target.value)}/></label>
       <label>予定額（税込）<input inputMode="numeric" value={amount} onChange={e=>setAmount(e.target.value)}/></label>
       <p>空欄は金額要確認です。保存額は契約変更で自動更新されず、実績の確定額とは別です。</p>
-      <button className="btn btn-main" type="submit">{busy?'保存中…':'予定を保存'}</button>
-      <button className="btn" type="button" onClick={onClose}>閉じる</button>
+      <div className="editor-footer"><button className="btn btn-sub" type="button" onClick={onClose}>キャンセル</button><button className="btn btn-main" type="submit">{busy?'保存中…':'予定を保存'}</button></div>
     </fieldset></form>
   </section>
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { ProjectDetail, AnnualRecordInput, PeriodicMaintenanceInput, MaintenanceResponseInput, MaintenancePlanLevel, BillingDetail as BillingDetailData } from '../types'
 import { BillingDetailView } from './BillingDetail'
 import type {BillingHistoryData} from '../components/BillingHistorySection'
@@ -6,9 +6,6 @@ import type {InvoiceWriteRequest} from '../lib/invoice-write-session'
 import type {SavedMaintenancePeriodChange} from '../lib/saved-maintenance-period'
 import {ManualDebitPlanCreator,type NewDebitPlan} from '../components/ManualDebitPlanCreator'
 import {OwnershipBillingPlanEditor} from '../components/OwnershipBillingPlanEditor'
-import {BillingItemSelection} from '../components/BillingItemSelection'
-import {billingItemSelectionPatch} from '../lib/billing-item-selection'
-import type {ManagementEvent} from '../lib/management-lifecycle'
 import type {TransferBillingChoice,TransferBillingUnit} from '../lib/ownership-billing-plan'
 import { getBillingDetail } from '../lib/data'
 import { hasSupabaseEnv } from '../lib/supabase'
@@ -104,7 +101,7 @@ function InfoTip({ text }: { text: string }) {
   )
 }
 
-type Tab = '基本情報' | '設備情報' | '契約情報' | '保守情報' | '請求情報' | '請求詳細' | 'その他' | '保守対応' | '年次請求記録'
+type Tab = '基本情報' | '設備情報' | '契約情報' | '保守情報' | '請求情報' | '請求詳細' | 'その他' | '保守対応' | '年次請求記録' | '管理設定' | '変更履歴'
 
 type Props = {
   detail: ProjectDetail
@@ -113,7 +110,8 @@ type Props = {
   onViewCustomer: (customerId: number) => void
   onViewMaintenance: (id: number) => void
   billingHistory?:BillingHistoryData
-  managementEvents?:readonly ManagementEvent[]
+  managementTools?:ReactNode
+  changeHistory?:ReactNode
   onSaveInvoice?:(request:InvoiceWriteRequest)=>Promise<unknown>
   onSavePeriod?:(change:SavedMaintenancePeriodChange)=>Promise<unknown>
   onOwnershipTransfer?:()=>void
@@ -131,7 +129,7 @@ const BILLING_METHODS = ['請求書', '口座振替'] as const
 
 // 年次請求記録タブは請求タブ／請求詳細に運用を集約したため非表示（描画コードは dormant で残置）
 // 並び順: 設定系 → 保守関連（保守情報・保守対応）→ 請求関連（請求情報・請求詳細）→ その他
-const TABS: Tab[] = ['基本情報', '設備情報', '契約情報', '保守情報', '保守対応', '請求情報', '請求詳細', 'その他']
+const TABS: Tab[] = ['基本情報', '設備情報', '契約情報', '保守情報', '保守対応', '請求情報', '請求詳細', '管理設定', '変更履歴', 'その他']
 
 function readTabFromHash(): Tab {
   const h = window.location.hash
@@ -150,7 +148,7 @@ function writeTabToHash(t: Tab) {
   }
 }
 
-export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, onViewMaintenance,billingHistory,onSaveInvoice,onSavePeriod,onOwnershipTransfer,billingUnits,onAddDebit,onSaveBillingPlan,managementEvents }: Props) {
+export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, onViewMaintenance,billingHistory,onSaveInvoice,onSavePeriod,onOwnershipTransfer,billingUnits,onAddDebit,onSaveBillingPlan,managementTools,changeHistory }: Props) {
   const toast = useToast()
   const { project, customer, contract, annualRecords, maintenanceResponses, periodicMaintenance } = detail
   // DB追加前は新列を送信しない。モックではDBを変更せず動作確認できる。
@@ -767,7 +765,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
 
       {/* タブ */}
       <div className="tab-bar">
-        {TABS.map(t => (
+        {TABS.filter(t=>t==='管理設定'?!!managementTools:t==='変更履歴'?!!changeHistory:true).map(t => (
           <button
             key={t}
             className={`tab-btn ${tab === t ? 'active' : ''}`}
@@ -930,8 +928,6 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       {/* ── 保守情報タブ ── */}
       {tab === '保守情報' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {contract&&<BillingItemSelection key={`${contract.id}:${JSON.stringify(contract.billing_item_flags)}`} contract={contract} managementEvents={managementEvents}
-            onSave={billingHistory?async flags=>{await updateContract(contract.id,billingItemSelectionPatch(flags));onReload()}:undefined}/>}
           {/* 中項目: 保守契約 */}
           <div className="card">
             <div className="card-header-row">
@@ -1077,8 +1073,9 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       )}
 
       {/* ── その他タブ ── */}
-      {tab==='請求詳細'&&billingHistory&&(onAddDebit||(billingUnits&&onSaveBillingPlan))&&<details className="card invoice-exception-tools">
-        <summary>変更・例外対応</summary>
+      {tab==='管理設定'&&<div className="project-management-tab standard-editor">{managementTools}
+      {billingHistory&&(onAddDebit||(billingUnits&&onSaveBillingPlan))&&<section className="card">
+        <h3 className="section-title">請求予定の変更・例外対応</h3>
         <p>振替予定の追加や、今後の請求先・方法をまとめて変更するときだけ使用します。</p>
         {onAddDebit && (
           <ManualDebitPlanCreator recipients={billingHistory.recipients} testOnly={false} onSave={onAddDebit}/>
@@ -1088,7 +1085,9 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             oldOwner={{id:customer.id,name:customer.name}} newOwner={{id:customer.id,name:customer.name}}
             recipientOptions={billingHistory.recipients} units={billingUnits} onSave={onSaveBillingPlan} testOnly={false}/>
         </details>}
-      </details>}
+      </section>}
+      </div>}
+      {tab==='変更履歴'&&<div className="project-history-tab">{changeHistory}</div>}
       {tab === 'その他' && (
         <div className="card">
           <div className="card-header-row">

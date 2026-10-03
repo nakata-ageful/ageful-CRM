@@ -1,5 +1,12 @@
-import {useEffect,useState,type ReactNode} from 'react'
+import {createContext,useContext,useEffect,useState,type ReactNode} from 'react'
 import {supabase} from '../lib/supabase'
+
+const AccountContext=createContext<{busy:boolean;error:string;logout:()=>Promise<void>}|null>(null)
+export function AccountControls(){
+ const account=useContext(AccountContext)
+ if(!account)return null
+ return <div className="sidebar-account"><button type="button" className="nav-btn" disabled={account.busy} onClick={()=>void account.logout()}>{account.busy?'ログアウト中…':'ログアウト'}</button>{account.error&&<p role="alert">{account.error}</p>}</div>
+}
 
 export function BillingAccessGate({children}:{children:ReactNode}){
   const [user,setUser]=useState<string|null>(null),[loaded,setLoaded]=useState(false),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false)
@@ -11,7 +18,8 @@ export function BillingAccessGate({children}:{children:ReactNode}){
     return()=>{active=false;data.subscription.unsubscribe()}
   },[])
   if(!loaded)return <p>ログインを確認しています…</p>
-  if(user)return <div key={user}><div style={{textAlign:'right',padding:8}}><button className="btn" disabled={busy} onClick={async()=>{if(!supabase||busy)return;setBusy(true);setError('');try{const {error}=await supabase.auth.signOut();if(error)throw error}catch{setError('ログアウトできませんでした。接続を確認してください')}finally{setBusy(false)}}}>ログアウト</button>{error&&<p role="alert">{error}</p>}</div>{children}</div>
+  async function logout(){if(!supabase||busy)return;setBusy(true);setError('');try{const {error}=await supabase.auth.signOut();if(error)throw error}catch{setError('ログアウトできませんでした。接続を確認してください')}finally{setBusy(false)}}
+  if(user)return <AccountContext.Provider value={{busy,error,logout}}><div key={user}>{children}</div></AccountContext.Provider>
   return <main className="card" style={{maxWidth:480,margin:'64px auto',padding:24}}><h1>Ageful Manager ログイン</h1>
     <p>登録済みの利用者だけが請求データを開けます。</p>
     <form onSubmit={async e=>{e.preventDefault();if(busy||!supabase)return;setBusy(true);setError('');try{const {error}=await supabase.auth.signInWithPassword({email,password});if(error)setError('ログインできません。メールアドレスとパスワードを確認してください');else setPassword('')}catch{setError('接続できませんでした。時間をおいて再度お試しください')}finally{setBusy(false)}}}>

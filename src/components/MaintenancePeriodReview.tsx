@@ -3,6 +3,7 @@ import type {BillingUnit} from '../lib/billing-unit'
 import {maintenancePeriodLabel} from '../lib/maintenance-period-label'
 import {SavedMaintenancePeriodEditor} from './SavedMaintenancePeriodEditor'
 import type {SavedMaintenancePeriodChange} from '../lib/saved-maintenance-period'
+import {Modal} from './Modal'
 
 /** Display the stored service year separately from invoice/payment dates.
  * A date outside the annual period is not evidence of a missing/duplicate invoice.
@@ -25,7 +26,7 @@ export function MaintenancePeriodReview({startDate,units,onSave}:{startDate:stri
     {u.periodStart&&u.periodEnd&&<div>この回に指定した対象期間：{u.periodStart} ～ {u.periodEnd}</div>}
    </div>)}
    {onSave&&<button type="button" className="btn" onClick={()=>setEditingYear(year)}>この期間の保存記録を修正</button>}
-   {onSave&&editingYear===year&&<SavedMaintenancePeriodEditor key={`${year}:${startDate}:${units.map(u=>`${u.id}:${u.revision}`).join(',')}`} startDate={startDate} year={year} units={units} onSave={onSave} onClose={()=>setEditingYear(null)}/>}
+   {onSave&&editingYear===year&&<Modal title="保存済み記録の保守期間を修正" width={720} onClose={()=>setEditingYear(null)}><div className="standard-editor"><SavedMaintenancePeriodEditor key={`${year}:${startDate}:${units.map(u=>`${u.id}:${u.revision}`).join(',')}`} startDate={startDate} year={year} units={units} onSave={onSave} onClose={()=>setEditingYear(null)}/></div></Modal>}
   </section>})}
  </details>
 }

@@ -25,7 +25,7 @@ import { Billing } from './views/Billing'
 import { CsvImport } from './views/CsvImport'
 import { Prospects } from './views/Prospects'
 import { ProspectDetailView } from './views/ProspectDetail'
-import {BillingAccessGate} from './components/BillingAccessGate'
+import {BillingAccessGate,AccountControls} from './components/BillingAccessGate'
 import {OwnershipTransferEditor} from './components/OwnershipTransferEditor'
 import {billingRuntimeEnabled,loadBillingRuntime,saveBillingRuntime,hasPendingBillingRuntime,type BillingRuntimeSnapshot} from './lib/billing-runtime'
 import type {BillingHistoryData} from './components/BillingHistorySection'
@@ -327,6 +327,7 @@ function MainApp() {
             {n.label}
           </button>
         ))}
+        <AccountControls/>
       </aside>
 
       <main className="main">
@@ -365,7 +366,16 @@ function MainApp() {
             )}
             {view === 'project-detail' && projectDetail && (
               <ProjectDetailView
-                managementEvents={runtime?.managementEvents.filter(e=>e.project_id===projectDetail.project.id)}
+                managementTools={runtime?<>
+                  <ManagementLifecycleEditor expanded key={`${projectDetail.project.id}:${JSON.stringify(runtime.managementEvents)}:${runtime.units.map(u=>`${u.id}:${u.revision}`).join(',')}`}
+                    projectId={projectDetail.project.id} events={runtime.managementEvents.filter(e=>e.project_id===projectDetail.project.id)} units={runtime.units}
+                    onSave={async request=>{await saveRuntime({action:'management',value:request})}}/>
+                  {projectDetail.contract&&billingRows.filter(r=>r.project_id===projectDetail.project.id).map(row=><FutureScheduleEditor
+                    key={`${row.project_id}:${JSON.stringify(runtime)}:${JSON.stringify(projectDetail.contract)}`} row={{...row,contract:projectDetail.contract}} customers={customers} units={runtime.units} events={runtime.managementEvents}
+                    onPeriodSave={value=>saveRuntime({action:'service_period',value})} onSave={value=>saveRuntime({action:'future_schedule',value})}/>)}
+                </>:undefined}
+                changeHistory={runtime&&billingHistory?<OwnershipTransferHistory expanded
+                  transfers={runtime.transfers.filter(t=>t.project_id===projectDetail.project.id)} events={runtime.events.filter(e=>e.project_id===projectDetail.project.id)} recipientName={billingHistory.recipientName}/>:undefined}
                 billingHistory={billingHistory}
                 onSaveInvoice={billingHistory?request=>saveRuntime({action:'invoice',value:request}):undefined}
                 onSavePeriod={runtime&&projectDetail.contract?async change=>{await saveRuntime({action:'service_period',value:{projectId:projectDetail.project.id,contract:projectDetail.contract,versions:Object.fromEntries(runtime.units.filter(u=>u.projectId===projectDetail.project.id).map(u=>[u.id,u.revision])),...change}})}:undefined}
@@ -472,19 +482,6 @@ function MainApp() {
             )}
           </>
         )}
-        {view==='project-detail'&&runtime&&projectDetail&&<details className="card invoice-exception-tools">
-          <summary>管理終了・変更履歴・今後の予定</summary>
-          <p>管理終了や再開、変更履歴の確認、今後の請求予定を追加するときだけ使用します。</p>
-          {billingHistory&&<OwnershipTransferHistory
-            transfers={runtime.transfers.filter(t=>t.project_id===projectDetail.project.id)} events={runtime.events.filter(e=>e.project_id===projectDetail.project.id)} recipientName={billingHistory.recipientName}/>}
-          <ManagementLifecycleEditor
-            key={`${projectDetail.project.id}:${JSON.stringify(runtime.managementEvents)}:${runtime.units.map(u=>`${u.id}:${u.revision}`).join(',')}`}
-            projectId={projectDetail.project.id} events={runtime.managementEvents.filter(e=>e.project_id===projectDetail.project.id)} units={runtime.units}
-            onSave={async request=>{await saveRuntime({action:'management',value:request})}}/>
-          {projectDetail.contract&&billingRows.filter(r=>r.project_id===projectDetail.project.id).map(row=><FutureScheduleEditor
-            key={`${row.project_id}:${JSON.stringify(runtime)}:${JSON.stringify(projectDetail.contract)}`} row={{...row,contract:projectDetail.contract}} customers={customers} units={runtime.units} events={runtime.managementEvents}
-            onPeriodSave={value=>saveRuntime({action:'service_period',value})} onSave={value=>saveRuntime({action:'future_schedule',value})}/>)}
-        </details>}
         {transferOpen&&runtime&&projectDetail?.contract&&<Modal title="所有者を変更" width={1100} onClose={()=>setTransferOpen(false)}>
           <OwnershipTransferEditor project={projectDetail.project} contract={projectDetail.contract} customers={customers}
             units={runtime.units.filter(u=>u.projectId===projectDetail.project.id)}

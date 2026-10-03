@@ -27,10 +27,10 @@ export function InvoiceCorrectionEditor({unit:initial,recipients,onSave,onClose}
       <label>請求日<input type="date" value={issued} onChange={e=>setIssued(e.target.value)}/></label>
       <label>入金日<input type="date" value={received} onChange={e=>setReceived(e.target.value)}/></label>
       <label>入金予定日<input type="date" value={due} onChange={e=>setDue(e.target.value)}/></label>
-      {items.map((i,n)=><div key={n}><label>明細名<input value={i.name} onChange={e=>setItems(items.map((v,k)=>k===n?{...v,name:e.target.value}:v))}/></label><label>金額（税込）<input inputMode="numeric" value={i.amount} onChange={e=>setItems(items.map((v,k)=>k===n?{...v,amount:e.target.value}:v))}/></label><button type="button" onClick={()=>setItems(items.filter((_,k)=>k!==n))}>明細を削除</button></div>)}
+      {items.map((i,n)=><div key={n} className="editor-line-item"><label>明細名<input value={i.name} onChange={e=>setItems(items.map((v,k)=>k===n?{...v,name:e.target.value}:v))}/></label><label>金額（税込）<input inputMode="numeric" value={i.amount} onChange={e=>setItems(items.map((v,k)=>k===n?{...v,amount:e.target.value}:v))}/></label><button type="button" onClick={()=>setItems(items.filter((_,k)=>k!==n))}>明細を削除</button></div>)}
       <button type="button" onClick={()=>setItems([...items,{name:'',amount:''}])}>明細を追加</button>
       <label>訂正理由<textarea className="form-input" required value={reason} onChange={e=>setReason(e.target.value)}/></label>
-      <p role="alert">{error}</p><button className="btn btn-main" disabled={busy}>訂正を保存</button><button className="btn" type="button" onClick={onClose}>閉じる</button>
+      <p role="alert">{error}</p><div className="editor-footer"><button className="btn btn-sub" type="button" onClick={onClose}>キャンセル</button><button className="btn btn-main" disabled={busy}>訂正を保存</button></div>
     </fieldset></form>
   </section>
 }

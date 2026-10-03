@@ -42,14 +42,13 @@ export function InvoiceUnitEditor({unit:initialUnit,recipientName,onSave,onClose
     <form onSubmit={save}><fieldset disabled={busy} style={{border:0}}>
       <label>{issuing?'請求日':'入金日'}<input type="date" required value={date} onChange={e=>setDate(e.target.value)}/></label>
       {issuing&&<><label>入金予定日<input type="date" value={due} onChange={e=>setDue(e.target.value)}/></label>
-        {items.map((item,index)=><div key={index}>
+        {items.map((item,index)=><div key={index} className="editor-line-item">
           <label>明細名<input required value={item.name} onChange={e=>setItems(items.map((v,i)=>i===index?{...v,name:e.target.value}:v))}/></label>
           <label>金額（税込）<input required inputMode="numeric" value={item.amount} onChange={e=>setItems(items.map((v,i)=>i===index?{...v,amount:e.target.value}:v))}/></label>
           {items.length>1&&<button type="button" onClick={()=>setItems(items.filter((_,i)=>i!==index))}>削除</button>}
         </div>)}<button type="button" onClick={()=>setItems([...items,{name:'',amount:''}])}>明細を追加</button></>}
       <p>入力内容を確認して保存してください。保存後に最新の請求履歴を読み込みます。</p>
-      <button type="submit" className="btn btn-main">{busy?'保存中…':issuing?'発行して保存':'入金確認を保存'}</button>
-      <button type="button" className="btn" onClick={onClose}>閉じる</button>
+      <div className="editor-footer"><button type="button" className="btn btn-sub" onClick={onClose}>キャンセル</button><button type="submit" className="btn btn-main">{busy?'保存中…':issuing?'発行して保存':'入金確認を保存'}</button></div>
     </fieldset></form>
   </section>
 }

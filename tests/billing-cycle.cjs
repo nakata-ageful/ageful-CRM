@@ -20,7 +20,7 @@ const row={project_id:1,contract:c,records:[]},pay=new Map([[1,1]])
 let review=coverage([row],pay,[],'2026-10',3,[],rules)
 assert.equal(review.candidates.length,1);assert.equal(review.candidates[0].date,'2026-12-01');assert.equal(review.candidates[0].serviceYear,2027)
 assert.equal(coverage([row],pay,[],'2027-08',1,[],rules).candidates.length,0,'No anniversary-month reminder after switching')
-const stored={project_id:1,service_year:2027,recipient_customer_id:1,collection_method:'invoice',round_number:1,scheduled_date:'2026-12-01',lifecycle:'planned',planned_amount:165000}
+const stored={project_id:1,service_year:2027,recipient_customer_id:1,collection_method:'invoice',round_number:1,scheduled_date:'2026-12-01',lifecycle:'planned',planned_amount:165000,period_start:'2027-01-01',period_end:'2027-12-31'}
 assert.equal(coverage([row],pay,[stored],'2026-12',1,[],rules).candidates[0].status,'matches')
 assert.equal(coverage([row],pay,[{...stored,service_year:2026}],'2026-12',1,[],rules).candidates[0].status,'review','A same-day previous-period record cannot hide the next year')
 assert.equal(coverage([row],pay,[{...stored,lifecycle:'received'}],'2026-12',1,[],rules).candidates[0].status,'handled')

@@ -120,8 +120,9 @@ async function main(){
   if(!real){
    assert.equal(coverage.candidates[0].date,'2027-06-15');assert.equal(coverage.summary.missing,1)
    const proposal=coverage.candidates[0]
-   const match={project_id:1,recipient_customer_id:1,collection_method:'invoice',scheduled_date:proposal.date,lifecycle:'planned',planned_amount:proposal.amount,round_number:proposal.round,service_month:null}
-   assert.equal(inspectFutureBillingCoverage(coverageRows,new Map([[1,1]]),[match],'2026-09',15).summary.matching,1)
+   const match={project_id:1,service_year:proposal.serviceYear,recipient_customer_id:1,collection_method:'invoice',scheduled_date:proposal.date,lifecycle:'planned',planned_amount:proposal.amount,round_number:proposal.round,service_month:null,period_start:proposal.periodStart,period_end:proposal.periodEnd}
+   const matchedCoverage=inspectFutureBillingCoverage(coverageRows,new Map([[1,1]]),[match],'2026-09',15)
+   assert.equal(matchedCoverage.summary.matching,1,JSON.stringify({proposal,match,candidates:matchedCoverage.candidates}))
    assert.equal(inspectFutureBillingCoverage(coverageRows,new Map([[1,1]]),[{...match,planned_amount:null}],'2026-09',15).summary.review,1)
    assert.equal(inspectFutureBillingCoverage(coverageRows,new Map([[1,1]]),[match,match],'2026-09',15).summary.review,1)
    const debitRows=[{...coverageRows[0],contract:{...contract,billing_method:'口座振替',billing_schedule_days:['25日'],annual_maintenance_inc:1200}}]
@@ -418,4 +419,4 @@ async function main(){
   }))},null,2))
  }finally{await db.close()}
 }
-main().catch(e=>{console.error(e.message);process.exitCode=1})
+main().catch(e=>{console.error(e.stack??e.message);process.exitCode=1})

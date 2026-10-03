@@ -6,8 +6,9 @@ import type {MaintenanceScheduleItem} from './maintenance-schedule'
 import {managementActiveOn,managementBillingContract,type ManagementEvent} from './management-lifecycle'
 import {validateIndividualPeriod} from './individual-maintenance-period'
 import {futureMaintenancePeriod,cycleInvoiceDate,cycleRuleForYear,validateCycleOccurrence,type BillingCycleRule} from './billing-cycle'
+import {inspectCandidatePeriod} from './billing-period-coverage'
 
-export type DetailPlanCandidate = Omit<MaintenanceScheduleItem,'periodStart'|'periodEnd'> & {periodStart:string|null;periodEnd:string|null}
+export type DetailPlanCandidate = Omit<MaintenanceScheduleItem,'periodStart'|'periodEnd'> & {periodStart:string|null;periodEnd:string|null;reviewReason?:string}
 
 export function detailPlanCount(contract:Contract):number {
   return contract.billing_count??(contract.billing_method==='口座振替'?12:contract.billing_schedule_days?.length||1)
@@ -19,6 +20,7 @@ export function detailPlanCandidate(contract:Contract,recipientId:number,units:r
   const count=detailPlanCount(contract)
   if(!Number.isInteger(count)||count<1||count>96)return null
   const debit=contract.billing_method==='口座振替'
+  const own=units.filter(u=>u.projectId===contract.project_id)
   const calendarYear=Number(today.slice(0,4)),calendarMonth=Number(today.slice(5,7))
   let year=calendarYear
   try{if(today<futureMaintenancePeriod(contract,year,rules).periodStart)year--}catch{/* No guessed maintenance anchor. */}
@@ -36,7 +38,9 @@ export function detailPlanCandidate(contract:Contract,recipientId:number,units:r
       if(round>=1&&round<=count)options.push({year:serviceYear,round,date,month})
     }
   }else{
-    for(let serviceYear=year;serviceYear<=year+2;serviceYear++){
+    // A long transition can cover several years; still find the first uncovered year.
+    const lastYear=Math.min(2199,Math.max(year+2,...own.filter(u=>isBillingDate(u.periodEnd??'')).map(u=>Number(u.periodEnd!.slice(0,4))+1)))
+    for(let serviceYear=year;serviceYear<=lastYear;serviceYear++){
       const prepaidDate=cycleInvoiceDate(contract,serviceYear,rules)
       if(prepaidDate){options.push({year:serviceYear,round:1,date:prepaidDate,month:12});continue}
       for(let round=1;round<=count;round++){
@@ -50,8 +54,11 @@ export function detailPlanCandidate(contract:Contract,recipientId:number,units:r
       }
     }
   }
-  const own=units.filter(u=>u.projectId===contract.project_id)
-  const next=options.find(o=>!own.some(u=>u.serviceYear===o.year&&(u.roundLabel===`第${o.round}回`||u.roundLabel==='保存済み単回記録'||u.roundLabel.endsWith('月分'))))
+  const next=options.find(o=>{
+    if(own.some(u=>u.serviceYear===o.year&&(u.roundLabel===`第${o.round}回`||u.roundLabel==='保存済み単回記録'||u.roundLabel.endsWith('月分'))))return false
+    if(!debit){try{if(inspectCandidatePeriod(contract,o.year,futureMaintenancePeriod(contract,o.year,rules),own,rules).superseded)return false}catch{/* Keep uncertain candidates visible. */}}
+    return true
+  })
   if(!next)return null
   let period:{periodStart:string|null;periodEnd:string|null}={periodStart:null,periodEnd:null}
   try{period=futureMaintenancePeriod(contract,next.year,rules)}catch{if(cycleRuleForYear(rules,contract.project_id,next.year)?.mode==='calendar_prepaid')return null}
@@ -61,7 +68,9 @@ export function detailPlanCandidate(contract:Contract,recipientId:number,units:r
   if(!managementActiveOn(events,contract.project_id,'all',period.periodStart||next.date||today))return null
   const changes=period.periodStart&&period.periodEnd&&events.some(e=>e.project_id===contract.project_id&&e.effective_date>=period.periodStart!&&e.effective_date<=period.periodEnd!)
   const effective=managementBillingContract(contract,events,next.date||today)
+  const assessment=debit?{superseded:false}:inspectCandidatePeriod(contract,next.year,period,own,rules)
   return {...next,...period,method:debit?'direct_debit':'invoice',recipientId,
+    ...(assessment.reason?{reviewReason:assessment.reason}:{}),
     amount:changes?null:debit?withdrawalAmount(effective,next.month):invoiceAmount(effective,next.round,count)}
 }
 

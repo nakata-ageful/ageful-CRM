@@ -124,8 +124,9 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
         <BillingDates method={candidate.method==='direct_debit'?'口座振替':'請求書'} scheduledDate={candidate.date} reference/>
         {contract&&<p className="invoice-current-basis">年間総額（税込・請求対象のみ）：{fmtYen(annualBillableTotalInc(contract))}</p>}
         <p className="invoice-reference-help">まだ保存していない予定候補です。請求先・対象期間・日付・金額を確認して登録してください。過去の請求・入金実績ではありません。</p>
+        {candidate.reviewReason&&<p className="billing-overview-notice" role="alert">保守期間要確認：{candidate.reviewReason}</p>}
         {!candidate.periodStart&&<p className="invoice-reference-help">「保守情報」で保守開始日を確認してください。委託契約の開始日とは別の項目です。</p>}
-        {canCreate&&<div className="invoice-current-actions"><button type="button" className="btn btn-main" onClick={()=>setAdding({after:null})}>予定を登録</button><button type="button" className="btn" onClick={()=>setAdding({after:candidate.method==='direct_debit'?'debit':'invoice'})}>{candidate.method==='direct_debit'?'振替結果を記録':'請求内容を入力して発行'}</button></div>}
+        {canCreate&&<div className="invoice-current-actions"><button type="button" className="btn btn-main" onClick={()=>setAdding({after:null})}>{candidate.reviewReason?'予定を確認・調整':'予定を登録'}</button>{!candidate.reviewReason&&<button type="button" className="btn" onClick={()=>setAdding({after:candidate.method==='direct_debit'?'debit':'invoice'})}>{candidate.method==='direct_debit'?'振替結果を記録':'請求内容を入力して発行'}</button>}</div>}
       </>:<p className="invoice-reference-help">{units.length?'追加できる予定候補がありません。「請求情報」の設定と保存済み記録を確認してください。':'この発電所の請求記録はまだありません。「請求情報」で請求方法・予定日を確認してください。'}</p>}
       {!!contract?.notes&&<div className="invoice-current-lines"><h3>備考</h3><p style={{whiteSpace:'pre-wrap'}}>{contract.notes}</p></div>}
     </div> : (() => {

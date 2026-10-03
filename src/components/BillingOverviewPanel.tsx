@@ -45,7 +45,7 @@ export function BillingOverviewPanel({ data, today, onViewDetail, setupItems = [
   </li>)}</ul>
   return <section className="billing-overview">
     <header className="billing-overview-toolbar"><h2>請求</h2><div>
-      <span>未入金 <strong>{fmtYen(overview.totals.unpaidAmount)}</strong> ／ 入金済 <strong>{fmtYen(overview.totals.receivedAmount)}</strong><small>今年度・昨年度</small></span>
+      <span>未入金 <strong>{fmtYen(overview.totals.unpaidAmount)}</strong> ／ 入金済 <strong>{fmtYen(overview.totals.receivedAmount)}</strong><small>今年度・昨年度・前払い分</small></span>
       <button type="button" className="btn btn-sub btn-sm" onClick={() => downloadBillingUnitCsv(buildBillingUnitCsv(data.units, data.recipientName, data.projectName))}>請求CSV</button>
     </div></header>
     {!!overview.totals.unknownActualCount && <p className="billing-overview-notice" role="status">金額要確認：{overview.totals.unknownActualCount}件。金額不明分は合計に含みません。</p>}
@@ -69,13 +69,13 @@ export function BillingOverviewPanel({ data, today, onViewDetail, setupItems = [
     </OverviewSection>
     <OverviewSection title="入金済" count={overview.received.length} color="green" collapsed><BillingOverviewTable {...tableProps} units={overview.received} mode="received" /></OverviewSection>
     {([['表示期間より前の予定', overview.overduePlans], ['日付要確認', overview.undatedPlans], ['それ以降の予定', overview.laterPlans], ['記録要確認', overview.review]] as const)
-      .filter(([, units]) => units.length).map(([label, units]) => <OverviewSection key={label} title={label} count={units.length} color="amber" collapsed><BillingOverviewTable {...tableProps} units={units} mode="review" /></OverviewSection>)}
-    {!!remainingItems.length && <OverviewSection title="未保存・要確認の請求予定" count={remainingItems.length} color="amber" collapsed>
+      .filter(([, units]) => units.length).map(([label, units]) => <OverviewSection key={label} title={label} count={units.length} color="amber" collapsed={label==='それ以降の予定'}><BillingOverviewTable {...tableProps} units={units} mode="review" /></OverviewSection>)}
+    {!!remainingItems.length && <OverviewSection title="未保存・要確認の請求予定" count={remainingItems.length} color="amber">
       <p className="billing-overview-help">予定日を過ぎた候補・保存記録と一致しない候補です。発行済みか、別日に変更した同じ回がないか確認してください。自動発行しません。</p>
       <BillingOverviewTable {...tableProps} candidates={remainingItems} mode="review" />
       {remainingItems.filter(item => item.reason).map(item => <p className="billing-overview-help" key={`${item.projectId}:${item.date}:${item.round}:${item.method}`}>{item.projectName}（{item.date}）：{item.reason}</p>)}
     </OverviewSection>}
-    {!!setupIssues.length && <OverviewSection title="請求設定要確認" count={setupIssues.length} color="amber" collapsed>
+    {!!setupIssues.length && <OverviewSection title="請求設定要確認" count={setupIssues.length} color="amber" collapsed={!actionRequired.length}>
       <p className="billing-overview-help">請求方法・日付・金額を未設定のまま表示しています。自動で「請求なし」と確定しません。</p>
       {!!actionRequired.length && <><h4 className="billing-overview-subtitle">請求設定が必要（{actionRequired.length}件）</h4>{issueList(actionRequired)}</>}
       {!!noBillingCandidates.length && <details className="billing-overview-secondary"><summary>自社請求なし候補（{noBillingCandidates.length}件・未確定）</summary><p className="billing-overview-help">他社保守などの可能性があります。発電所ごとに確認します。</p>{issueList(noBillingCandidates)}</details>}

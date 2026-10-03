@@ -14,7 +14,9 @@ export function buildBillingOverview(source: readonly BillingUnit[], today: stri
   })
   const planned=units.filter(u=>u.lifecycle==='planned'&&!u.issuedOn&&!u.receivedOn)
   const invoices=planned.filter(u=>u.method==='請求書')
-  const active=units.filter(u=>u.serviceYear>=year-1&&u.serviceYear<=year&&u.lifecycle!=='cancelled'&&u.lifecycle!=='review_required')
+  // A future service year can already be invoiced/paid this December. Never drop
+  // its unpaid obligation just because maintenance starts next year.
+  const active=units.filter(u=>u.serviceYear>=year-1&&u.lifecycle!=='cancelled'&&u.lifecycle!=='review_required')
   const received=active.filter(u=>u.lifecycle==='received'||!!u.receivedOn)
   const unpaid=active.filter(u=>!u.receivedOn&&u.lifecycle!=='received'&&(u.lifecycle==='issued'||u.lifecycle==='fixed'||!!u.issuedOn))
   const olderUnpaid=units.filter(u=>u.serviceYear<year-1&&!u.receivedOn&&u.lifecycle!=='received'

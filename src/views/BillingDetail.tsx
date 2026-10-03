@@ -10,6 +10,7 @@ import type { BillingHistoryData } from '../components/BillingHistorySection'
 import { InvoiceLedgerDetail } from '../components/InvoiceLedgerDetail'
 import type { InvoiceWriteRequest } from '../lib/invoice-write-session'
 import type {SavedMaintenancePeriodChange} from '../lib/saved-maintenance-period'
+import type {AddBillingOccurrence} from '../components/BillingOccurrenceCreator'
 
 type LineItemForm = { name: string; amount: string }
 
@@ -33,10 +34,11 @@ type Props = {
   billingHistory?: BillingHistoryData
   onSaveInvoice?:(request:InvoiceWriteRequest)=>Promise<unknown>
   onSavePeriod?:(change:SavedMaintenancePeriodChange)=>Promise<unknown>
+  onAddSchedule?:AddBillingOccurrence
 }
 
 
-export function BillingDetailView({ detail, onBack, onReload, onViewProject, embedded = false, billingHistory, onSaveInvoice, onSavePeriod }: Props) {
+export function BillingDetailView({ detail, onBack, onReload, onViewProject, embedded = false, billingHistory, onSaveInvoice, onSavePeriod,onAddSchedule }: Props) {
   const toast = useToast()
   const { project, customer, contract, annualRecords, maintenanceResponses, periodicMaintenance } = detail
   const currentYear = new Date().getFullYear()
@@ -315,7 +317,7 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject, emb
   if (billingHistory) return <div>
     {!embedded && <button className="btn" onClick={onBack}>戻る</button>}
     {!onSaveInvoice&&<p role="status">新しい請求記録の表示確認中です。この画面ではまだ編集できません。</p>}
-    <InvoiceLedgerDetail data={billingHistory} projectId={project.id} onSave={onSaveInvoice} maintenanceStartDate={contract.maintenance_start_date} onSavePeriod={onSavePeriod}/>
+    <InvoiceLedgerDetail data={billingHistory} projectId={project.id} onSave={onSaveInvoice} contract={contract} currentRecipientId={customer.id} onAddSchedule={onAddSchedule} maintenanceStartDate={contract.maintenance_start_date} onSavePeriod={onSavePeriod}/>
   </div>
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

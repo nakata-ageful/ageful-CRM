@@ -378,6 +378,9 @@ function MainApp() {
                   transfers={runtime.transfers.filter(t=>t.project_id===projectDetail.project.id)} events={runtime.events.filter(e=>e.project_id===projectDetail.project.id)} recipientName={billingHistory.recipientName}/>:undefined}
                 billingHistory={billingHistory}
                 onSaveInvoice={billingHistory?request=>saveRuntime({action:'invoice',value:request}):undefined}
+                onAddSchedule={runtime&&projectDetail.contract?async(item,reason)=>{await saveRuntime({action:'future_schedule',value:{projectId:projectDetail.project.id,contract:projectDetail.contract,
+                  versions:Object.fromEntries(runtime.units.filter(u=>u.projectId===projectDetail.project.id).map(u=>[u.id,u.revision])),
+                  last:Math.max(0,...runtime.managementEvents.filter(e=>e.project_id===projectDetail.project.id).map(e=>e.id)),items:[item],reason}})}:undefined}
                 onSavePeriod={runtime&&projectDetail.contract?async change=>{await saveRuntime({action:'service_period',value:{projectId:projectDetail.project.id,contract:projectDetail.contract,versions:Object.fromEntries(runtime.units.filter(u=>u.projectId===projectDetail.project.id).map(u=>[u.id,u.revision])),...change}})}:undefined}
                 onOwnershipTransfer={billingHistory?()=>setTransferOpen(true):undefined}
                 billingUnits={runtime?.units.filter(u=>u.projectId===projectDetail.project.id)}

@@ -4,6 +4,7 @@ import { BillingDetailView } from './BillingDetail'
 import type {BillingHistoryData} from '../components/BillingHistorySection'
 import type {InvoiceWriteRequest} from '../lib/invoice-write-session'
 import type {SavedMaintenancePeriodChange} from '../lib/saved-maintenance-period'
+import type {AddBillingOccurrence} from '../components/BillingOccurrenceCreator'
 import {ManualDebitPlanCreator,type NewDebitPlan} from '../components/ManualDebitPlanCreator'
 import {OwnershipBillingPlanEditor} from '../components/OwnershipBillingPlanEditor'
 import type {TransferBillingChoice,TransferBillingUnit} from '../lib/ownership-billing-plan'
@@ -114,6 +115,7 @@ type Props = {
   changeHistory?:ReactNode
   onSaveInvoice?:(request:InvoiceWriteRequest)=>Promise<unknown>
   onSavePeriod?:(change:SavedMaintenancePeriodChange)=>Promise<unknown>
+  onAddSchedule?:AddBillingOccurrence
   onOwnershipTransfer?:()=>void
   billingUnits?:readonly TransferBillingUnit[]
   onAddDebit?:(input:NewDebitPlan)=>Promise<void>
@@ -148,7 +150,7 @@ function writeTabToHash(t: Tab) {
   }
 }
 
-export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, onViewMaintenance,billingHistory,onSaveInvoice,onSavePeriod,onOwnershipTransfer,billingUnits,onAddDebit,onSaveBillingPlan,managementTools,changeHistory }: Props) {
+export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, onViewMaintenance,billingHistory,onSaveInvoice,onSavePeriod,onAddSchedule,onOwnershipTransfer,billingUnits,onAddDebit,onSaveBillingPlan,managementTools,changeHistory }: Props) {
   const toast = useToast()
   const { project, customer, contract, annualRecords, maintenanceResponses, periodicMaintenance } = detail
   // DB追加前は新列を送信しない。モックではDBを変更せず動作確認できる。
@@ -1061,6 +1063,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             billingHistory={billingHistory}
             onSaveInvoice={onSaveInvoice}
             onSavePeriod={onSavePeriod}
+            onAddSchedule={onAddSchedule}
             detail={billingDetail}
             embedded
             onBack={() => {}}

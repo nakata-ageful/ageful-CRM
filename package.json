@@ -10,6 +10,7 @@
     "test:billing-db": "node tests/invoice-write-postgres.mjs && node tests/invoice-recipient-plan-postgres.mjs && node tests/ownership-transfer-postgres.mjs && node tests/invoice-schedule-postgres.mjs && node tests/manual-billing-plan-postgres.mjs && node tests/ownership-manual-postgres.mjs && node tests/ownership-four-methods-postgres.mjs",
     "test:billing-migration": "node tests/billing-backup-audit.cjs && node tests/billing-migration-source.cjs && node tests/invoice-migration-payload.cjs && node tests/billing-import-reconciliation.cjs",
     "test:project-search": "node tests/project-search.cjs",
+    "test:active-source-sync": "node tests/active-source-sync.cjs",
     "test:ui-layout": "node tests/ui-layout.cjs && node tests/billing-detail-periods.cjs && node tests/billing-overview-layout.cjs && node tests/customer-picker.cjs && node tests/management-history-layout.cjs",
     "test:maintenance-period": "node tests/maintenance-period-label.cjs && node tests/maintenance-period-review.cjs && node tests/maintenance-schedule.cjs && node tests/saved-maintenance-period.cjs",
     "test:billing-cycle": "node tests/billing-cycle.cjs && node tests/billing-alert-safety.cjs && node tests/billing-cycle-postgres.mjs",

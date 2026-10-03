@@ -1,4 +1,6 @@
 import {useState} from 'react'
+import {CustomerPicker} from './CustomerPicker'
+import type {CustomerChoice} from '../lib/customer-search'
 import type {Contract,Project} from '../types'
 import {ContractTransferFields} from './ContractTransferFields'
 import {OwnershipBillingPlanEditor} from './OwnershipBillingPlanEditor'
@@ -13,7 +15,7 @@ import './OwnershipTransferEditor.css'
 
 export type OwnershipTransferInput={project:Project;contract:Contract;newOwner:number;futureRecipient:number;date:string;fields:{contract:ContractChoices};choices:(TransferBillingChoice|{newOccurrence:MaintenanceScheduleItem})[];reason:string}
 export function OwnershipTransferEditor({project:initialProject,contract:initialContract,customers,units,managementEvents=[],onSave,testOnly=false}:{
-  project:Project;contract:Contract;customers:readonly {id:number;name:string}[];units:readonly TransferBillingUnit[];managementEvents?:readonly ManagementEvent[];
+  project:Project;contract:Contract;customers:readonly CustomerChoice[];units:readonly TransferBillingUnit[];managementEvents?:readonly ManagementEvent[];
   onSave:(input:OwnershipTransferInput)=>Promise<void>;testOnly?:boolean
 }){
   const [project]=useState(()=>structuredClone(initialProject)),[contract]=useState(()=>structuredClone(initialContract))
@@ -51,7 +53,7 @@ export function OwnershipTransferEditor({project:initialProject,contract:initial
       <section className="ownership-transfer-card"><h3>所有者と変更日</h3><div className="ownership-transfer-grid">
         <div className="ownership-transfer-current"><span>現在の所有者</span><strong>{oldOwner.name}</strong><small>顧客ID {oldOwner.id}</small></div>
         <span className="ownership-transfer-arrow" aria-hidden="true">→</span>
-        <label>新しい所有者<select className="form-input" value={target} onChange={e=>setTarget(e.target.value)}><option value="">顧客を選択してください</option>{customers.filter(c=>c.id!==project.customer_id).map(c=><option key={c.id} value={c.id}>{c.name}（顧客ID {c.id}）</option>)}</select></label>
+        <CustomerPicker label="新しい所有者" value={target} onChange={setTarget} customers={customers.filter(c=>c.id!==project.customer_id)} emptyLabel="顧客を選択してください"/>
         <label>変更日<input className="form-input" type="date" value={date} onChange={e=>setDate(e.target.value)}/></label>
       </div></section>
       {newOwner&&<section className="ownership-transfer-card"><h3>変更後に追加する請求</h3><label>基本の請求先<select className="form-input" value={future} onChange={e=>setFuture(e.target.value as 'old'|'new')}><option value="new">{newOwner.name}</option><option value="old">{oldOwner.name}</option></select></label><p>下の各回の指定を優先します。請求の自動追加や銀行への振替手配は行いません。</p></section>}

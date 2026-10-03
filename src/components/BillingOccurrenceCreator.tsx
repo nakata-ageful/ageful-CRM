@@ -1,4 +1,6 @@
 import {useRef,useState} from 'react'
+import {CustomerPicker} from './CustomerPicker'
+import type {CustomerChoice} from '../lib/customer-search'
 import type {Contract} from '../types'
 import type {BillingUnit} from '../lib/billing-unit'
 import {maintenancePeriod} from '../lib/maintenance-period-label'
@@ -11,7 +13,7 @@ export type AddBillingOccurrence=(item:MaintenanceScheduleItem,reason:string)=>P
 /** One reviewed occurrence, using the existing atomic insert-only schedule writer. */
 export function BillingOccurrenceCreator({candidate,contract,units,recipients,onSave,onClose}:{
   candidate:DetailPlanCandidate;contract:Contract;units:readonly BillingUnit[];
-  recipients:readonly {id:number;name:string}[];onSave:AddBillingOccurrence;onClose:()=>void
+  recipients:readonly CustomerChoice[];onSave:AddBillingOccurrence;onClose:()=>void
 }){
   const [year,setYear]=useState(String(candidate.year)),[round,setRound]=useState(String(candidate.round))
   const [start,setStart]=useState(candidate.periodStart??''),[end,setEnd]=useState(candidate.periodEnd??'')
@@ -48,7 +50,7 @@ export function BillingOccurrenceCreator({candidate,contract,units,recipients,on
       <label>対象の回<select value={round} onChange={e=>changeCoverage(setRound,e.target.value)}>{Array.from({length:detailPlanCount(contract)},(_,i)=><option key={i} value={i+1}>第{i+1}回</option>)}</select></label>
       <label>保守期間の開始日<input type="date" required value={start} onChange={e=>{changeCoverage(setStart,e.target.value);setYear(e.target.value.slice(0,4))}}/></label>
       <label>保守期間の終了日<input type="date" required value={end} onChange={e=>changeCoverage(setEnd,e.target.value)}/></label>
-      <label>請求先<select value={recipient} onChange={e=>change(setRecipient,e.target.value)}><option value="">選択してください</option>{recipients.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label>
+      <CustomerPicker label="請求先" value={recipient} onChange={value=>change(setRecipient,value)} customers={recipients}/>
       <label>{debit?'振替予定日':'請求予定日'}<input type="date" required value={date} onChange={e=>changeCoverage(setDate,e.target.value)}/></label>
       <label>予定額（税込）<input inputMode="numeric" required value={amount} onChange={e=>change(setAmount,e.target.value)}/></label>
       <label>確認内容・備考<textarea required value={reason} onChange={e=>change(setReason,e.target.value)} placeholder="対象期間・請求先・予定額を確認した内容"/></label>

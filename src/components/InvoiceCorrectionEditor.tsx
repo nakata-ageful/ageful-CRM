@@ -1,9 +1,11 @@
 import {useRef,useState} from 'react'
+import {CustomerPicker} from './CustomerPicker'
+import type {CustomerChoice} from '../lib/customer-search'
 import type {BillingUnit} from '../lib/billing-unit'
 import {isBillingDate} from '../lib/billing-unit'
 import type {InvoiceWriteRequest} from '../lib/invoice-write-session'
 
-export function InvoiceCorrectionEditor({unit:initial,recipients,onSave,onClose}:{unit:BillingUnit;recipients:readonly {id:number;name:string}[];onSave:(r:InvoiceWriteRequest)=>Promise<unknown>;onClose:()=>void}){
+export function InvoiceCorrectionEditor({unit:initial,recipients,onSave,onClose}:{unit:BillingUnit;recipients:readonly CustomerChoice[];onSave:(r:InvoiceWriteRequest)=>Promise<unknown>;onClose:()=>void}){
   const [unit]=useState(()=>structuredClone(initial)),[recipient,setRecipient]=useState(String(initial.recipientId??''))
   const [issued,setIssued]=useState(initial.issuedOn??''),[received,setReceived]=useState(initial.receivedOn??''),[scheduled,setScheduled]=useState(initial.scheduledDate??'')
   const [due,setDue]=useState(initial.paymentDueOn??''),[reason,setReason]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('')
@@ -22,7 +24,7 @@ export function InvoiceCorrectionEditor({unit:initial,recipients,onSave,onClose}
         onClose()
       }catch(e){setError(e instanceof Error?e.message:String(e))}finally{lock.current=false;setBusy(false)}
     }}><fieldset disabled={busy} style={{border:0,padding:0}}>
-      <label>請求先<select className="form-input" value={recipient} onChange={e=>setRecipient(e.target.value)}><option value="">選択してください</option>{recipients.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label>
+      <CustomerPicker label="請求先" value={recipient} onChange={setRecipient} customers={recipients}/>
       <label>請求予定日<input type="date" value={scheduled} onChange={e=>setScheduled(e.target.value)}/></label>
       <label>請求日<input type="date" value={issued} onChange={e=>setIssued(e.target.value)}/></label>
       <label>入金日<input type="date" value={received} onChange={e=>setReceived(e.target.value)}/></label>

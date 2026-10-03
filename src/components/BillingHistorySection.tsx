@@ -3,13 +3,14 @@ import { customerBillingHistory, summarizeBillingHistory } from '../lib/billing-
 import { BillingUnitTable } from './BillingUnitTable'
 import { fmtYen } from '../lib/utils'
 import type { ManagementEvent } from '../lib/management-lifecycle'
+import type { CustomerChoice } from '../lib/customer-search'
 
 export type BillingHistoryData = {
   units: readonly BillingUnit[]
   recipientName: (id: number) => string
   projectName: (id: number) => string
   plannedAmount: (unit: BillingUnit) => number | null
-  recipients?: readonly {id:number;name:string}[]
+  recipients?: readonly CustomerChoice[]
   cutoverOn?: string
   managementEvents?: readonly ManagementEvent[]
 }

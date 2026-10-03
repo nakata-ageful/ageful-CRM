@@ -1,7 +1,9 @@
 import {useRef,useState} from 'react'
+import {CustomerPicker} from './CustomerPicker'
+import type {CustomerChoice} from '../lib/customer-search'
 import {isBillingDate} from '../lib/billing-unit'
 export type NewDebitPlan={recipient:number;year:number;month:number;date:string;amount:number|null;note:string;reason:string}
-export function ManualDebitPlanCreator({onSave,recipients=[{id:1,name:'顧客A'},{id:2,name:'顧客B'}],testOnly=true}:{onSave:(value:NewDebitPlan)=>Promise<void>;recipients?:readonly {id:number;name:string}[];testOnly?:boolean}){
+export function ManualDebitPlanCreator({onSave,recipients=[{id:1,name:'顧客A'},{id:2,name:'顧客B'}],testOnly=true}:{onSave:(value:NewDebitPlan)=>Promise<void>;recipients?:readonly CustomerChoice[];testOnly?:boolean}){
  const [recipient,setRecipient]=useState(''),[year,setYear]=useState(''),[month,setMonth]=useState(''),[date,setDate]=useState(''),[amount,setAmount]=useState(''),[note,setNote]=useState(''),[reason,setReason]=useState('')
  const [error,setError]=useState(''),[busy,setBusy]=useState(false);const lock=useRef(false)
  async function save(e:React.FormEvent){e.preventDefault();if(lock.current)return;lock.current=true;setBusy(true);setError('')
@@ -11,7 +13,7 @@ export function ManualDebitPlanCreator({onSave,recipients=[{id:1,name:'顧客A'}
   }catch(e){setError(e instanceof Error?e.message:String(e))}finally{lock.current=false;setBusy(false)}}
  return <details className="card" style={{padding:20}}><summary>振替予定を1件追加</summary><p>対象の月と予定日を指定します。自動で毎月の請求は作りません。</p>
  <form onSubmit={save}><fieldset disabled={busy} style={{border:0,display:'grid',gap:10}}>
- <label>請求先<select value={recipient} onChange={e=>setRecipient(e.target.value)}><option value="">選択してください</option>{recipients.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label>
+ <CustomerPicker label="請求先" value={recipient} onChange={setRecipient} customers={recipients}/>
  <label>対象年<input value={year} onChange={e=>setYear(e.target.value)} inputMode="numeric" required/></label>
  <label>対象月<input value={month} onChange={e=>setMonth(e.target.value)} inputMode="numeric" required/></label>
  <label>振替予定日<input type="date" value={date} onChange={e=>setDate(e.target.value)} required/></label>

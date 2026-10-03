@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import {CustomerPicker} from './CustomerPicker'
+import type {CustomerChoice} from '../lib/customer-search'
 import './OwnershipBillingPlanEditor.css'
 import { prepareOwnershipBillingPlan, type TransferBillingChoice, type TransferBillingUnit } from '../lib/ownership-billing-plan'
 
-type Owner = { id: number; name: string }
+type Owner = CustomerChoice
 export function OwnershipBillingPlanEditor({projectId,oldOwner,newOwner,units:initialUnits,onSave,saveScope='plan',reviewContext,onReview,reviewSummary,testOnly=true,recipientOptions}:{
   projectId:number;oldOwner:Owner;newOwner:Owner;units:readonly TransferBillingUnit[];
   onSave?:(choices:TransferBillingChoice[],reason:string)=>Promise<void>
@@ -59,9 +61,7 @@ export function OwnershipBillingPlanEditor({projectId,oldOwner,newOwner,units:in
           <legend>{unit.serviceYear}年 {unit.roundLabel}</legend>
           {failed&&<p>振替不能の回です。元の請求先を維持し、請求書として残します。</p>}
           <div className="ownership-billing-fields">
-            <label>請求先<select className="form-input" value={d.recipientId} disabled={failed} onChange={e=>patch(i,'recipientId',e.target.value)}>
-              <option value="">選択してください</option>{options.filter(o=>saveScope==='plan'||o.id===oldOwner.id||o.id===newOwner.id||o.id===unit.recipientId).map(o=><option key={o.id} value={o.id}>{o.name}</option>)}
-            </select></label>
+            <CustomerPicker label="請求先" value={d.recipientId} disabled={failed} onChange={value=>patch(i,'recipientId',value)} customers={options.filter(o=>saveScope==='plan'||o.id===oldOwner.id||o.id===newOwner.id||o.id===unit.recipientId)}/>
             <label>請求方法<select className="form-input" value={d.method} onChange={e=>patch(i,'method',e.target.value)}>
               <option>請求書</option>{!failed&&<option>口座振替</option>}
             </select></label>

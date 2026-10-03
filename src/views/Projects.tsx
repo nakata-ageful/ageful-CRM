@@ -3,6 +3,7 @@ import type { ProjectRow, Customer, CustomerInput } from '../types'
 import type { ProjectInput } from '../lib/actions'
 import { dateInputRange } from '../lib/utils'
 import { Modal } from '../components/Modal'
+import { CustomerPicker } from '../components/CustomerPicker'
 import { createCustomer, createProject, deleteProject } from '../lib/actions'
 import { useToast } from '../components/Toast'
 import { projectMatchesSearch } from '../lib/project-search'
@@ -282,17 +283,7 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
 
           {customerMode === 'existing' ? (
             <div className="form-grid">
-              <label className="form-label required" style={{ gridColumn: '1/-1' }}>
-                顧客を選択
-                <select className="form-select" value={selectedCustomerId} onChange={e => setSelectedCustomerId(Number(e.target.value))}>
-                  <option value={0}>-- 顧客を選択 --</option>
-                  {customers.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.company_name ? `${c.company_name}（${c.name}）` : c.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div style={{gridColumn:'1/-1'}}><CustomerPicker label="顧客を選択" value={selectedCustomerId?String(selectedCustomerId):''} onChange={value=>setSelectedCustomerId(Number(value))} customers={customers}/></div>
             </div>
           ) : (
             <div className="form-grid">

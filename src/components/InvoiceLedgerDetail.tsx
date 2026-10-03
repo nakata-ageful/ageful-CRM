@@ -7,6 +7,8 @@ import { ManualDebitEditor } from './ManualDebitEditor'
 import { InvoiceCorrectionEditor } from './InvoiceCorrectionEditor'
 import type { BillingHistoryData } from './BillingHistorySection'
 import { fmtYen } from '../lib/utils'
+import {MaintenancePeriodReview} from './MaintenancePeriodReview'
+import type {SavedMaintenancePeriodChange} from '../lib/saved-maintenance-period'
 
 type EditorMode = 'invoice' | 'plan' | 'debit' | 'correction'
 
@@ -36,10 +38,12 @@ function periodLabel(unit: BillingUnit): string {
     : `${unit.serviceYear}年（保守期間未確認）`
 }
 
-export function InvoiceLedgerDetail({ data, projectId, onSave }: {
+export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartDate, onSavePeriod }: {
   data: BillingHistoryData
   projectId: number
   onSave?: (request: InvoiceWriteRequest) => Promise<unknown>
+  maintenanceStartDate?:string|null
+  onSavePeriod?:(change:SavedMaintenancePeriodChange)=>Promise<unknown>
 }) {
   const units = data.units.filter(unit => unit.projectId === projectId)
   const first = initialUnit(units)
@@ -133,5 +137,9 @@ export function InvoiceLedgerDetail({ data, projectId, onSave }: {
         </div>}
       </>
     })()}
+    {!!units.length&&maintenanceStartDate!==undefined&&<div className="card" style={{padding:20,marginTop:16}}>
+      <h3>保守期間の確認・修正</h3>
+      <MaintenancePeriodReview startDate={maintenanceStartDate} units={units} onSave={onSavePeriod}/>
+    </div>}
   </section>
 }

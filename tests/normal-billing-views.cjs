@@ -31,6 +31,11 @@ const detailHistory={units:[old,{...base,id:'current',roundLabel:'第2回',recip
 const detailHtml=render(InvoiceLedgerDetail,{data:detailHistory,projectId:1,onSave:async()=>{}});
 for(const text of ['今回・次回の請求','82,500','新所有者B','請求予定日','2026-12-01','請求日','2026-12-03','入金予定日','2026-12-31','請求明細','保守料','過去の請求・入金記録','旧所有者A','165,000','入金日を記録'])assert.ok(detailHtml.includes(text),`billing detail missing ${text}`);
 assert.ok(!detailHtml.includes('この発電所の操作'),'old all-actions block must not return');
+const periodDetail=render(InvoiceLedgerDetail,{data:detailHistory,projectId:1,onSave:noAction,maintenanceStartDate:'2022-07-14',onSavePeriod:noAction});
+assert.ok(periodDetail.includes('保守期間の確認・修正'));
+assert.ok(periodDetail.includes('2026-07-14 ～ 2027-07-13'));
+assert.ok(periodDetail.includes('この期間の保存記録を修正'));
+assert.ok(periodDetail.includes('2026-12-03')&&periodDetail.includes('165,000'));
 // Year rollover must move an unpaid occurrence to a warning, not make it disappear.
 const {buildBillingOverview}=load('src/lib/billing-overview.ts');
 const unpaid2025={...old,id:'unpaid-2025',serviceYear:2025,lifecycle:'issued',receivedOn:null,frozenAmount:82500,issuedOn:'2025-12-02'};

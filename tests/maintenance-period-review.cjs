@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path'),ts=require('typescript')
 const root=path.resolve(__dirname,'..')
-function load(file){const m={exports:{}};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText,{exports:m.exports,require:n=>n.startsWith('.')?load(path.resolve(path.dirname(file),n)+'.ts'):require(n)});return m.exports}
+function load(file){const m={exports:{}};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText,{exports:m.exports,require:n=>{if(!n.startsWith('.'))return require(n);const base=path.resolve(path.dirname(file),n);return load(base+(fs.existsSync(base+'.ts')?'.ts':'.tsx'))}});return m.exports}
 const {MaintenancePeriodReview}=load(path.join(root,'src/components/MaintenancePeriodReview.tsx'))
 const React=require('react'),{renderToStaticMarkup}=require('react-dom/server')
 const units=[{id:'1',serviceYear:2026,roundLabel:'保存済み単回記録',lifecycle:'received',scheduledDate:null,issuedOn:'2025-12-02',receivedOn:'2025-12-21',frozenAmount:165000,plannedAmount:null},

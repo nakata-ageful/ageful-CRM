@@ -1,8 +1,8 @@
 import {isBillingDate} from './billing-unit'
 import {maintenancePeriod} from './maintenance-period-label'
-import type {TransferBillingUnit} from './ownership-billing-plan'
+import type {BillingUnit} from './billing-unit'
 export type IndividualPeriod={periodStart:string;periodEnd:string}
-export function validateIndividualPeriod(period:IndividualPeriod,year:number,projectId:number,units:readonly TransferBillingUnit[],startDate?:string|null){
+export function validateIndividualPeriod(period:IndividualPeriod,year:number,projectId:number,units:readonly BillingUnit[],startDate?:string|null){
  if(!isBillingDate(period.periodStart)||!isBillingDate(period.periodEnd)||period.periodStart>period.periodEnd||Number(period.periodStart.slice(0,4))!==year)throw Error('保守期間の開始日・終了日・開始年を確認してください')
  for(const unit of units.filter(u=>u.projectId===projectId)){
   const saved=unit.periodStart&&unit.periodEnd?{periodStart:unit.periodStart,periodEnd:unit.periodEnd}:startDate?maintenancePeriod(startDate,unit.serviceYear):null

@@ -3,6 +3,7 @@ import type { ProjectDetail, AnnualRecordInput, PeriodicMaintenanceInput, Mainte
 import { BillingDetailView } from './BillingDetail'
 import type {BillingHistoryData} from '../components/BillingHistorySection'
 import type {InvoiceWriteRequest} from '../lib/invoice-write-session'
+import type {SavedMaintenancePeriodChange} from '../lib/saved-maintenance-period'
 import {ManualDebitPlanCreator,type NewDebitPlan} from '../components/ManualDebitPlanCreator'
 import {OwnershipBillingPlanEditor} from '../components/OwnershipBillingPlanEditor'
 import {BillingItemSelection} from '../components/BillingItemSelection'
@@ -114,6 +115,7 @@ type Props = {
   billingHistory?:BillingHistoryData
   managementEvents?:readonly ManagementEvent[]
   onSaveInvoice?:(request:InvoiceWriteRequest)=>Promise<unknown>
+  onSavePeriod?:(change:SavedMaintenancePeriodChange)=>Promise<unknown>
   onOwnershipTransfer?:()=>void
   billingUnits?:readonly TransferBillingUnit[]
   onAddDebit?:(input:NewDebitPlan)=>Promise<void>
@@ -148,7 +150,7 @@ function writeTabToHash(t: Tab) {
   }
 }
 
-export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, onViewMaintenance,billingHistory,onSaveInvoice,onOwnershipTransfer,billingUnits,onAddDebit,onSaveBillingPlan,managementEvents }: Props) {
+export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, onViewMaintenance,billingHistory,onSaveInvoice,onSavePeriod,onOwnershipTransfer,billingUnits,onAddDebit,onSaveBillingPlan,managementEvents }: Props) {
   const toast = useToast()
   const { project, customer, contract, annualRecords, maintenanceResponses, periodicMaintenance } = detail
   // DB追加前は新列を送信しない。モックではDBを変更せず動作確認できる。
@@ -1062,6 +1064,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           <BillingDetailView
             billingHistory={billingHistory}
             onSaveInvoice={onSaveInvoice}
+            onSavePeriod={onSavePeriod}
             detail={billingDetail}
             embedded
             onBack={() => {}}

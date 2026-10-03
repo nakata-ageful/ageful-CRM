@@ -368,6 +368,7 @@ function MainApp() {
                 managementEvents={runtime?.managementEvents.filter(e=>e.project_id===projectDetail.project.id)}
                 billingHistory={billingHistory}
                 onSaveInvoice={billingHistory?request=>saveRuntime({action:'invoice',value:request}):undefined}
+                onSavePeriod={runtime&&projectDetail.contract?async change=>{await saveRuntime({action:'service_period',value:{projectId:projectDetail.project.id,contract:projectDetail.contract,versions:Object.fromEntries(runtime.units.filter(u=>u.projectId===projectDetail.project.id).map(u=>[u.id,u.revision])),...change}})}:undefined}
                 onOwnershipTransfer={billingHistory?()=>setTransferOpen(true):undefined}
                 billingUnits={runtime?.units.filter(u=>u.projectId===projectDetail.project.id)}
                 onAddDebit={runtime&&projectDetail.contract?async input=>{await saveRuntime({action:'debit_add',value:{...input,projectId:projectDetail.project.id,contractId:projectDetail.contract!.id}})}:undefined}

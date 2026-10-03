@@ -23,6 +23,9 @@ export function inspectCandidatePeriod(contract:Contract,year:number,period:{per
     if(!conflicting&&u.periodEnd===`${nextYear-1}-12-31`&&next?.mode==='calendar_prepaid'&&next.effective_year===nextYear&&year<nextYear)
       return {superseded:true}
   }
+  const sameYearMismatch=units.some(other=>other.projectId===contract.project_id&&other.serviceYear===year
+    &&isBillingDate(other.periodStart??'')&&isBillingDate(other.periodEnd??'')&&(other.periodStart!==period.periodStart||other.periodEnd!==period.periodEnd))
+  if(sameYearMismatch)return {superseded:false,reason:'保存済みの保守期間と候補の期間が異なります。移行期間と今後の繰り返し設定を確認してください。自動で請求済みとは扱いません'}
   if(overlaps.length||long.length)return {superseded:false,reason:'保存済みの保守期間と重なります。対象期間と請求済みの範囲を確認してください。自動で請求済みとは扱いません'}
   return {superseded:false}
 }

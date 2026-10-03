@@ -83,6 +83,9 @@ export function inspectFutureBillingCoverage(rows:readonly BillingRow[],recipien
             &&u.scheduled_date&&u.service_year!=null&&(serviceYear==null?[y,y+1].includes(u.service_year):u.service_year===serviceYear)
             &&Math.abs(Date.parse(`${u.scheduled_date}T00:00:00Z`)-Date.parse(`${item.date}T00:00:00Z`))<300*86400000)
           if(nearby.length){status='review';reason='別日に保存された同じ回の可能性があります。保守期間・第何回かを確認してください'}
+          else if(serviceYear!=null&&own.some(u=>u.service_year===serviceYear)){
+            status='review';reason='同じ保守開始年の保存記録があります。予定日・対象期間・第何回かの対応を確認してください。別の回は自動で請求済みとは扱いません'
+          }
         }
         // Old imports with no anchor keep their existing date/round correspondence;
         // any actual overlap overrides "handled" instead of erasing an alert.

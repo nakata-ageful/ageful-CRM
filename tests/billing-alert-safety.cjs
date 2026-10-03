@@ -25,6 +25,7 @@ assert.match(next(c,1,history,'2026-10-03').reviewReason,/重な/)
 const shortContract={...c,maintenance_start_date:'2023-08-01'},short={...paid,periodStart:'2026-08-01',periodEnd:'2026-12-31'},shortRule={...rule,effective_year:2027}
 const shortNext=next(shortContract,1,[short],'2026-10-03',[],[shortRule])
 assert.equal(shortNext.year,2027);assert.equal(shortNext.date,'2026-12-01');assert.equal(shortNext.periodStart,'2027-01-01')
+assert.match(assess(shortContract,2026,{periodStart:'2026-08-01',periodEnd:'2027-07-31'},[short],[]).reason,/候補の期間が異な/)
 assert.equal(assess({...c,billing_count:2},2027,partial,[paid],rules).superseded,false,'Two invoices are not waived merely by a long paid period')
 // Scan three complete years: no anniversary claim inside the confirmed transition,
 // and every December prepayment remains until its matching occurrence is registered.
@@ -56,7 +57,7 @@ const {BillingOverviewPanel}=load('src/components/BillingOverviewPanel.tsx'),{In
 const data={units:history,recipients:[{id:1,name:'検証顧客'}],recipientName:()=> '検証顧客',projectName:()=>row.project_name,plannedAmount:()=>null}
 const review=alerts([row],recipients,[paid],'2026-11-03')
 const html=renderToStaticMarkup(React.createElement(BillingOverviewPanel,{data,today:'2026-11-03',setupItems:review.items}))
-assert.ok(html.includes('保存済みの保守期間と重なります'));assert.ok(html.includes('<h3><span>未保存・要確認の請求予定'))
+assert.ok(html.includes('保存済みの保守期間と候補の期間が異なります'));assert.ok(html.includes('<h3><span>未保存・要確認の請求予定'))
 const detail=renderToStaticMarkup(React.createElement(InvoiceLedgerDetail,{data,contract:c,projectId:1,currentRecipientId:1,maintenanceStartDate:c.maintenance_start_date,today:'2026-10-03',onAddSchedule:()=>{throw Error('Render must not write')}}))
 assert.ok(detail.includes('保守期間要確認'));assert.ok(detail.includes('予定を確認・調整'));assert.ok(!detail.includes('請求内容を入力して発行'))
 assert.equal(JSON.stringify({c,paid,rule,row}),baseline)

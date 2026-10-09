@@ -15,6 +15,8 @@ export type BillingHistoryData = {
   cutoverOn?: string
   managementEvents?: readonly ManagementEvent[]
   cycleRules?:readonly BillingCycleRule[]
+  cycleRulesReady?:boolean
+  ownershipChangedProjects?:readonly number[]
 }
 
 export function BillingHistorySection({ data, customerId, projectId, onViewDetail }: {

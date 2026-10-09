@@ -10,6 +10,7 @@ import type { BillingHistoryData } from '../components/BillingHistorySection'
 import {legacyScheduleSetupReview} from '../lib/billing-cutover-coverage'
 import type { InvoiceWriteRequest } from '../lib/invoice-write-session'
 import { managementActiveOn } from '../lib/management-lifecycle'
+import {routineInvoiceContext,type AddRoutineInvoice} from '../lib/routine-invoice'
 
 type Props = {
   rows: BillingRow[]
@@ -19,6 +20,7 @@ type Props = {
   billingToday?: string
   projectRecipients?: ReadonlyMap<number,number>
   onSaveInvoice?: (request: InvoiceWriteRequest) => Promise<unknown>
+  onAddRoutine?:AddRoutineInvoice
 }
 
 // 日付ヘルパー・金額計算・未入金判定は lib/billing.ts に共通化（ダッシュボードと共有）
@@ -30,6 +32,13 @@ export function Billing(props: Props) {
     const setup=legacyScheduleSetupReview(props.rows,props.projectRecipients??new Map(),props.billingHistory.units,today,
       props.billingHistory.cutoverOn,props.billingHistory.managementEvents,props.billingHistory.cycleRules)
     const events = props.billingHistory.managementEvents ?? []
+    const routineInvoices=setup.items.flatMap(item=>{
+      const row=props.rows.find(r=>r.project_id===item.projectId)
+      if(item.status!=='missing'||item.reason||!row?.contract||item.serviceYear==null)return []
+      const context=routineInvoiceContext(row.contract,{year:item.serviceYear,round:item.round,date:item.date,method:item.method,
+        recipientId:item.recipientId,amount:item.amount,periodStart:item.periodStart??null,periodEnd:item.periodEnd??null},props.billingHistory!,today)
+      return context?[context]:[]
+    })
     const debitProjects = props.rows.filter(row => row.contract?.billing_method === '口座振替'
       && (row.contract_count ?? 1) === 1 && managementActiveOn(events, row.project_id, 'all', today)).map(row => {
         const contract = managementActiveOn(events, row.project_id, 'maintenance', today) ? row.contract
@@ -38,7 +47,8 @@ export function Billing(props: Props) {
           days: (row.contract?.billing_schedule_days ?? []).join('・'), amount: withdrawalAmount(contract, Number(today.slice(5, 7))) }
       })
     return <BillingOverviewPanel data={props.billingHistory} today={today} onViewDetail={props.onViewDetail}
-      setupItems={setup.items} setupIssues={setup.issues} debitProjects={debitProjects} onSave={props.onSaveInvoice} />
+      setupItems={setup.items} setupIssues={setup.issues} debitProjects={debitProjects} onSave={props.onSaveInvoice}
+      routineInvoices={routineInvoices} onAddRoutine={props.onAddRoutine}/>
   }
   return <LegacyBilling {...props} />
 }

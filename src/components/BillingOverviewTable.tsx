@@ -7,9 +7,10 @@ export type OverviewMode = 'upcoming' | 'unpaid' | 'received' | 'review'
 export type OverviewEditor = { unitId: string; mode: 'invoice' | 'plan' | 'debit' }
 
 /** Presentation only: one occurrence per row; saved and reference amounts remain distinct. */
-export function BillingOverviewTable({ data, units = [], candidates = [], mode, today, onViewDetail, onEdit }: {
+export function BillingOverviewTable({ data, units = [], candidates = [], mode, today, onViewDetail, onEdit, canRecordCandidate, onRecordCandidate }: {
   data: BillingHistoryData; units?: readonly BillingUnit[]; candidates?: readonly ScheduleSetupItem[]
   mode: OverviewMode; today: string; onViewDetail?: (id: number) => void; onEdit?: (editor: OverviewEditor) => void
+  canRecordCandidate?:(candidate:ScheduleSetupItem)=>boolean;onRecordCandidate?:(candidate:ScheduleSetupItem)=>void
 }) {
   const rows = [
     ...units.map(unit => ({ key: `unit:${unit.id}`, unit, candidate: undefined, projectId: unit.projectId,
@@ -28,9 +29,10 @@ export function BillingOverviewTable({ data, units = [], candidates = [], mode, 
       <th className="billing-overview-money">金額（税込）</th><th className="billing-overview-operation">操作</th></tr></thead>
     <tbody>{rows.map(({ key, unit, candidate, projectId }) => {
       const name = candidate?.projectName ?? data.projectName(projectId)
+      const routine=!!candidate&&!!onRecordCandidate&&!!canRecordCandidate?.(candidate)
       const amount = unit ? resolveUnitAmount(unit) : { amount: candidate!.amount, basis: '参考額' }
       const status = candidate ? candidate.status === 'review' ? '保存内容を確認' : candidate.status === 'overdue' ? '期限超過・要確認'
-        : candidate.date < today ? '予定日経過・要確認' : '未保存・要確認' : billingUnitStatusLabel(unit!)
+        : candidate.date < today ? '予定日経過・要確認' : routine?'請求予定':'未保存・要確認' : billingUnitStatusLabel(unit!)
       const period = unit?.periodStart && unit.periodEnd ? `${unit.periodStart} ～ ${unit.periodEnd}` : unit ? `${unit.serviceYear}年（保守期間未確認）` : candidate?.periodStart&&candidate.periodEnd?`${candidate.periodStart} ～ ${candidate.periodEnd}（参考）`:'対象の保守期間は登録前に確認してください'
       const canIssue = unit && isEditableInvoicePlan(unit) && unit.recipientId != null
       const canCollect = unit?.method === '請求書' && unit.lifecycle === 'issued' && !unit.receivedOn
@@ -38,20 +40,22 @@ export function BillingOverviewTable({ data, units = [], candidates = [], mode, 
       return <tr key={key} data-unit-id={unit?.id} data-candidate-key={candidate ? key : undefined}>
         <td>{onViewDetail ? <button type="button" className="link-btn" onClick={() => onViewDetail(projectId)}>{name}</button> : name}
           {unit?.method === '口座振替' && <small>口座振替</small>}</td>
-        <td>{candidate ? <>{candidate.customerName}<small className="billing-overview-warning">現在の顧客・請求先未確定</small></>
+        <td>{candidate ? <>{candidate.customerName}<small className={routine?'':'billing-overview-warning'}>{routine?'発行時に確認':'請求先・保守期間を確認'}</small></>
           : unit!.recipientId == null ? <span className="billing-overview-warning">請求先要確認</span> : data.recipientName(unit!.recipientId)}</td>
         <td title={`保守期間：${period}`}>{candidate ? `第${candidate.round}回` : unit!.roundLabel === '保存済み単回記録' ? '回数未確認' : unit!.roundLabel}
           {unit && <small>{unit.serviceYear}年</small>}{candidate?.serviceYear&&<small>{candidate.serviceYear}年分（参考）</small>}</td>
         <td className="billing-overview-date-value">{mode === 'unpaid' || mode === 'received' ? unit?.issuedOn ?? '—' : unit?.scheduledDate ?? candidate?.date ?? '日付要確認'}</td>
         <td className={mode === 'unpaid' || mode === 'received' ? 'billing-overview-date-value' : undefined}>{mode === 'unpaid' ? unit?.paymentDueOn ?? '—' : mode === 'received' ? unit?.receivedOn ?? '—'
-          : <span className={candidate ? 'billing-overview-warning' : ''} title={candidate?.reason}>{status}</span>}</td>
+          : <span className={candidate&&!routine ? 'billing-overview-warning' : ''} title={candidate?.reason}>{status}</span>}</td>
         <td className="billing-overview-money"><strong>{amount.amount == null ? '金額要確認' : fmtYen(amount.amount)}</strong>
           {amount.amount != null && amount.basis !== '確定額' && <small className={candidate ? 'billing-overview-warning' : ''}>{amount.basis}</small>}</td>
         <td><div className="billing-overview-actions">
+          {routine&&<button type="button" className="btn btn-main btn-sm" onClick={()=>onRecordCandidate!(candidate!)}>発行内容を記録</button>}
           {onEdit && unit && (canIssue || canCollect) && <button type="button" className="btn btn-main btn-sm" onClick={() => onEdit({ unitId: unit.id, mode: 'invoice' })}>{canCollect ? '入金日を記録' : '発行'}</button>}
           {onEdit && canDebit && <button type="button" className="btn btn-main btn-sm" onClick={() => onEdit({ unitId: unit.id, mode: 'debit' })}>振替結果を記録</button>}
           {onEdit && unit && !canIssue && isEditableInvoicePlan(unit) && data.recipients && <button type="button" className="btn btn-sm" onClick={() => onEdit({ unitId: unit.id, mode: 'plan' })}>請求先を設定</button>}
-          {onViewDetail && !(onEdit && unit && (canIssue || canCollect || canDebit || (isEditableInvoicePlan(unit) && data.recipients))) && <button type="button" className="btn btn-sub btn-sm" aria-label={`${name}の請求詳細を開く`} onClick={() => onViewDetail(projectId)}>{candidate ? '予定を確認' : '詳細'}</button>}
+          {onViewDetail && !routine && !(onEdit && unit && (canIssue || canCollect || canDebit || (isEditableInvoicePlan(unit) && data.recipients))) && <button type="button" className="btn btn-sub btn-sm" aria-label={`${name}の請求詳細を開く`} onClick={() => onViewDetail(projectId)}>{candidate ? '予定を確認' : '詳細'}</button>}
+          {routine&&onViewDetail&&<button type="button" className="btn btn-sub btn-sm" onClick={()=>onViewDetail(projectId)}>詳細</button>}
         </div></td>
       </tr>
     })}</tbody>

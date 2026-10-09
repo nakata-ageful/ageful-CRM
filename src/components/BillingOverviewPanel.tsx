@@ -10,6 +10,8 @@ import { InvoiceUnitEditor } from './InvoiceUnitEditor'
 import { InvoicePlanEditor } from './InvoicePlanEditor'
 import { ManualDebitEditor } from './ManualDebitEditor'
 import { Modal } from './Modal'
+import {RoutineInvoiceEditor} from './RoutineInvoiceEditor'
+import {routineInvoiceKey,type AddRoutineInvoice,type RoutineInvoiceContext} from '../lib/routine-invoice'
 
 export type DebitOverviewProject = { projectId: number; projectName: string; customerName: string; days: string; amount: number }
 function OverviewSection({ title, count, color, collapsed = false, children }: {
@@ -21,13 +23,17 @@ function OverviewSection({ title, count, color, collapsed = false, children }: {
 }
 
 /** Cross-project work list. Classification, saved payer and amount rules are unchanged. */
-export function BillingOverviewPanel({ data, today, onViewDetail, setupItems = [], setupIssues = [], onSave, debitProjects = [] }: {
+export function BillingOverviewPanel({ data, today, onViewDetail, setupItems = [], setupIssues = [], onSave, debitProjects = [], routineInvoices=[],onAddRoutine }: {
   data: BillingHistoryData; today: string; onViewDetail?: (projectId: number) => void
   setupItems?: readonly ScheduleSetupItem[]; setupIssues?: readonly ScheduleSetupIssue[]
   onSave?: (request: InvoiceWriteRequest) => Promise<unknown>; debitProjects?: readonly DebitOverviewProject[]
+  routineInvoices?:readonly RoutineInvoiceContext[];onAddRoutine?:AddRoutineInvoice
 }) {
   const overview = buildBillingOverview(data.units, today)
   const [editor, setEditor] = useState<OverviewEditor | null>(null)
+  const [routine,setRoutine]=useState<RoutineInvoiceContext|null>(null)
+  const [routineBusy,setRoutineBusy]=useState(false)
+  const routineMap=new Map(routineInvoices.map(c=>[routineInvoiceKey(c.contract.project_id,c.item),c]))
   const editingUnit = data.units.find(unit => unit.id === editor?.unitId)
   const noBillingCandidates = setupIssues.filter(issue => issue.category === 'no_billing_candidate')
   const actionRequired = setupIssues.filter(issue => issue.category === 'action_required')
@@ -37,7 +43,9 @@ export function BillingOverviewPanel({ data, today, onViewDetail, setupItems = [
   const debitChecks = setupItems.filter(item => item.method === 'direct_debit')
   const movedItems = new Set<ScheduleSetupItem>([...nearTermCandidates, ...debitChecks])
   const remainingItems = setupItems.filter(item => !movedItems.has(item))
-  const tableProps = { data, today, onViewDetail, onEdit: onSave ? setEditor : undefined }
+  const tableProps = { data, today, onViewDetail, onEdit: onSave ? setEditor : undefined,
+    canRecordCandidate:(item:ScheduleSetupItem)=>routineMap.has(routineInvoiceKey(item.projectId,item)),
+    onRecordCandidate:onAddRoutine&&onSave&&data.recipients?(item:ScheduleSetupItem)=>setRoutine(routineMap.get(routineInvoiceKey(item.projectId,item))??null):undefined }
   const closeEditor = () => setEditor(null)
   const issueList = (issues: readonly ScheduleSetupIssue[]) => <ul className="billing-overview-issues">{issues.map(issue => <li key={`${issue.projectId}:${issue.code}`}>
     <span><strong>{issue.projectName}</strong><small>{issue.reason}</small></span>
@@ -57,7 +65,7 @@ export function BillingOverviewPanel({ data, today, onViewDetail, setupItems = [
     <OverviewSection title="未入金" count={overview.unpaid.length} color="red"><BillingOverviewTable {...tableProps} units={overview.unpaid} mode="unpaid" /></OverviewSection>
     <OverviewSection title="今月・来月・再来月の請求予定" count={overview.upcoming.length + nearTermCandidates.length} color="blue">
       <BillingOverviewTable {...tableProps} units={overview.upcoming} candidates={nearTermCandidates} mode="upcoming" />
-      {!!nearTermCandidates.length && <p className="billing-overview-help">まだ保存していない予定候補です。「参考額」の行は請求先・保守期間・日付・金額を確認して登録してください。自動発行しません。</p>}
+      {!!nearTermCandidates.length && <p className="billing-overview-help">まだ保存していない予定候補です。通常の請求は「発行内容を記録」から、請求先と実際の請求日・明細をまとめて保存できます。「予定を確認」の行は、先に保守期間や保存済み記録との対応を確認してください。請求書の作成・送信は行いません。</p>}
     </OverviewSection>
     <OverviewSection title="口座振替" count={new Set([...debitProjects.map(p => p.projectId), ...debitChecks.map(p => p.projectId), ...overview.debitPlans.map(p => p.projectId)]).size} color="purple" collapsed>
       <p className="billing-overview-help">銀行が振替を実行します。ここでは結果を確認するだけで、未保存は未払い・振替失敗を意味しません。</p>
@@ -81,6 +89,9 @@ export function BillingOverviewPanel({ data, today, onViewDetail, setupItems = [
       {!!noBillingCandidates.length && <details className="billing-overview-secondary"><summary>自社請求なし候補（{noBillingCandidates.length}件・未確定）</summary><p className="billing-overview-help">他社保守などの可能性があります。発電所ごとに確認します。</p>{issueList(noBillingCandidates)}</details>}
     </OverviewSection>}
     <p className="billing-overview-footer">金額・スケジュール・請求方法は「発電所 ＞ 請求情報」、各回の明細・保守期間・訂正は「請求詳細」で確認できます。請求CSVは全期間の各回を出力します。</p>
+    {routine&&onAddRoutine&&onSave&&data.recipients&&<Modal title={`${data.projectName(routine.contract.project_id)}：発行内容を記録`} width={720} closeDisabled={routineBusy} onClose={()=>setRoutine(null)}><div className="standard-editor">
+      <RoutineInvoiceEditor context={routine} recipients={data.recipients} onAdd={onAddRoutine} onSave={onSave} onBusyChange={setRoutineBusy} onClose={()=>setRoutine(null)}/>
+    </div></Modal>}
     {editingUnit && onSave && <Modal title={`${data.projectName(editingUnit.projectId)}：${editor?.mode === 'plan' ? '請求先・予定を設定' : editor?.mode === 'debit' ? '振替結果を記録' : editingUnit.lifecycle === 'issued' ? '入金日を記録' : '請求内容を入力して発行'}`} width={720} onClose={closeEditor}>
       <div className="standard-editor">{editor?.mode === 'plan' && data.recipients ? <InvoicePlanEditor key={editingUnit.id} unit={editingUnit} recipients={data.recipients} onSave={onSave} onClose={closeEditor} />
         : editor?.mode === 'debit' ? <ManualDebitEditor key={editingUnit.id} unit={editingUnit} recipientName={data.recipientName} onSave={onSave} onClose={closeEditor} />

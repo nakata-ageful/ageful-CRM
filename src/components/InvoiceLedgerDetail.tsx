@@ -16,6 +16,8 @@ import {detailPlanCandidate} from '../lib/billing-detail-plan'
 import {BillingOccurrenceCreator,type AddBillingOccurrence} from './BillingOccurrenceCreator'
 import type {MaintenanceScheduleItem} from '../lib/maintenance-schedule'
 import {annualBillableTotalInc} from '../lib/billing'
+import {routineInvoiceContext,type AddRoutineInvoice} from '../lib/routine-invoice'
+import {RoutineInvoiceEditor} from './RoutineInvoiceEditor'
 
 type EditorMode = 'invoice' | 'plan' | 'debit' | 'correction'
 
@@ -67,7 +69,7 @@ function BillingDates({method,scheduledDate,issuedOn,paymentDueOn,receivedOn,ref
   </div>
 }
 
-export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartDate, onSavePeriod,contract,currentRecipientId,onAddSchedule,today }: {
+export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartDate, onSavePeriod,contract,currentRecipientId,onAddSchedule,today,onAddRoutine }: {
   data: BillingHistoryData
   projectId: number
   onSave?: (request: InvoiceWriteRequest) => Promise<unknown>
@@ -77,6 +79,7 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
   currentRecipientId?:number
   onAddSchedule?:AddBillingOccurrence
   today?:string
+  onAddRoutine?:AddRoutineInvoice
 }) {
   const units = data.units.filter(unit => unit.projectId === projectId)
   const first = initialUnit(units)
@@ -90,7 +93,11 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
   const history = billingDetailPeriods(units,maintenanceStartDate)
   const [adding,setAdding]=useState<{after:EditorMode|null}|null>(null)
   const [created,setCreated]=useState<{projectId:number;item:MaintenanceScheduleItem;after:EditorMode|null}|null>(null)
-  useEffect(()=>{setFocusedId(null);setEditor(null);setAdding(null);setCreated(null)},[projectId])
+  const [recording,setRecording]=useState<ReturnType<typeof routineInvoiceContext>>(null)
+  const [recordingBusy,setRecordingBusy]=useState(false)
+  const routine=contract&&candidate?routineInvoiceContext(contract,candidate,data,today??new Date().toLocaleDateString('sv-SE')):null
+  const canRecord=!!routine&&!!onAddRoutine&&!!onSave&&!!data.recipients
+  useEffect(()=>{setFocusedId(null);setEditor(null);setAdding(null);setCreated(null);setRecording(null)},[projectId])
   useEffect(()=>{
     if(!created)return
     if(created.projectId!==projectId){setCreated(null);return}
@@ -117,16 +124,16 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
         <div className="invoice-current-amount">{candidate.amount==null?'金額要確認':fmtYen(candidate.amount)}</div>
         <p className="invoice-current-basis">契約からの参考額 ／ {candidate.method==='direct_debit'?'口座振替':'請求書'}</p>
         <dl className="invoice-current-facts">
-          <div><dt>請求先の候補</dt><dd>{data.recipientName(candidate.recipientId)}</dd></div>
+          <div><dt>{canRecord?'請求先（発行時に確認）':'請求先の候補'}</dt><dd>{data.recipientName(candidate.recipientId)}</dd></div>
           <div><dt>対象の回</dt><dd>第{candidate.round}回（参考）</dd></div>
           <div className="invoice-period-fact"><dt>保守期間</dt><dd>{candidate.periodStart&&candidate.periodEnd?`${candidate.periodStart} ～ ${candidate.periodEnd}（参考）`:'保守開始日未設定'}</dd></div>
         </dl>
         <BillingDates method={candidate.method==='direct_debit'?'口座振替':'請求書'} scheduledDate={candidate.date} reference/>
         {contract&&<p className="invoice-current-basis">年間総額（税込・請求対象のみ）：{fmtYen(annualBillableTotalInc(contract))}</p>}
-        <p className="invoice-reference-help">まだ保存していない予定候補です。請求先・対象期間・日付・金額を確認して登録してください。過去の請求・入金実績ではありません。</p>
+        <p className="invoice-reference-help">{canRecord?'請求先は現在の顧客を初期選択しています。「発行内容を記録」で請求日・実際の明細と一緒に保存できます。事前の予定登録は不要です。':'まだ保存していない予定候補です。請求先・対象期間・日付・金額を確認して登録してください。過去の請求・入金実績ではありません。'}</p>
         {candidate.reviewReason&&<p className="billing-overview-notice" role="alert">保守期間要確認：{candidate.reviewReason}</p>}
         {!candidate.periodStart&&<p className="invoice-reference-help">「保守情報」で保守開始日を確認してください。委託契約の開始日とは別の項目です。</p>}
-        {canCreate&&<div className="invoice-current-actions"><button type="button" className="btn btn-main" onClick={()=>setAdding({after:null})}>{candidate.reviewReason?'予定を確認・調整':'予定を登録'}</button>{!candidate.reviewReason&&<button type="button" className="btn" onClick={()=>setAdding({after:candidate.method==='direct_debit'?'debit':'invoice'})}>{candidate.method==='direct_debit'?'振替結果を記録':'請求内容を入力して発行'}</button>}</div>}
+        {canCreate&&<div className="invoice-current-actions">{canRecord&&<button type="button" className="btn btn-main" onClick={()=>setRecording(routine)}>発行内容を記録</button>}<button type="button" className={canRecord?'btn':'btn btn-main'} onClick={()=>setAdding({after:null})}>{candidate.reviewReason?'予定を確認・調整':'予定を登録'}</button>{!canRecord&&!candidate.reviewReason&&<button type="button" className="btn" onClick={()=>setAdding({after:candidate.method==='direct_debit'?'debit':'invoice'})}>{candidate.method==='direct_debit'?'振替結果を記録':'請求内容を入力して発行'}</button>}</div>}
       </>:<p className="invoice-reference-help">{units.length?'追加できる予定候補がありません。「請求情報」の設定と保存済み記録を確認してください。':'この発電所の請求記録はまだありません。「請求情報」で請求方法・予定日を確認してください。'}</p>}
       {!!contract?.notes&&<div className="invoice-current-lines"><h3>備考</h3><p style={{whiteSpace:'pre-wrap'}}>{contract.notes}</p></div>}
     </div> : (() => {
@@ -205,6 +212,7 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
       </div><p className="invoice-history-help">各回を選ぶと、左側で明細の確認・記録の訂正ができます。請求日が期間外でも、対象の保守期間にまとめます。</p>
     </aside>
     </div>
+    {recording&&onAddRoutine&&onSave&&data.recipients&&<Modal title="発行内容を記録" width={720} closeDisabled={recordingBusy} onClose={()=>setRecording(null)}><div className="standard-editor"><RoutineInvoiceEditor context={recording} recipients={data.recipients} onAdd={onAddRoutine} onSave={onSave} onBusyChange={setRecordingBusy} onClose={()=>setRecording(null)}/></div></Modal>}
     {adding&&candidate&&contract&&onAddSchedule&&data.recipients&&<Modal title="請求・振替予定を追加" width={720} onClose={()=>setAdding(null)}><div className="standard-editor"><BillingOccurrenceCreator key={`${projectId}:${JSON.stringify(candidate)}:${units.map(u=>u.id+':'+u.revision).join(',')}`} candidate={candidate} contract={contract} units={units} recipients={data.recipients} cycleRules={data.cycleRules}
       onSave={async(item,reason)=>{await onAddSchedule(item,reason);setCreated({projectId,item,after:adding.after})}} onClose={()=>setAdding(null)}/></div></Modal>}
     {!!units.length&&maintenanceStartDate!==undefined&&<div className="card" style={{padding:20,marginTop:16}}>

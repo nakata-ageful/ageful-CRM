@@ -33,6 +33,7 @@ import {Modal} from './components/Modal'
 import {OwnershipTransferHistory} from './components/OwnershipTransferHistory'
 import {ProjectManagementActions} from './components/ProjectManagementActions'
 import {BillingCycleSettings} from './components/BillingCycleSettings'
+import {exactRoutinePlan,type AddRoutineInvoice} from './lib/routine-invoice'
 
 type ViewKey =
   | 'dashboard'
@@ -175,6 +176,7 @@ function MainApp() {
   const billingHistory:BillingHistoryData|undefined=runtime?{
     units:runtime.units,recipients:customers,plannedAmount:()=>null,
     cutoverOn:runtime.cutoverOn,managementEvents:runtime.managementEvents,cycleRules:runtime.cycleRules,
+    cycleRulesReady:runtime.cycleRulesReady,ownershipChangedProjects:runtime.transfers.map(t=>Number(t.project_id)),
     recipientName:id=>customers.find(c=>c.id===id)?.name??`請求先ID ${id}（名前未取得）`,
     projectName:id=>projectRows.find(p=>p.id===id)?.project_name??`発電所ID ${id}`,
   }:undefined
@@ -185,10 +187,21 @@ function MainApp() {
     const cd=customerDetail?await getCustomerDetail(customerDetail.customer.id):null
     setRuntime(ledger);setCustomers(c);setProjectRows(p);setBillingRows(b)
     if(detail)setProjectDetail(detail);if(cd)setCustomerDetail(cd)
+    return ledger
   }
-  async function saveRuntime(request:Record<string,unknown>|null){
-    try{await saveBillingRuntime(request,reloadRuntime);setPendingBilling(false)}
+  function saveRuntime(request:Record<string,unknown>|null):Promise<void>
+  function saveRuntime(request:Record<string,unknown>|null,returnSnapshot:true):Promise<BillingRuntimeSnapshot>
+  async function saveRuntime(request:Record<string,unknown>|null,_returnSnapshot?:true):Promise<void|BillingRuntimeSnapshot>{
+    try{const ledger=await saveBillingRuntime(request,reloadRuntime);setPendingBilling(false);return _returnSnapshot?ledger:undefined}
     catch(e){setPendingBilling(await hasPendingBillingRuntime());throw e}
+  }
+  const addRoutineInvoice:AddRoutineInvoice=async(context,item,reason)=>{
+    const ledger=await saveRuntime({action:'future_schedule',value:{projectId:context.contract.project_id,contract:context.contract,
+      versions:context.versions,last:context.last,items:[item],reason,
+      ...(context.cycleRevision==null?{}:{cycleRevision:context.cycleRevision})}},true)
+    const matches=ledger.units.filter(unit=>exactRoutinePlan(unit,context,item))
+    if(matches.length!==1)throw Object.assign(new Error('予定の保存結果を確認してください。新しい予定は追加せず、請求詳細から確認してください'),{code:'PLAN_CORRESPONDENCE'})
+    return matches[0]
   }
 
   useEffect(() => { loadAll() }, [loadAll])
@@ -366,6 +379,7 @@ function MainApp() {
             )}
             {view === 'project-detail' && projectDetail && (
               <ProjectDetailView
+                onAddRoutine={runtime?addRoutineInvoice:undefined}
                 billingCycleSettings={runtime&&projectDetail.contract?<BillingCycleSettings key={`${projectDetail.project.id}:${JSON.stringify(runtime.cycleRules)}`} contract={projectDetail.contract} units={runtime.units} rules={runtime.cycleRules??[]}
                   onSave={runtime.cycleRulesReady?async value=>{await saveRuntime({action:'cycle_rule',value:{projectId:projectDetail.project.id,contract:projectDetail.contract,
                     versions:Object.fromEntries(runtime.units.filter(u=>u.projectId===projectDetail.project.id).map(u=>[u.id,u.revision])),
@@ -453,6 +467,7 @@ function MainApp() {
             {view === 'billing' && (
               <Billing
                 billingHistory={billingHistory}
+                onAddRoutine={runtime?addRoutineInvoice:undefined}
                 onSaveInvoice={billingHistory?request=>saveRuntime({action:'invoice',value:request}):undefined}
                 projectRecipients={new Map(projectRows.map(p=>[p.id,p.customer_id]))}
                 rows={billingRows}

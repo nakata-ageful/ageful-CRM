@@ -5,6 +5,7 @@ import type {BillingHistoryData} from '../components/BillingHistorySection'
 import type {InvoiceWriteRequest} from '../lib/invoice-write-session'
 import type {SavedMaintenancePeriodChange} from '../lib/saved-maintenance-period'
 import type {AddBillingOccurrence} from '../components/BillingOccurrenceCreator'
+import type {AddRoutineInvoice} from '../lib/routine-invoice'
 import type {NewDebitPlan} from '../components/ManualDebitPlanCreator'
 import {BillingExceptionActions} from '../components/BillingExceptionActions'
 import type {TransferBillingChoice,TransferBillingUnit} from '../lib/ownership-billing-plan'
@@ -117,6 +118,7 @@ type Props = {
   onSaveInvoice?:(request:InvoiceWriteRequest)=>Promise<unknown>
   onSavePeriod?:(change:SavedMaintenancePeriodChange)=>Promise<unknown>
   onAddSchedule?:AddBillingOccurrence
+  onAddRoutine?:AddRoutineInvoice
   onOwnershipTransfer?:()=>void
   billingUnits?:readonly TransferBillingUnit[]
   onAddDebit?:(input:NewDebitPlan)=>Promise<void>
@@ -151,7 +153,7 @@ function writeTabToHash(t: Tab) {
   }
 }
 
-export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, onViewMaintenance,billingHistory,onSaveInvoice,onSavePeriod,onAddSchedule,onOwnershipTransfer,billingUnits,onAddDebit,onSaveBillingPlan,managementTools,changeHistory,billingCycleSettings }: Props) {
+export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, onViewMaintenance,billingHistory,onSaveInvoice,onSavePeriod,onAddSchedule,onAddRoutine,onOwnershipTransfer,billingUnits,onAddDebit,onSaveBillingPlan,managementTools,changeHistory,billingCycleSettings }: Props) {
   const toast = useToast()
   const { project, customer, contract, annualRecords, maintenanceResponses, periodicMaintenance } = detail
   // DB追加前は新列を送信しない。モックではDBを変更せず動作確認できる。
@@ -1066,6 +1068,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             onSaveInvoice={onSaveInvoice}
             onSavePeriod={onSavePeriod}
             onAddSchedule={onAddSchedule}
+            onAddRoutine={onAddRoutine}
             detail={billingDetail}
             embedded
             onBack={() => {}}

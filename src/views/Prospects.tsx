@@ -482,6 +482,7 @@ export function Prospects({
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
+                <th style={{ ...thStyle, width: '1%', padding: '9px 6px' }}>見込み</th>
                 <th style={thStyle}>顧客名</th>
                 <th style={thStyle}>発電所名</th>
                 <th style={thStyle}>信販利用</th>
@@ -499,6 +500,17 @@ export function Prospects({
                   className="clickable-row"
                   onClick={() => onViewDetail(p.id)}
                 >
+                  <td style={{ ...tdStyle, padding: '4px 6px', whiteSpace: 'nowrap' }}>
+                    <button
+                      type="button"
+                      className="btn btn-sub btn-sm prospect-detail-button"
+                      aria-label={`${p.project_name}の見込み詳細を開く`}
+                      onClick={e => {
+                        e.stopPropagation()
+                        onViewDetail(p.id)
+                      }}
+                    >詳細</button>
+                  </td>
                   <td style={{ ...tdStyle, fontWeight: 600 }} onClick={e => {
                     if (p.converted_customer_id) {
                       e.stopPropagation()
@@ -518,15 +530,6 @@ export function Prospects({
                     {p.converted_customer_id ? (
                       <span style={{ color: '#2563eb', cursor: 'pointer', textDecoration: 'underline' }}>{p.project_name}</span>
                     ) : p.project_name}
-                    <button
-                      type="button"
-                      className="btn btn-sub btn-sm prospect-detail-button"
-                      aria-label={`${p.project_name}の見込み詳細を開く`}
-                      onClick={e => {
-                        e.stopPropagation()
-                        onViewDetail(p.id)
-                      }}
-                    >見込み詳細</button>
                   </td>
                   <td style={tdStyle}>
                     {p.loan_company && (
@@ -547,7 +550,7 @@ export function Prospects({
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan={8} className="empty-cell">該当する案件がありません</td></tr>
+                <tr><td colSpan={9} className="empty-cell">該当する案件がありません</td></tr>
               )}
             </tbody>
           </table>

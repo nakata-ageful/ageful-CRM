@@ -28,25 +28,32 @@ const rows=nodes(tree,e=>e.type==='tr'&&e.props.className==='clickable-row')
 assert.equal(rows.length,2)
 for(const [i,row] of rows.entries()){
  const button=nodes(row,e=>e.type==='button'&&e.props.className.includes('prospect-detail-button'))[0]
- assert.equal(button.props.type,'button');assert.equal(button.props.children,'見込み詳細')
+ assert.equal(button.props.type,'button');assert.equal(button.props.children,'詳細')
  assert.equal(button.props['aria-label'],`${prospects[i].project_name}の見込み詳細を開く`)
  let stopped=false
  button.props.onClick({stopPropagation(){stopped=true}})
  // Model real bubbling only when the child handler did not stop it.
  const cells=nodes(row,e=>e.type==='td')
- assert.ok(nodes(cells[1],e=>e===button).length,'Button must be beside the project name, not in the far-right action column')
- if(!stopped){cells[1].props.onClick({stopPropagation(){stopped=true}});if(!stopped)row.props.onClick()}
+ assert.equal(cells.length,9)
+ assert.ok(nodes(cells[0],e=>e===button).length,'Button must have its own column before the customer name')
+ assert.equal(nodes(cells[2],e=>e===button).length,0,'No button stacked under the project name')
+ assert.equal(cells[0].props.style.padding,'4px 6px')
+ if(!stopped)row.props.onClick()
  assert.equal(stopped,true)
  assert.deepEqual(calls.pop(),['prospect',prospects[i].id]);assert.equal(calls.length,0,'No duplicate or project navigation')
  row.props.onClick();assert.deepEqual(calls.pop(),['prospect',prospects[i].id])
- for(const [column,kind] of [[0,'customer'],[1,'project']]){
+ for(const [column,kind] of [[1,'customer'],[2,'project']]){
   stopped=false;cells[column].props.onClick({stopPropagation(){stopped=true}})
   if(prospects[i].converted_customer_id){assert.equal(stopped,true);assert.deepEqual(calls.pop(),[kind,23])}
   else {assert.equal(stopped,false);row.props.onClick();assert.deepEqual(calls.pop(),['prospect',18])}
  }
 }
 assert.equal(JSON.stringify(prospects),before);assert.equal(calls.length,0)
+const headers=nodes(tree,e=>e.type==='th')
+assert.equal(headers.length,9);assert.equal(headers[0].props.children,'見込み');assert.equal(headers[0].props.style.width,'1%')
+const empty=Prospects({prospects:[],customers:[],onReload:()=>{},onViewDetail:()=>{},onViewProject:()=>{},onViewCustomer:()=>{}})
+assert.equal(nodes(empty,e=>e.type==='td'&&e.props.className==='empty-cell')[0].props.colSpan,9)
 const css=fs.readFileSync(path.join(root,'src/styles.css'),'utf8')
-assert.match(css,/\.prospect-detail-button\s*\{[^}]*min-height:\s*44px;[^}]*white-space:\s*nowrap;/s)
+assert.match(css,/\.prospect-detail-button\s*\{[^}]*min-width:\s*44px;[^}]*min-height:\s*36px;[^}]*margin:\s*0;[^}]*white-space:\s*nowrap;/s)
 assert.match(css,/\.prospect-detail-button:focus-visible/)
-console.log('PASS: explicit prospect detail button by plant name, one correct-ID navigation, stopped bubbling, unchanged customer/project/row routes, touch target and no business writes')
+console.log('PASS: narrow leading prospect column, compact unstacked button, nine-column empty state, one correct-ID navigation, stopped bubbling, unchanged customer/project/row routes and no business writes')

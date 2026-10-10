@@ -518,6 +518,15 @@ export function Prospects({
                     {p.converted_customer_id ? (
                       <span style={{ color: '#2563eb', cursor: 'pointer', textDecoration: 'underline' }}>{p.project_name}</span>
                     ) : p.project_name}
+                    <button
+                      type="button"
+                      className="btn btn-sub btn-sm prospect-detail-button"
+                      aria-label={`${p.project_name}の見込み詳細を開く`}
+                      onClick={e => {
+                        e.stopPropagation()
+                        onViewDetail(p.id)
+                      }}
+                    >見込み詳細</button>
                   </td>
                   <td style={tdStyle}>
                     {p.loan_company && (

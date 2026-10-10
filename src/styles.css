@@ -856,6 +856,14 @@ input[type="number"] {
 .link-btn:hover { color: #0284c7; }
 
 /* ── Prospect Badges ─────────────────────────────────────── */
+.prospect-detail-button {
+  display: block;
+  min-height: 44px;
+  margin: 8px auto 0;
+  white-space: nowrap;
+}
+.prospect-detail-button:focus-visible { outline: 2px solid #0284c7; outline-offset: 2px; }
+
 .prospect-badge {
   display: inline-block;
   padding: 3px 10px;

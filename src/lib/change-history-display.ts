@@ -9,7 +9,7 @@ const record=(value:unknown):Record<string,unknown>=>value&&typeof value==='obje
 export function buildChangeHistory(transfers:readonly Record<string,unknown>[],events:readonly Record<string,unknown>[],management:readonly ManagementEvent[]):HistoryEntry[]{
   const entries:HistoryEntry[]=[
     ...transfers.map(t=>({key:`ownership:${t.id}`,kind:'ownership' as const,date:String(t.recorded_at??t.transfer_date??''),title:t.event_type==='correction'?'所有者変更を訂正':'所有者を変更',reason:String(record(t.field_decisions).reason??'確認内容の記録なし'),record:t})),
-    ...events.map(e=>({key:`billing:${e.id}`,kind:'billing' as const,date:String(e.recorded_at??''),title:eventLabels[String(e.event_type)]??'請求記録を保存',reason:String(e.reason??'確認内容の記録なし'),record:e})),
+    ...events.map(e=>({key:`billing:${e.id}`,kind:'billing' as const,date:String(e.recorded_at??''),title:record(e.before_value).removed_at!==record(e.after_value).removed_at&&(record(e.before_value).removed_at||record(e.after_value).removed_at)?(record(e.after_value).removed_at?'請求・入金記録を削除':'請求・入金記録を復元'):eventLabels[String(e.event_type)]??'請求記録を保存',reason:String(e.reason??'確認内容の記録なし'),record:e})),
     ...management.map(m=>({key:`management:${m.id}`,kind:'management' as const,date:String((m as ManagementEvent&{recorded_at?:string}).recorded_at??m.effective_date),title:`${m.scope==='all'?'すべての取引':'保守だけ'}を${m.action==='end'?'終了':'再開'}`,reason:m.reason,record:m})),
   ]
   return entries.sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0)||Number(b.record.id)-Number(a.record.id)||a.key.localeCompare(b.key))
@@ -19,7 +19,7 @@ function canonical(value:unknown):string {
 }
 const billingLabels:Record<string,string>={recipient_customer_id:'請求先',collection_method:'請求方法',original_method:'登録時の請求方法',planned_amount:'予定額（税込）',frozen_amount:'確定額（税込）',scheduled_date:'請求・振替予定日',issued_on:'請求日',payment_due_on:'入金予定日',received_on:'入金日',period_start:'保守期間の開始日',period_end:'保守期間の終了日',plan_note:'備考',frozen_line_items:'確定した明細',lifecycle:'請求の状態',collection_state:'振替・入金の結果',service_year:'保守期間の開始年',service_month:'対象月',round_number:'対象の回',id:'請求回ID',project_id:'発電所ID',contract_id:'契約ID',revision:'更新番号',updated_at:'更新日時',created_at:'登録日時',frozen_at:'金額の確定日時',recipient_source:'請求先の確認状態',amount_basis:'金額の根拠'}
 export function historyFields(before:unknown,after:unknown,kind:'contract'|'billing',all=false){
-  const a=record(before),b=record(after),labels:Record<string,string>=kind==='contract'?contractTransferLabels:billingLabels
+  const a=record(before),b=record(after),labels:Record<string,string>=kind==='contract'?contractTransferLabels:{...billingLabels,removed_at:'記録の削除日時',removal_reason:'削除理由'}
   const keys=[...new Set([...Object.keys(labels),...Object.keys(a),...Object.keys(b)])]
   const technical=['id','project_id','contract_id','revision','updated_at','created_at','frozen_at','recipient_plan_id','schema_version']
   return keys.filter(k=>(k in a||k in b)&&(all||!technical.includes(k)&&canonical(a[k])!==canonical(b[k]))).map(key=>({key,label:labels[key]??({mode:'繰り返し方法',effective_year:'適用開始年',reason:'確認内容',recorded_at:'記録日時',actor_user_id:'記録者ID',operation_key:'操作ID'} as Record<string,string>)[key]??`追加項目（${key}）`,before:a[key],after:b[key]}))

@@ -1,12 +1,12 @@
 import type { BillingUnit } from './billing-unit'
-import { resolveUnitAmount } from './billing-unit'
+import { resolveUnitAmount,isActiveBillingUnit } from './billing-unit'
 import { copyJson } from './billing-json'
 
 /** Filter the already authorized cross-project ledger by saved payer, never current project owner. */
 export function customerBillingHistory(units: readonly BillingUnit[], customerId: number): BillingUnit[] {
   if (!Number.isSafeInteger(customerId) || customerId <= 0) throw new Error('顧客を確認してください')
   if (new Set(units.map(unit => unit.id)).size !== units.length) throw new Error('請求回IDが重複しています')
-  return copyJson(units.filter(unit => unit.recipientId === customerId)).sort((a, b) =>
+  return copyJson(units.filter(unit => isActiveBillingUnit(unit)&&unit.recipientId === customerId)).sort((a, b) =>
     (b.receivedOn ?? b.issuedOn ?? b.scheduledDate ?? '').localeCompare(a.receivedOn ?? a.issuedOn ?? a.scheduledDate ?? '')
       || b.serviceYear - a.serviceYear || a.id.localeCompare(b.id))
 }
@@ -16,6 +16,7 @@ export function summarizeBillingHistory(units: readonly BillingUnit[]) {
   if (new Set(units.map(unit => unit.id)).size !== units.length) throw new Error('請求回IDが重複しています')
   const result = { receivedAmount: 0, unpaidAmount: 0, unknownActualCount: 0, plannedCount: 0, reviewCount: 0, cancelledCount: 0 }
   for (const unit of units) {
+    if(!isActiveBillingUnit(unit))continue
     if (unit.lifecycle === 'cancelled') { result.cancelledCount++; continue }
     if (unit.lifecycle === 'review_required') { result.reviewCount++; continue }
     if (unit.lifecycle === 'planned' && !unit.receivedOn && !unit.issuedOn) { result.plannedCount++; continue }

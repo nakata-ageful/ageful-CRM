@@ -34,7 +34,7 @@ export function BillingOverviewPanel({ data, today, onViewDetail, setupItems = [
   const [routine,setRoutine]=useState<RoutineInvoiceContext|null>(null)
   const [routineBusy,setRoutineBusy]=useState(false)
   const routineMap=new Map(routineInvoices.map(c=>[routineInvoiceKey(c.contract.project_id,c.item),c]))
-  const editingUnit = data.units.find(unit => unit.id === editor?.unitId)
+  const editingUnit = data.units.find(unit => !unit.removedAt&&unit.id === editor?.unitId)
   const noBillingCandidates = setupIssues.filter(issue => issue.category === 'no_billing_candidate')
   const actionRequired = setupIssues.filter(issue => issue.category === 'action_required')
   const nearTermCandidates = setupItems.filter(item => item.method === 'invoice' && overview.months.includes(item.date.slice(0, 7))

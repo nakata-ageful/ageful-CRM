@@ -1,4 +1,4 @@
-import { isBillingDate, type BillingUnit } from './billing-unit'
+import { isBillingDate,isActiveBillingUnit, type BillingUnit } from './billing-unit'
 import { copyJson } from './billing-json'
 import { summarizeBillingHistory } from './billing-history'
 
@@ -6,7 +6,7 @@ import { summarizeBillingHistory } from './billing-history'
 export function buildBillingOverview(source: readonly BillingUnit[], today: string) {
   if (!isBillingDate(today)) throw new Error('集計日が不正です')
   if (new Set(source.map(u => u.id)).size !== source.length) throw new Error('請求回IDが重複しています')
-  const units = copyJson([...source])
+  const units = copyJson(source.filter(isActiveBillingUnit))
   const year = Number(today.slice(0,4)), month = Number(today.slice(5,7))
   const months = Array.from({length:3},(_,i) => {
     const offset=month-1+i

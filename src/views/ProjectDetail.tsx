@@ -116,6 +116,7 @@ type Props = {
   changeHistory?:ReactNode
   billingCycleSettings?:ReactNode
   onSaveInvoice?:(request:InvoiceWriteRequest)=>Promise<unknown>
+  onRecordRemoval?:(request:import('../lib/billing-record-removal').BillingRecordRemovalRequest)=>Promise<unknown>
   onSavePeriod?:(change:SavedMaintenancePeriodChange)=>Promise<unknown>
   onAddSchedule?:AddBillingOccurrence
   onAddRoutine?:AddRoutineInvoice
@@ -153,7 +154,7 @@ function writeTabToHash(t: Tab) {
   }
 }
 
-export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, onViewMaintenance,billingHistory,onSaveInvoice,onSavePeriod,onAddSchedule,onAddRoutine,onOwnershipTransfer,billingUnits,onAddDebit,onSaveBillingPlan,managementTools,changeHistory,billingCycleSettings }: Props) {
+export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, onViewMaintenance,billingHistory,onSaveInvoice,onSavePeriod,onAddSchedule,onAddRoutine,onOwnershipTransfer,billingUnits,onAddDebit,onSaveBillingPlan,managementTools,changeHistory,billingCycleSettings,onRecordRemoval }: Props) {
   const toast = useToast()
   const { project, customer, contract, annualRecords, maintenanceResponses, periodicMaintenance } = detail
   // DB追加前は新列を送信しない。モックではDBを変更せず動作確認できる。
@@ -1066,6 +1067,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           <BillingDetailView
             billingHistory={billingHistory}
             onSaveInvoice={onSaveInvoice}
+            onRecordRemoval={onRecordRemoval}
             onSavePeriod={onSavePeriod}
             onAddSchedule={onAddSchedule}
             onAddRoutine={onAddRoutine}

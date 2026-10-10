@@ -2,6 +2,7 @@ import {resolveUnitAmount,billingUnitStatusLabel,type BillingUnit} from './billi
 // Text fields are protected against spreadsheet formula execution. Numeric yen remain numeric.
 const cell=(value:string|number|null)=>{let text=value==null?'':String(value);if(typeof value==='string'&&/^[\s]*[=+@-]/.test(text))text="'"+text;return /[",\r\n]/.test(text)?`"${text.replace(/"/g,'""')}"`:text}
 export function buildBillingUnitCsv(units:readonly BillingUnit[],recipientName:(id:number)=>string,projectName:(id:number)=>string){
+ units=units.filter(u=>!u.removedAt)
  const header=['請求回ID','発電所ID','発電所','請求先ID','請求先','保守開始日','保守終了日','保守期間の確認','記録年','回','請求方法','請求予定日','発行日','入金日','状態','金額区分','表示金額（税込）','予定額（税込）','確定額（税込）','備考']
  return '\uFEFF'+[header,...[...units].sort((a,b)=>a.projectId-b.projectId||a.serviceYear-b.serviceYear||a.id.localeCompare(b.id)).map(u=>{const amount=resolveUnitAmount(u);return [u.id,u.projectId,projectName(u.projectId),u.recipientId,u.recipientId==null?'請求先要確認':recipientName(u.recipientId),u.periodStart??null,u.periodEnd??null,u.periodStart&&u.periodEnd?'保存済み':'要確認',u.serviceYear,u.roundLabel,u.method,u.scheduledDate,u.issuedOn,u.receivedOn,billingUnitStatusLabel(u),amount.basis,amount.amount,u.plannedAmount??null,u.frozenAmount,u.planNote??null]})].map(row=>row.map(cell).join(',')).join('\r\n')
 }

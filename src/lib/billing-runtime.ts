@@ -8,13 +8,14 @@ import {cycleRuleFromStorage,type BillingCycleRule} from './billing-cycle'
 
 // Deployment opt-in AND authenticated server readiness. Never silently fall back to old writers.
 export {billingRuntimeEnabled}
-export type BillingRuntimeSnapshot={units:TransferBillingUnit[];transfers:Record<string,unknown>[];events:Record<string,unknown>[];managementEvents:ManagementEvent[];cutoverOn:string;cycleRules?:BillingCycleRule[];cycleRulesReady?:boolean}
+export type BillingRuntimeSnapshot={units:TransferBillingUnit[];transfers:Record<string,unknown>[];events:Record<string,unknown>[];managementEvents:ManagementEvent[];cutoverOn:string;cycleRules?:BillingCycleRule[];cycleRulesReady?:boolean;recordRemovalReady?:boolean}
 export async function loadBillingRuntime():Promise<BillingRuntimeSnapshot>{
   if(billingRuntimePreview)return previewSnapshot()
   if(!supabase||!billingRuntimeEnabled)throw Error('新しい請求機能はまだ有効化されていません')
   const {data,error}=await supabase.rpc('billing_runtime_snapshot')
   if(error)throw error
-  if(data?.version!==2||data?.ready!==true||!isBillingDate(data.cutover_on)||!Array.isArray(data.units)||!Array.isArray(data.transfers)||!Array.isArray(data.events)||!Array.isArray(data.management_events))throw Error('請求データの移行・アクセス保護が未完了です。旧画面へは自動で切り替えません')
+  if(![2,3].includes(data?.version)||data?.ready!==true||!isBillingDate(data.cutover_on)||!Array.isArray(data.units)||!Array.isArray(data.transfers)||!Array.isArray(data.events)||!Array.isArray(data.management_events))throw Error('請求データの移行・アクセス保護が未完了です。画面を再読み込みして確認してください。旧画面へは自動で切り替えません')
+  if(data.version===3&&(data.record_removal_ready!==true||data.units.some((row:Record<string,unknown>)=>!Object.hasOwn(row,'removed_at')||!Object.hasOwn(row,'removal_reason'))))throw Error('削除状態を取得できません。画面を再読み込みしてください')
   const units:TransferBillingUnit[]=data.units.map((row:Record<string,unknown>)=>{
     if(!['pending','succeeded','failed','not_applicable'].includes(String(row.collection_state)))throw Error('振替状態が不正です')
     if(!['default','override','confirmed','unconfirmed'].includes(String(row.recipient_source)))throw Error('請求先の確定状態が不正です')
@@ -25,7 +26,7 @@ export async function loadBillingRuntime():Promise<BillingRuntimeSnapshot>{
   if(new Set(units.map(u=>u.id)).size!==units.length)throw Error('請求回が重複しています')
   if(data.cycle_rules_ready===true&&!Array.isArray(data.cycle_rules))throw Error('請求の繰り返し設定を取得できません')
   return {units,transfers:data.transfers,events:data.events,managementEvents:data.management_events.map(managementEventFromStorage),cutoverOn:data.cutover_on,
-    cycleRules:Array.isArray(data.cycle_rules)?data.cycle_rules.map(cycleRuleFromStorage):[],cycleRulesReady:data.cycle_rules_ready===true}
+    cycleRules:Array.isArray(data.cycle_rules)?data.cycle_rules.map(cycleRuleFromStorage):[],cycleRulesReady:data.cycle_rules_ready===true,recordRemovalReady:data.version===3&&data.record_removal_ready===true}
 }
 async function operation<T>(reload:()=>Promise<T>){
   if(!supabase||!billingRuntimeEnabled)throw Error('新しい請求機能は無効です')

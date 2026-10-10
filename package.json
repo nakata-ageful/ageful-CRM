@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "test:billing-removal": "node tests/billing-record-removal.cjs && node tests/billing-record-removal-postgres.mjs",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",

@@ -2,13 +2,14 @@ import type {Contract} from '../types'
 import {isBillingDate} from './billing-unit'
 import {cycleCompatibility,cycleRuleForYear,type BillingCycleRule} from './billing-cycle'
 
-export type PeriodEvidence={projectId:number;serviceYear:number;method:string;lifecycle:string;periodStart?:string|null;periodEnd?:string|null}
+export type PeriodEvidence={projectId:number;serviceYear:number;method:string;lifecycle:string;periodStart?:string|null;periodEnd?:string|null;removedAt?:string|null}
 
 /** Explicit ranges only: neither a payment date nor the historical start proves coverage.
  * Suppress a reference only when a completed long transition and its next January rule
  * explain it together. Ambiguous overlaps stay actionable, never become "handled".
  */
 export function inspectCandidatePeriod(contract:Contract,year:number,period:{periodStart:string|null;periodEnd:string|null},units:readonly PeriodEvidence[],rules:readonly BillingCycleRule[]=[]):{superseded:boolean;reason?:string}{
+  units=units.filter(u=>!u.removedAt)
   if(!period.periodStart||!period.periodEnd)return {superseded:false,reason:'対象の保守期間が未確認です。「保守情報」と保存済み記録を確認してください'}
   const overlaps=units.filter(u=>u.projectId===contract.project_id&&u.serviceYear!==year
     &&isBillingDate(u.periodStart??'')&&isBillingDate(u.periodEnd??'')&&u.periodStart!<=period.periodEnd!&&period.periodStart!<=u.periodEnd!)

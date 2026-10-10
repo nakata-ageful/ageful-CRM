@@ -181,7 +181,7 @@ function MainApp() {
   const billingHistory:BillingHistoryData|undefined=runtime?{
     units:runtime.units,recipients:customers,plannedAmount:()=>null,
     cutoverOn:runtime.cutoverOn,managementEvents:runtime.managementEvents,cycleRules:runtime.cycleRules,
-    cycleRulesReady:runtime.cycleRulesReady,ownershipChangedProjects:runtime.transfers.map(t=>Number(t.project_id)),
+    cycleRulesReady:runtime.cycleRulesReady,recordRemovalReady:runtime.recordRemovalReady,ownershipChangedProjects:runtime.transfers.map(t=>Number(t.project_id)),
     recipientName:id=>customers.find(c=>c.id===id)?.name??`請求先ID ${id}（名前未取得）`,
     projectName:id=>projectRows.find(p=>p.id===id)?.project_name??`発電所ID ${id}`,
   }:undefined
@@ -399,6 +399,7 @@ function MainApp() {
                   key={projectDetail.project.id} managementEvents={runtime.managementEvents.filter(e=>e.project_id===projectDetail.project.id)} transfers={runtime.transfers.filter(t=>t.project_id===projectDetail.project.id)} events={runtime.events.filter(e=>e.project_id===projectDetail.project.id)} recipientName={billingHistory.recipientName}/>:undefined}
                 billingHistory={billingHistory}
                 onSaveInvoice={billingHistory?request=>saveRuntime({action:'invoice',value:request}):undefined}
+                onRecordRemoval={runtime?.recordRemovalReady?request=>saveRuntime({action:'record_removal',value:request}):undefined}
                 onAddSchedule={runtime&&projectDetail.contract?async(item,reason)=>{await saveRuntime({action:'future_schedule',value:{projectId:projectDetail.project.id,contract:projectDetail.contract,
                   versions:Object.fromEntries(runtime.units.filter(u=>u.projectId===projectDetail.project.id).map(u=>[u.id,u.revision])),
                   last:Math.max(0,...runtime.managementEvents.filter(e=>e.project_id===projectDetail.project.id).map(e=>e.id)),items:[item],reason,

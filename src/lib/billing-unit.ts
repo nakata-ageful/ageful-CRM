@@ -24,12 +24,18 @@ export type BillingUnit = {
   periodStart?: string | null
   periodEnd?: string | null
   planNote?: string | null
+  /** Soft removal preserves financial facts and occurrence identity. */
+  removedAt?: string | null
+  removalReason?: string | null
 }
+
+export const isActiveBillingUnit = (unit: Pick<BillingUnit,'removedAt'>): boolean => !unit.removedAt
 
 export type UnitAmount = { amount: number | null; basis: '確定額' | '予定額' | '金額要確認' }
 
 /** Shared display wording for invoice/debit history; does not decide when debit amounts freeze. */
 export function billingUnitStatusLabel(unit: BillingUnit): string {
+  if (!isActiveBillingUnit(unit)) return '削除済み'
   if (unit.lifecycle === 'cancelled') return '取りやめ'
   if (unit.lifecycle === 'review_required') return '記録要確認'
   if (unit.lifecycle === 'received' || unit.receivedOn) return '入金済'
@@ -63,7 +69,7 @@ export function resolveUnitAmount(unit: BillingUnit, _legacyEstimate?: () => num
 
 /** 振替の固定境界は未決。今回の編集対象は未発行の請求書のみ。 */
 export function isEditableInvoicePlan(unit: BillingUnit): boolean {
-  return unit.method === '請求書' && unit.lifecycle === 'planned'
+  return isActiveBillingUnit(unit) && unit.method === '請求書' && unit.lifecycle === 'planned'
     && !unit.issuedOn && !unit.receivedOn && !unit.frozenAt && unit.frozenAmount == null
 }
 

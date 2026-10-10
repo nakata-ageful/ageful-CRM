@@ -35,13 +35,17 @@ export function billingUnitFromStorage(row: Record<string, unknown>): BillingUni
     if (typeof row.frozen_at !== 'string' || !Number.isFinite(Date.parse(row.frozen_at))) throw new Error('確定日時が不正です')
     frozenAt = row.frozen_at
   } else if (row.frozen_line_items !== null || row.frozen_at !== null) throw new Error('確定情報が不整合です')
+  const removedAt=row.removed_at??null,removalReason=row.removal_reason??null
+  if(removedAt!==null&&(typeof removedAt!=='string'||!Number.isFinite(Date.parse(removedAt)))
+    ||(removedAt===null?removalReason!==null:typeof removalReason!=='string'||!removalReason.trim()))throw Error('請求記録の削除状態が不正です')
+  if(removedAt!==null&&(!['issued','received'].includes(String(lifecycle))||row.issued_on===null&&row.received_on===null))throw Error('削除済み記録の請求・入金実績が不正です')
   return { id: String(integer('id',1)), projectId: integer('project_id',1), serviceYear: year,
     roundLabel: month !== null ? `${month}月分` : round !== null ? `第${round}回` : '保存済み単回記録',
     method: row.collection_method === 'invoice' ? '請求書' : '口座振替',
     scheduledDate: date('scheduled_date'), issuedOn: date('issued_on'), receivedOn: date('received_on'),paymentDueOn:date('payment_due_on'),
     recipientId: row.recipient_customer_id === null ? null : integer('recipient_customer_id',1),
     lifecycle: lifecycle as BillingUnit['lifecycle'], frozenAmount: amount, frozenLineItems: items, frozenAt,
-    plannedAmount: row.planned_amount == null ? null : integer('planned_amount',0), revision: integer('revision',0),
+    plannedAmount: row.planned_amount == null ? null : integer('planned_amount',0), revision: integer('revision',0),removedAt:removedAt as string|null,removalReason:removalReason as string|null,
     ...(row.period_start===undefined?{}:{periodStart:date('period_start')}),...(row.period_end===undefined?{}:{periodEnd:date('period_end')}),
     ...(row.plan_note===undefined?{}:{planNote:row.plan_note==null?null:String(row.plan_note)}) }
 }

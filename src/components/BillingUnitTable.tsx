@@ -1,5 +1,5 @@
 import type { BillingUnit } from '../lib/billing-unit'
-import { resolveUnitAmount, billingUnitStatusLabel } from '../lib/billing-unit'
+import { resolveUnitAmount, billingUnitStatusLabel,isActiveBillingUnit } from '../lib/billing-unit'
 import { fmtYen } from '../lib/utils'
 
 type Props = {
@@ -12,7 +12,7 @@ type Props = {
 export function BillingUnitTable({ units, recipientName, plannedAmount }: Props) {
   return <div style={{ overflowX: 'auto' }}><table className="data-table" style={{ width: '100%', whiteSpace: 'nowrap' }}>
     <thead><tr>{['保守期間・回', '請求先', '方法', '予定日', '発行・振替日', '入金日', '金額（税込）', '状態'].map(label => <th key={label}>{label}</th>)}</tr></thead>
-    <tbody>{units.map(unit => {
+    <tbody>{units.filter(isActiveBillingUnit).map(unit => {
       const amount = resolveUnitAmount(unit, () => plannedAmount(unit))
       const status = billingUnitStatusLabel(unit)
       return <tr key={unit.id}>

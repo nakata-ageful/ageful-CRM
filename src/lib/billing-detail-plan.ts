@@ -55,22 +55,23 @@ export function detailPlanCandidate(contract:Contract,recipientId:number,units:r
     }
   }
   const next=options.find(o=>{
-    if(own.some(u=>u.serviceYear===o.year&&(u.roundLabel===`第${o.round}回`||u.roundLabel==='保存済み単回記録'||u.roundLabel.endsWith('月分'))))return false
+    if(own.some(u=>u.serviceYear===o.year&&(u.roundLabel===`第${o.round}回`||!u.removedAt&&(u.roundLabel==='保存済み単回記録'||u.roundLabel.endsWith('月分')))))return false
     if(!debit){try{if(inspectCandidatePeriod(contract,o.year,futureMaintenancePeriod(contract,o.year,rules),own,rules).superseded)return false}catch{/* Keep uncertain candidates visible. */}}
     return true
   })
   if(!next)return null
   let period:{periodStart:string|null;periodEnd:string|null}={periodStart:null,periodEnd:null}
   try{period=futureMaintenancePeriod(contract,next.year,rules)}catch{if(cycleRuleForYear(rules,contract.project_id,next.year)?.mode==='calendar_prepaid')return null}
-  const sameYear=own.filter(u=>u.serviceYear===next.year)
+  const sameYear=own.filter(u=>!u.removedAt&&u.serviceYear===next.year)
   const stored=sameYear.find(u=>u.periodStart&&u.periodEnd)
   if(stored)period={periodStart:stored.periodStart!,periodEnd:stored.periodEnd!}
   if(!managementActiveOn(events,contract.project_id,'all',period.periodStart||next.date||today))return null
   const changes=period.periodStart&&period.periodEnd&&events.some(e=>e.project_id===contract.project_id&&e.effective_date>=period.periodStart!&&e.effective_date<=period.periodEnd!)
   const effective=managementBillingContract(contract,events,next.date||today)
   const assessment=debit?{superseded:false}:inspectCandidatePeriod(contract,next.year,period,own,rules)
+  const removedUnknown=own.some(u=>u.removedAt&&u.serviceYear===next.year&&(u.roundLabel==='保存済み単回記録'||u.roundLabel.endsWith('月分')))
   return {...next,...period,method:debit?'direct_debit':'invoice',recipientId,
-    ...(assessment.reason?{reviewReason:assessment.reason}:{}),
+    ...(removedUnknown?{reviewReason:'削除済みの記録との回の対応を確認してください。同じ請求の再作成は行いません。「削除済みの記録」から確認・復元できます。'}:assessment.reason?{reviewReason:assessment.reason}:{}),
     amount:changes?null:debit?withdrawalAmount(effective,next.month):invoiceAmount(effective,next.round,count)}
 }
 
@@ -83,7 +84,7 @@ export function validateDetailPlan(item:MaintenanceScheduleItem,units:readonly B
   const own=units.filter(u=>u.projectId===projectId)
   if(own.some(u=>u.serviceYear===item.year&&(u.roundLabel===`第${item.round}回`||u.roundLabel==='保存済み単回記録'||u.roundLabel.endsWith('月分'))))
     throw Error('この期間の保存済み記録との対応確認が必要です。既存の記録を選んで確認してください')
-  if(own.some(u=>u.serviceYear===item.year&&u.periodStart&&u.periodEnd&&(u.periodStart!==item.periodStart||u.periodEnd!==item.periodEnd)))
+  if(own.some(u=>!u.removedAt&&u.serviceYear===item.year&&u.periodStart&&u.periodEnd&&(u.periodStart!==item.periodStart||u.periodEnd!==item.periodEnd)))
     throw Error('同じ期間の保存済み記録と保守期間が異なります')
   if(startDate!==undefined)validateIndividualPeriod(item,item.year,projectId,own,startDate)
   if(contract)validateCycleOccurrence(contract,item.year,item.periodEnd,rules)

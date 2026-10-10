@@ -224,6 +224,14 @@ body {
 .standard-editor .invoice-correction-dates { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
 .standard-editor .invoice-correction-dates > div { display:grid; gap:14px; min-width:0; align-content:start; }
 @media(max-width:620px) { .standard-editor .invoice-correction-dates { grid-template-columns:1fr; } }
+.record-removal-button { color:#b42318; margin-left:auto; }
+.invoice-removed-records { margin-top:20px; padding-top:16px; border-top:1px solid #e2e8f0; }
+.invoice-removed-records summary { cursor:pointer; font-weight:600; padding:8px 0; }
+.invoice-removed-item { padding:16px 0; border-bottom:1px solid #e2e8f0; font-size:14px; overflow-wrap:anywhere; }
+.invoice-removed-item p { margin:8px 0; }
+.standard-editor .record-removal-confirm { display:flex; align-items:flex-start; gap:10px; margin:16px 0; }
+.standard-editor .record-removal-confirm input { width:18px; min-width:18px; height:18px; margin-top:3px; }
+.billing-record-removal .invoice-current-facts { margin:18px 0; }
 @media(max-width:620px) { .standard-editor fieldset,.standard-editor .editor-line-item { grid-template-columns:1fr; } }
 
 /* ── Main Content ────────────────────────────────────────── */

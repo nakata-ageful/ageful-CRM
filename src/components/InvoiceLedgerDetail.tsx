@@ -18,6 +18,9 @@ import type {MaintenanceScheduleItem} from '../lib/maintenance-schedule'
 import {annualBillableTotalInc} from '../lib/billing'
 import {routineInvoiceContext,type AddRoutineInvoice} from '../lib/routine-invoice'
 import {RoutineInvoiceEditor} from './RoutineInvoiceEditor'
+import {isActiveBillingUnit} from '../lib/billing-unit'
+import {canRemoveBillingRecord,type BillingRecordRemovalRequest} from '../lib/billing-record-removal'
+import {BillingRecordRemovalEditor} from './BillingRecordRemovalEditor'
 
 type EditorMode = 'invoice' | 'plan' | 'debit' | 'correction'
 
@@ -69,7 +72,7 @@ function BillingDates({method,scheduledDate,issuedOn,paymentDueOn,receivedOn,ref
   </div>
 }
 
-export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartDate, onSavePeriod,contract,currentRecipientId,onAddSchedule,today,onAddRoutine }: {
+export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartDate, onSavePeriod,contract,currentRecipientId,onAddSchedule,today,onAddRoutine,onRecordRemoval }: {
   data: BillingHistoryData
   projectId: number
   onSave?: (request: InvoiceWriteRequest) => Promise<unknown>
@@ -80,12 +83,16 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
   onAddSchedule?:AddBillingOccurrence
   today?:string
   onAddRoutine?:AddRoutineInvoice
+  onRecordRemoval?:(request:BillingRecordRemovalRequest)=>Promise<unknown>
 }) {
-  const units = data.units.filter(unit => unit.projectId === projectId)
+  const allUnits=data.units.filter(unit=>unit.projectId===projectId)
+  const units = allUnits.filter(isActiveBillingUnit),removed=allUnits.filter(u=>!isActiveBillingUnit(u))
+  const [removal,setRemoval]=useState<{unit:BillingUnit;mode:BillingRecordRemovalRequest['mode']}|null>(null)
+  const [removalBusy,setRemovalBusy]=useState(false),[notice,setNotice]=useState('')
   const first = initialUnit(units)
   const [focusedId, setFocusedId] = useState<string | null>(null)
   const [editor, setEditor] = useState<{ unitId: string; mode: EditorMode } | null>(null)
-  const candidate=contract&&currentRecipientId?detailPlanCandidate(contract,currentRecipientId,units,today??new Date().toLocaleDateString('sv-SE'),data.managementEvents,data.cycleRules):null
+  const candidate=contract&&currentRecipientId?detailPlanCandidate(contract,currentRecipientId,allUnits,today??new Date().toLocaleDateString('sv-SE'),data.managementEvents,data.cycleRules):null
   const canCreate=!!onAddSchedule&&!!data.recipients&&isBillingDate(contract?.maintenance_start_date??'')
   const active=first&&!['received','cancelled'].includes(first.lifecycle)
   const focused = units.find(unit => unit.id === focusedId) ?? (active||!candidate?first:undefined)
@@ -97,7 +104,7 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
   const [recordingBusy,setRecordingBusy]=useState(false)
   const routine=contract&&candidate?routineInvoiceContext(contract,candidate,data,today??new Date().toLocaleDateString('sv-SE')):null
   const canRecord=!!routine&&!!onAddRoutine&&!!onSave&&!!data.recipients
-  useEffect(()=>{setFocusedId(null);setEditor(null);setAdding(null);setCreated(null);setRecording(null)},[projectId])
+  useEffect(()=>{setFocusedId(null);setEditor(null);setAdding(null);setCreated(null);setRecording(null);setRemoval(null);setNotice('')},[projectId])
   useEffect(()=>{
     if(!created)return
     if(created.projectId!==projectId){setCreated(null);return}
@@ -112,6 +119,7 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
   const closeEditor = () => setEditor(null)
 
   return <section className="invoice-detail-classic">
+    {notice&&<p className="notice" role="status">{notice}</p>}
     <div className="invoice-detail-toolbar"><h3>請求詳細</h3><div>
       {focusedId&&candidate&&<button type="button" className="btn btn-sub btn-sm" onClick={()=>{setFocusedId(null);setEditor(null)}}>今回・次回の請求に戻る</button>}
       {candidate&&canCreate&&<button type="button" className="btn btn-sub btn-sm" onClick={()=>setAdding({after:null})}>＋ 請求・振替予定を追加</button>}
@@ -178,6 +186,7 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
                 {canEditPlan && <button className="btn" type="button" onClick={() => openEditor(focused, 'plan')}>{focused.recipientId == null ? '請求先・予定を設定' : '予定を変更'}</button>}
                 {canCorrectInvoice && <button className="btn" type="button" onClick={() => openEditor(focused, 'correction')}>この記録を訂正</button>}
                 {canCorrectDebit && <button className="btn" type="button" onClick={() => openEditor(focused, 'debit')}>この記録を訂正</button>}
+                {data.recordRemovalReady&&onRecordRemoval&&canRemoveBillingRecord(focused)&&<button type="button" className="btn btn-sub record-removal-button" onClick={()=>setRemoval({unit:structuredClone(focused),mode:'remove'})}>この記録を削除</button>}
               </div>}
             </div>
 
@@ -210,10 +219,20 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
           })}
         </section>)}
       </div><p className="invoice-history-help">各回を選ぶと、左側で明細の確認・記録の訂正ができます。請求日が期間外でも、対象の保守期間にまとめます。</p>
+      {!!removed.length&&<details className="invoice-removed-records"><summary>削除済みの記録（{removed.length}件）</summary><p className="invoice-history-help">通常の一覧・集計・請求CSVには含みません。</p>
+        {removed.map(unit=><section className="invoice-removed-item" key={unit.id}>
+          <strong>{periodLabel(unit,maintenanceStartDate)}</strong><p>{roundLabel(unit)} ／ ID {unit.id} ／ {resolveUnitAmount(unit).amount==null?'金額要確認':fmtYen(resolveUnitAmount(unit).amount!)}<br/>請求先：{unit.recipientId==null?'要確認':data.recipientName(unit.recipientId)}<br/>請求日：{unit.issuedOn??'未登録'} ／ 入金日：{unit.receivedOn??'未登録'}</p>
+          <p style={{whiteSpace:'pre-wrap'}}>削除理由：{unit.removalReason}</p>
+          {data.recordRemovalReady&&onRecordRemoval&&<button type="button" className="btn btn-sub btn-sm" onClick={()=>setRemoval({unit:structuredClone(unit),mode:'restore'})}>内容を確認して復元</button>}
+        </section>)}
+      </details>}
     </aside>
     </div>
+    {removal&&onRecordRemoval&&<Modal title={removal.mode==='remove'?'請求・入金記録を削除':'削除済みの記録を復元'} width={720} closeDisabled={removalBusy} onClose={()=>setRemoval(null)}><div className="standard-editor"><BillingRecordRemovalEditor key={`${removal.unit.id}:${removal.mode}:${removal.unit.revision}`} unit={removal.unit} mode={removal.mode} recipientName={data.recipientName} periodLabel={periodLabel(removal.unit,maintenanceStartDate)} onBusyChange={setRemovalBusy} onClose={()=>setRemoval(null)} onSave={async request=>{
+      await onRecordRemoval(request);setEditor(null);setFocusedId(request.mode==='restore'?String(request.unitId):null);setNotice(request.mode==='restore'?'記録を削除前の内容で復元しました。':'記録を削除しました。「削除済みの記録」から復元できます。')
+    }}/></div></Modal>}
     {recording&&onAddRoutine&&onSave&&data.recipients&&<Modal title="発行内容を記録" width={720} closeDisabled={recordingBusy} onClose={()=>setRecording(null)}><div className="standard-editor"><RoutineInvoiceEditor context={recording} recipients={data.recipients} onAdd={onAddRoutine} onSave={onSave} onBusyChange={setRecordingBusy} onClose={()=>setRecording(null)}/></div></Modal>}
-    {adding&&candidate&&contract&&onAddSchedule&&data.recipients&&<Modal title="請求・振替予定を追加" width={720} onClose={()=>setAdding(null)}><div className="standard-editor"><BillingOccurrenceCreator key={`${projectId}:${JSON.stringify(candidate)}:${units.map(u=>u.id+':'+u.revision).join(',')}`} candidate={candidate} contract={contract} units={units} recipients={data.recipients} cycleRules={data.cycleRules}
+    {adding&&candidate&&contract&&onAddSchedule&&data.recipients&&<Modal title="請求・振替予定を追加" width={720} onClose={()=>setAdding(null)}><div className="standard-editor"><BillingOccurrenceCreator key={`${projectId}:${JSON.stringify(candidate)}:${allUnits.map(u=>u.id+':'+u.revision).join(',')}`} candidate={candidate} contract={contract} units={allUnits} recipients={data.recipients} cycleRules={data.cycleRules}
       onSave={async(item,reason)=>{await onAddSchedule(item,reason);setCreated({projectId,item,after:adding.after})}} onClose={()=>setAdding(null)}/></div></Modal>}
     {!!units.length&&maintenanceStartDate!==undefined&&<div className="card" style={{padding:20,marginTop:16}}>
       <h3>保守期間の確認・修正</h3>

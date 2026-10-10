@@ -1,4 +1,5 @@
 import type { BillingUnit } from '../lib/billing-unit'
+import {isActiveBillingUnit} from '../lib/billing-unit'
 import { customerBillingHistory, summarizeBillingHistory } from '../lib/billing-history'
 import { BillingUnitTable } from './BillingUnitTable'
 import { fmtYen } from '../lib/utils'
@@ -16,13 +17,14 @@ export type BillingHistoryData = {
   managementEvents?: readonly ManagementEvent[]
   cycleRules?:readonly BillingCycleRule[]
   cycleRulesReady?:boolean
+  recordRemovalReady?:boolean
   ownershipChangedProjects?:readonly number[]
 }
 
 export function BillingHistorySection({ data, customerId, projectId, onViewDetail }: {
   data: BillingHistoryData; customerId?: number; projectId?: number; onViewDetail?: (projectId:number)=>void
 }) {
-  const selected = customerId == null ? [...data.units] : customerBillingHistory(data.units, customerId)
+  const selected = customerId == null ? data.units.filter(isActiveBillingUnit) : customerBillingHistory(data.units, customerId)
   const units = projectId == null ? selected : selected.filter(u => u.projectId === projectId)
   const total = summarizeBillingHistory(units)
   return <section className="card billing-history-card">

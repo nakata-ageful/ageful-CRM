@@ -35,7 +35,7 @@ export function validateCycleRule(contract:Contract,units:readonly BillingUnit[]
   if(mode==='calendar_prepaid'&&!cycleCompatibility(contract))throw Error('この設定は「請求書・年1回」の発電所で利用します')
   const period=(y:number)=>mode==='calendar_prepaid'?{periodStart:`${y}-01-01`,periodEnd:`${y}-12-31`}:maintenancePeriod(contract.maintenance_start_date,y)
   const first=period(year)
-  for(const u of units.filter(u=>u.projectId===contract.project_id)){
+  for(const u of units.filter(u=>!u.removedAt&&u.projectId===contract.project_id)){
     const saved=u.periodStart&&u.periodEnd?{periodStart:u.periodStart,periodEnd:u.periodEnd}:maintenancePeriod(contract.maintenance_start_date,u.serviceYear)
     if(u.serviceYear<year&&saved.periodEnd>=first.periodStart)throw Error('切替前の保守期間が新しい期間と重なります。「請求詳細」で移行期間の終了日を先に確認・修正してください')
     if(u.serviceYear>=year){

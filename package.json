@@ -12,6 +12,7 @@
     "test:project-search": "node tests/project-search.cjs",
     "test:active-source-sync": "node tests/active-source-sync.cjs",
     "test:routine-invoice": "node tests/routine-invoice.cjs",
+    "test:ownership-customer": "node tests/ownership-customer-registration.cjs",
     "test:ui-layout": "node tests/ui-layout.cjs && node tests/billing-detail-periods.cjs && node tests/billing-overview-layout.cjs && node tests/customer-picker.cjs && node tests/management-history-layout.cjs",
     "test:maintenance-period": "node tests/maintenance-period-label.cjs && node tests/maintenance-period-review.cjs && node tests/maintenance-schedule.cjs && node tests/saved-maintenance-period.cjs",
     "test:billing-cycle": "node tests/billing-cycle.cjs && node tests/billing-alert-safety.cjs && node tests/billing-cycle-postgres.mjs",

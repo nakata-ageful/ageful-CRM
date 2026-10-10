@@ -11,7 +11,7 @@ import {
 import type {
   DashboardStats, Customer, ProjectRow, ProjectDetail,
   CustomerDetailData, MaintenanceResponse, BillingRow, Prospect,
-  PeriodicMaintenance,
+  PeriodicMaintenance,CustomerInput,
 } from './types'
 
 import { Dashboard } from './views/Dashboard'
@@ -34,6 +34,7 @@ import {OwnershipTransferHistory} from './components/OwnershipTransferHistory'
 import {ProjectManagementActions} from './components/ProjectManagementActions'
 import {BillingCycleSettings} from './components/BillingCycleSettings'
 import {exactRoutinePlan,type AddRoutineInvoice} from './lib/routine-invoice'
+import {createCustomer} from './lib/actions'
 
 type ViewKey =
   | 'dashboard'
@@ -101,6 +102,10 @@ function MainApp() {
   const [error, setError] = useState('')
   const [runtime,setRuntime]=useState<BillingRuntimeSnapshot|null>(null)
   const [transferOpen,setTransferOpen]=useState(false),[pendingBilling,setPendingBilling]=useState(false)
+  const [transferBusy,setTransferBusy]=useState(false)
+  // Keep an uncertain customer insert in memory even if the transfer modal is
+  // closed/reopened. Do not persist personal input to browser storage.
+  const [pendingCustomerInput,setPendingCustomerInput]=useState<CustomerInput|null>(null)
   // List data
   const [stats, setStats] = useState<DashboardStats>({ totalCustomers: 0, totalProjects: 0, activeMaintenanceCount: 0, pendingBillingCount: 0 })
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -504,8 +509,12 @@ function MainApp() {
             )}
           </>
         )}
-        {transferOpen&&runtime&&projectDetail?.contract&&<Modal title="所有者を変更" width={1100} onClose={()=>setTransferOpen(false)}>
+        {transferOpen&&runtime&&projectDetail?.contract&&<Modal title="所有者を変更" width={1100} closeDisabled={transferBusy} onClose={()=>setTransferOpen(false)}>
           <OwnershipTransferEditor project={projectDetail.project} contract={projectDetail.contract} customers={customers}
+            onBusyChange={setTransferBusy}
+            pendingCustomerInput={pendingCustomerInput} onPendingCustomerChange={setPendingCustomerInput}
+            onCreateCustomer={async input=>{const customer=await createCustomer(input);setCustomers(list=>[...list.filter(c=>c.id!==customer.id),customer]);return customer}}
+            onReloadCustomers={async()=>{const list=await getCustomers();setCustomers(list);return list}}
             units={runtime.units.filter(u=>u.projectId===projectDetail.project.id)}
             managementEvents={runtime.managementEvents.filter(e=>e.project_id===projectDetail.project.id)}
             onSave={async input=>{await saveRuntime({action:'transfer',value:input});setTransferOpen(false)}}/>

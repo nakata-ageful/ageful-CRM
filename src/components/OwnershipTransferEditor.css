@@ -24,4 +24,15 @@
 .ownership-final-summary { margin:14px 0; padding:16px; border:1px solid #bfdbfe; border-radius:8px; background:#f8fbff; }
 .ownership-final-summary h4 { margin-bottom:8px; color:#1e3a8a; }
 .ownership-final-summary p { margin:5px 0; }
+.ownership-new-customer-trigger { margin-top:8px; }
+.ownership-new-customer { margin-top:16px; padding:16px; background:#f8fafc; border:1px solid #dbe4ef; border-radius:8px; }
+.ownership-new-customer h4 { margin:0 0 8px; }
+.ownership-new-customer p { margin:8px 0 14px; color:#475569; font-size:13px; }
+.ownership-customer-types { display:flex; gap:8px; grid-column:1/-1; }
+.ownership-customer-separate { display:flex; align-items:center; gap:8px; margin-top:14px; }
+.ownership-customer-matches { margin-top:16px; padding-top:14px; border-top:1px solid #dbe4ef; }
+.ownership-customer-matches > div { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid #e2e8f0; }
+.ownership-customer-matches span { overflow-wrap:anywhere; }
+.ownership-customer-recovery { padding:12px; background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; }
+.ownership-customer-recovery label { display:block; margin-top:12px; }
 @media(max-width:800px) { .ownership-transfer-grid { grid-template-columns:1fr; } .ownership-transfer-arrow { transform:rotate(90deg); } .ownership-transfer-steps { grid-template-columns:1fr; } .ownership-transfer-steps li { border-right:0; border-bottom:1px solid #dbe4ef; } .ownership-transfer-heading { flex-direction:column; } }

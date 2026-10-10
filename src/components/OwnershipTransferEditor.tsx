@@ -1,7 +1,9 @@
 import {useState} from 'react'
 import {CustomerPicker} from './CustomerPicker'
 import type {CustomerChoice} from '../lib/customer-search'
-import type {Contract,Project} from '../types'
+import type {Contract,Project,CustomerInput} from '../types'
+import type {RegistrationCustomer} from '../lib/customer-registration'
+import {CustomerRegistration} from './CustomerRegistration'
 import {ContractTransferFields} from './ContractTransferFields'
 import {OwnershipBillingPlanEditor} from './OwnershipBillingPlanEditor'
 import {prepareOwnershipFields} from '../lib/ownership-field-selection'
@@ -14,9 +16,11 @@ import type {ManagementEvent} from '../lib/management-lifecycle'
 import './OwnershipTransferEditor.css'
 
 export type OwnershipTransferInput={project:Project;contract:Contract;newOwner:number;futureRecipient:number;date:string;fields:{contract:ContractChoices};choices:(TransferBillingChoice|{newOccurrence:MaintenanceScheduleItem})[];reason:string}
-export function OwnershipTransferEditor({project:initialProject,contract:initialContract,customers,units,managementEvents=[],onSave,testOnly=false}:{
+export function OwnershipTransferEditor({project:initialProject,contract:initialContract,customers,units,managementEvents=[],onSave,testOnly=false,onCreateCustomer,onReloadCustomers,onBusyChange,pendingCustomerInput,onPendingCustomerChange}:{
   project:Project;contract:Contract;customers:readonly CustomerChoice[];units:readonly TransferBillingUnit[];managementEvents?:readonly ManagementEvent[];
   onSave:(input:OwnershipTransferInput)=>Promise<void>;testOnly?:boolean
+  onCreateCustomer?:(input:CustomerInput)=>Promise<RegistrationCustomer>;onReloadCustomers?:()=>Promise<readonly RegistrationCustomer[]>;onBusyChange?:(busy:boolean)=>void
+  pendingCustomerInput?:CustomerInput|null;onPendingCustomerChange?:(input:CustomerInput|null)=>void
 }){
   const [project]=useState(()=>structuredClone(initialProject)),[contract]=useState(()=>structuredClone(initialContract))
   const [target,setTarget]=useState(''),[date,setDate]=useState(()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`})
@@ -27,7 +31,15 @@ export function OwnershipTransferEditor({project:initialProject,contract:initial
   const [individualPeriod,setIndividualPeriod]=useState(false),[periodStart,setPeriodStart]=useState(''),[periodEnd,setPeriodEnd]=useState('')
   const [nextMethod,setNextMethod]=useState<'invoice'|'direct_debit'>(contract.billing_method==='口座振替'?'direct_debit':'invoice')
   const [nextRecipient,setNextRecipient]=useState<'old'|'new'>('old')
-  const oldOwner=customers.find(c=>c.id===project.customer_id),newOwner=customers.find(c=>c.id===Number(target))
+  const [creating,setCreating]=useState(!!pendingCustomerInput),[customerBusy,setCustomerBusy]=useState(false),[registrationSession,setRegistrationSession]=useState(0)
+  const [addedCustomers,setAddedCustomers]=useState<RegistrationCustomer[]>([]),[customerNotice,setCustomerNotice]=useState('')
+  const allCustomers=[...customers.filter(c=>!addedCustomers.some(a=>a.id===c.id)),...addedCustomers]
+  const oldOwner=allCustomers.find(c=>c.id===project.customer_id),newOwner=allCustomers.find(c=>c.id===Number(target))
+  function selectCustomer(customer:RegistrationCustomer,created:boolean){
+    onPendingCustomerChange?.(null)
+    setAddedCustomers(list=>[...list.filter(c=>c.id!==customer.id),customer]);setTarget(String(customer.id));setCreating(false)
+    setRegistrationSession(n=>n+1);setCustomerNotice(created?'顧客を登録し、新しい所有者として選択しました。所有者変更はまだ確定していません。':'登録済みの顧客を選択しました。所有者変更はまだ確定していません。')
+  }
   function validate(){
     const prepared=prepareOwnershipFields(project,contract,{contract:fields})
     validateContractBillingSettings(prepared.after.contract,fields)
@@ -53,9 +65,14 @@ export function OwnershipTransferEditor({project:initialProject,contract:initial
       <section className="ownership-transfer-card"><h3>所有者と変更日</h3><div className="ownership-transfer-grid">
         <div className="ownership-transfer-current"><span>現在の所有者</span><strong>{oldOwner.name}</strong><small>顧客ID {oldOwner.id}</small></div>
         <span className="ownership-transfer-arrow" aria-hidden="true">→</span>
-        <CustomerPicker label="新しい所有者" value={target} onChange={setTarget} customers={customers.filter(c=>c.id!==project.customer_id)} emptyLabel="顧客を選択してください"/>
+        <div><CustomerPicker label="新しい所有者" value={target} disabled={creating||customerBusy} onChange={value=>{setTarget(value);setCustomerNotice('')}} customers={allCustomers.filter(c=>c.id!==project.customer_id)} emptyLabel="顧客を選択してください"/>
+          {onCreateCustomer&&onReloadCustomers&&<button type="button" className="btn btn-sub btn-sm ownership-new-customer-trigger" disabled={customerBusy} aria-expanded={creating} onClick={()=>setCreating(!creating)}>{creating?'登録欄を閉じる':'＋ 新規顧客を登録'}</button>}
+        </div>
         <label>変更日<input className="form-input" type="date" value={date} onChange={e=>setDate(e.target.value)}/></label>
-      </div></section>
+      </div>
+        {customerNotice&&<p role="status">{customerNotice}</p>}
+        {onCreateCustomer&&onReloadCustomers&&<div hidden={!creating}><CustomerRegistration key={registrationSession} customers={allCustomers} currentOwnerId={project.customer_id} onCreate={onCreateCustomer} onReload={onReloadCustomers} pendingInput={pendingCustomerInput} onPendingChange={onPendingCustomerChange} onSelect={selectCustomer} onCancel={()=>setCreating(false)} onBusyChange={value=>{setCustomerBusy(value);onBusyChange?.(value)}}/></div>}
+      </section>
       {newOwner&&<section className="ownership-transfer-card"><h3>変更後に追加する請求</h3><label>基本の請求先<select className="form-input" value={future} onChange={e=>setFuture(e.target.value as 'old'|'new')}><option value="new">{newOwner.name}</option><option value="old">{oldOwner.name}</option></select></label><p>下の各回の指定を優先します。請求の自動追加や銀行への振替手配は行いません。</p></section>}
       {newOwner&&<section className="ownership-transfer-card"><h3>まだ保存していない1回を指定</h3>
         <label><input type="checkbox" checked={addNext} onChange={e=>setAddNext(e.target.checked)}/> 今回の所有者変更と同時に、確認した1回を保存する</label>
@@ -72,11 +89,11 @@ export function OwnershipTransferEditor({project:initialProject,contract:initial
           <label>保守期間の終了日<input className="form-input" type="date" value={periodEnd} onChange={e=>setPeriodEnd(e.target.value)}/></label></>}
         </div>}
       </section>}
-      <ContractTransferFields contract={contract} choices={fields} onChange={setFields} disabled={busy}/>
+      <ContractTransferFields contract={contract} choices={fields} onChange={setFields} disabled={busy||customerBusy}/>
     </fieldset>
-    {newOwner&&<OwnershipBillingPlanEditor key={newOwner.id} projectId={project.id} oldOwner={oldOwner} newOwner={newOwner} units={units} saveScope="ownership" testOnly={testOnly} recipientOptions={customers}
+    {newOwner&&<fieldset disabled={creating||customerBusy||busy} className="ownership-transfer-fieldset"><OwnershipBillingPlanEditor key={newOwner.id} projectId={project.id} oldOwner={oldOwner} newOwner={newOwner} units={units} saveScope="ownership" testOnly={testOnly} recipientOptions={allCustomers}
       reviewContext={JSON.stringify({date,fields,future,addNext,nextYear,nextRound,nextDate,nextAmount,nextMethod,nextRecipient,individualPeriod,periodStart,periodEnd})} onReview={validate}
       reviewSummary={<div className="ownership-final-summary"><h4>所有者・契約情報</h4><p>変更日：{date}</p><p>今後の基本請求先：{future==='old'?oldOwner.name:newOwner.name}</p>{addNext&&<p>未保存の1回：{nextYear}年・第{nextRound}回 ／ {nextDate} ／ {nextRecipient==='old'?oldOwner.name:newOwner.name} ／ {nextMethod==='invoice'?'請求書':'口座振替'} ／ {Number(nextAmount).toLocaleString()}円 ／ {individualPeriod?`保守期間：${periodStart} ～ ${periodEnd}`:maintenancePeriodLabel((prepareOwnershipFields(project,contract,{contract:fields}).after.contract as Contract).maintenance_start_date,nextYear)}</p>}{Object.entries(fields).filter(([,c])=>c.mode!=='keep').map(([key,c])=><p key={key}>{contractTransferLabels[key as keyof Contract]}：{c.mode==='clear'?'引き継がない（旧値は履歴に保存）':c.mode==='change'?`変更 → ${JSON.stringify(c.value)}`:'そのまま'}</p>)}<p>上記以外の契約情報はそのまま引き継ぎます。</p></div>}
-      onSave={async(choices,reason)=>{const {nextOccurrence}=validate();setBusy(true);try{await onSave({project,contract,newOwner:newOwner.id,futureRecipient:future==='old'?oldOwner.id:newOwner.id,date,fields:{contract:fields},choices:nextOccurrence?[...choices,{newOccurrence:nextOccurrence}]:choices,reason})}finally{setBusy(false)}}}/ >}
+      onSave={async(choices,reason)=>{if(creating||customerBusy)return;const {nextOccurrence}=validate();setBusy(true);onBusyChange?.(true);try{await onSave({project,contract,newOwner:newOwner.id,futureRecipient:future==='old'?oldOwner.id:newOwner.id,date,fields:{contract:fields},choices:nextOccurrence?[...choices,{newOccurrence:nextOccurrence}]:choices,reason})}finally{setBusy(false);onBusyChange?.(false)}}}/></fieldset>}
   </section>
 }

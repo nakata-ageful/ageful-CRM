@@ -5,6 +5,8 @@
 .ownership-billing-title > b { padding:6px 10px; border-radius:999px; background:#f1f5f9; color:#475569; font-size:11px; white-space:nowrap; }
 .ownership-billing-owners { display:flex; align-items:center; gap:28px; padding:16px 20px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; color:#64748b; font-size:12px; }
 .ownership-billing-owners strong { display:inline-block; margin-top:4px; font-size:18px; color:#0f172a; }
+.ownership-billing-owners > span { min-width:0; overflow-wrap:anywhere; }
+.ownership-billing-owners > span[aria-hidden] { flex-shrink:0; }
 .ownership-billing-notice { margin:12px 0 22px; padding:12px; background:#eff6ff; color:#334155; border-radius:6px; font-size:13px; }
 .ownership-billing-row { min-width:0; margin:0 0 16px; padding:16px; border:1px solid #e2e8f0; border-radius:8px; }
 .ownership-billing-row legend { padding:0 8px; font-weight:600; font-size:14px; }

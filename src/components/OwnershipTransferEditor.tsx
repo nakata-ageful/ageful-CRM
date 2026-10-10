@@ -75,18 +75,22 @@ export function OwnershipTransferEditor({project:initialProject,contract:initial
       </section>
       {newOwner&&<section className="ownership-transfer-card"><h3>変更後に追加する請求</h3><label>基本の請求先<select className="form-input" value={future} onChange={e=>setFuture(e.target.value as 'old'|'new')}><option value="new">{newOwner.name}</option><option value="old">{oldOwner.name}</option></select></label><p>下の各回の指定を優先します。請求の自動追加や銀行への振替手配は行いません。</p></section>}
       {newOwner&&<section className="ownership-transfer-card"><h3>まだ保存していない1回を指定</h3>
-        <label><input type="checkbox" checked={addNext} onChange={e=>setAddNext(e.target.checked)}/> 今回の所有者変更と同時に、確認した1回を保存する</label>
-        <p>選ばなければ予定を追加しません。選ぶ場合も発行・入金・銀行への振替手配は行いません。既に保存済みの回は下の一覧で変更してください。</p>
-        {addNext&&<div className="ownership-transfer-grid">
+        <label className="ownership-transfer-check"><input type="checkbox" checked={addNext} aria-expanded={addNext} aria-controls="ownership-next-occurrence" onChange={e=>setAddNext(e.target.checked)}/><span>今回の所有者変更と同時に、確認した1回を保存する</span></label>
+        <p id="ownership-next-help">選ばなければ予定を追加しません。選ぶ場合も発行・入金・銀行への振替手配は行いません。既に保存済みの回は下の一覧で変更してください。</p>
+        {addNext&&<div id="ownership-next-occurrence" className="ownership-next-occurrence" aria-describedby="ownership-next-help">
+          <div className="ownership-occurrence-grid">
           <label>保守期間の開始年<input className="form-input" type="number" min="2000" max="2199" value={nextYear} onChange={e=>setNextYear(Number(e.target.value))}/></label>
           <label>第何回<input className="form-input" type="number" min="1" max="96" value={nextRound} onChange={e=>setNextRound(Number(e.target.value))}/></label>
           <label>請求先<select className="form-input" value={nextRecipient} onChange={e=>setNextRecipient(e.target.value as 'old'|'new')}><option value="old">{oldOwner.name}</option><option value="new">{newOwner.name}</option></select></label>
           <label>方法<select className="form-input" value={nextMethod} onChange={e=>setNextMethod(e.target.value as 'invoice'|'direct_debit')}><option value="invoice">請求書</option><option value="direct_debit">口座振替</option></select></label>
           <label>請求・振替予定日<input className="form-input" type="date" value={nextDate} onChange={e=>setNextDate(e.target.value)}/></label>
           <label>予定額（税込）<input className="form-input" type="number" min="0" step="1" value={nextAmount} onChange={e=>setNextAmount(e.target.value)}/></label>
-          <label><input type="checkbox" checked={individualPeriod} onChange={e=>setIndividualPeriod(e.target.checked)}/> この回の保守期間を個別指定する</label>
-          {individualPeriod&&<><label>保守期間の開始日<input className="form-input" type="date" value={periodStart} onChange={e=>setPeriodStart(e.target.value)}/></label>
-          <label>保守期間の終了日<input className="form-input" type="date" value={periodEnd} onChange={e=>setPeriodEnd(e.target.value)}/></label></>}
+          </div>
+          <div className="ownership-occurrence-period">
+            <label className="ownership-transfer-check"><input type="checkbox" checked={individualPeriod} aria-expanded={individualPeriod} aria-controls="ownership-occurrence-period-dates" onChange={e=>setIndividualPeriod(e.target.checked)}/><span>この回の保守期間を個別指定する</span></label>
+            {individualPeriod&&<div id="ownership-occurrence-period-dates" className="ownership-occurrence-grid"><label>保守期間の開始日<input className="form-input" type="date" value={periodStart} onChange={e=>setPeriodStart(e.target.value)}/></label>
+            <label>保守期間の終了日<input className="form-input" type="date" value={periodEnd} onChange={e=>setPeriodEnd(e.target.value)}/></label></div>}
+          </div>
         </div>}
       </section>}
       <ContractTransferFields contract={contract} choices={fields} onChange={setFields} disabled={busy||customerBusy}/>

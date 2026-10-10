@@ -11,7 +11,7 @@ import '../styles.css'
 const initialProject={...Object.fromEntries(Object.keys(projectFieldKinds).map(k=>[k,null])),id:1,customer_id:1,project_name:'検証用発電所',plant_name:'検証用発電所'} as Project
 const contract={...Object.fromEntries(Object.keys(contractFieldKinds).map(k=>[k,null])),id:1,project_id:1,billing_method:'請求書',billing_count:1,billing_schedule_days:['12月1日'],maintenance_start_date:'2020-01-01',annual_maintenance_inc:82500} as Contract
 function Preview(){
-  const rows=useRef<RegistrationCustomer[]>([{id:1,name:'検証旧所有者'},{id:2,name:'検証既存顧客',phone:'090-0000-0000'}])
+  const rows=useRef<RegistrationCustomer[]>([{id:1,name:'検証旧所有者'},{id:2,name:'検証既存顧客・株式会社長い会社名と担当者名の表示確認用',phone:'090-0000-0000'}])
   const [customers,setCustomers]=useState(rows.current),[project,setProject]=useState(initialProject),[open,setOpen]=useState(true),[busy,setBusy]=useState(false),[lost,setLost]=useState(false),[notice,setNotice]=useState('')
   const [pending,setPending]=useState<CustomerInput|null>(null)
   async function create(input:CustomerInput){const customer={...input,id:Math.max(...rows.current.map(c=>c.id))+1};rows.current=[...rows.current,customer];

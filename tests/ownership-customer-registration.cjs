@@ -68,6 +68,31 @@ const submit=tree=>nodes(tree,e=>e.type==='form')[0].props.onSubmit({preventDefa
  assert.equal(transferSaves.length,0,'Customer registration/selection alone is not an ownership transfer')
  await plan.props.onSave([],'所有者変更を確認');assert.equal(transferSaves[0].newOwner,3);assert.equal(transferSaves[0].futureRecipient,3);assert.equal(transferSaves[0].date,'2026-11-15')
  assert.equal(transferSaves[0].fields.contract.notes.value,'変更条件');assert.equal(project.customer_id,1)
+ // The unsaved occurrence has its own uniform grid, not the owner's 34px arrow column.
+ const toggle=(tree,id,checked)=>nodes(tree,e=>e.type==='input'&&e.props['aria-controls']===id)[0].props.onChange({target:{checked}})
+ toggle(p.render(),'ownership-next-occurrence',true)
+ t=p.render();const occurrence=nodes(t,e=>e.props.id==='ownership-next-occurrence')[0]
+ assert.ok(occurrence);assert.equal(nodes(occurrence,e=>e.props.className==='ownership-transfer-grid').length,0)
+ const grids=nodes(occurrence,e=>e.props.className==='ownership-occurrence-grid')
+ assert.equal(grids.length,1);assert.equal(nodes(grids[0],e=>e.type==='label').length,6)
+ fill(t,'保守期間の開始年','2027');fill(t,'第何回','1');fill(t,'請求・振替予定日','2026-12-01');fill(t,'予定額（税込）','0')
+ toggle(p.render(),'ownership-occurrence-period-dates',true)
+ t=p.render();fill(t,'保守期間の開始日','2027-01-01');fill(t,'保守期間の終了日','2027-12-31')
+ assert.equal(nodes(t,e=>e.props.id==='ownership-occurrence-period-dates')[0].props.className,'ownership-occurrence-grid')
+ let occurrencePlan=nodes(p.render(),e=>typeof e.type==='function'&&e.type.name==='OwnershipBillingPlanEditor')[0]
+ occurrencePlan.props.onReview();assert.equal(transferSaves.length,1,'Layout changes never save during review')
+ await occurrencePlan.props.onSave([],'確認した1回を追加')
+ const added=transferSaves.at(-1).choices[0].newOccurrence
+ assert.equal(added.year,2027);assert.equal(added.round,1);assert.equal(added.date,'2026-12-01');assert.equal(added.amount,0)
+ assert.equal(added.recipientId,1);assert.equal(added.method,'invoice');assert.equal(added.periodStart,'2027-01-01');assert.equal(added.periodEnd,'2027-12-31')
+ toggle(p.render(),'ownership-next-occurrence',false)
+ assert.equal(nodes(p.render(),e=>e.props.id==='ownership-next-occurrence').length,0)
+ toggle(p.render(),'ownership-next-occurrence',true)
+ occurrencePlan=nodes(p.render(),e=>typeof e.type==='function'&&e.type.name==='OwnershipBillingPlanEditor')[0]
+ assert.equal(JSON.parse(occurrencePlan.props.reviewContext).nextDate,'2026-12-01','Toggling keeps the entered draft')
+ const css=fs.readFileSync(path.join(root,'src/components/OwnershipTransferEditor.css'),'utf8')
+ assert.match(css,/\.ownership-occurrence-grid\s*\{[^}]*repeat\(2,minmax\(0,1fr\)\)/)
+ assert.match(css,/@media\(max-width:620px\)[^{]*\{\s*\.ownership-occurrence-grid\s*\{\s*grid-template-columns:minmax\(0,1fr\)/)
  const app=fs.readFileSync(path.join(root,'src/App.tsx'),'utf8')
  assert.ok(app.includes('closeDisabled={transferBusy}')&&app.includes('onBusyChange={setTransferBusy}'))
  assert.ok(app.includes('pendingCustomerInput={pendingCustomerInput} onPendingCustomerChange={setPendingCustomerInput}'))

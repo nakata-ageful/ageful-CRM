@@ -221,6 +221,9 @@ body {
 .standard-editor .editor-footer { grid-column:1/-1; display:flex; justify-content:flex-end; gap:8px; padding-top:16px; border-top:1px solid #f1f5f9; }
 .standard-editor .editor-line-item { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto; align-items:end; gap:10px; }
 .standard-editor label:has(textarea) { grid-column:1/-1; }
+.standard-editor .invoice-correction-dates { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+.standard-editor .invoice-correction-dates > div { display:grid; gap:14px; min-width:0; align-content:start; }
+@media(max-width:620px) { .standard-editor .invoice-correction-dates { grid-template-columns:1fr; } }
 @media(max-width:620px) { .standard-editor fieldset,.standard-editor .editor-line-item { grid-template-columns:1fr; } }
 
 /* ── Main Content ────────────────────────────────────────── */

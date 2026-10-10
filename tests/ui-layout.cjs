@@ -7,7 +7,7 @@ function load(file){file=path.resolve(root,file);if(cache.has(file))return cache
  if(/\/(actions|data|mock-store)\.ts$/.test(file))return new Proxy({},{get:()=>()=>{throw Error('Business data access forbidden')}})
  const module={exports:{}};cache.set(file,module)
  vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText,
- {module,exports:module.exports,Date,URLSearchParams,window:browser,require:n=>{if(['react','react/jsx-runtime'].includes(n))return require(n);if(n.endsWith('.css'))return {};if(!n.startsWith('.'))throw Error('External access forbidden');const p=path.resolve(path.dirname(file),n);return load(p+(fs.existsSync(p+'.ts')?'.ts':'.tsx'))}})
+ {module,exports:module.exports,Date,URLSearchParams,structuredClone,window:browser,require:n=>{if(['react','react/jsx-runtime'].includes(n))return require(n);if(n.endsWith('.css'))return {};if(!n.startsWith('.'))throw Error('External access forbidden');const p=path.resolve(path.dirname(file),n);return load(p+(fs.existsSync(p+'.ts')?'.ts':'.tsx'))}})
  return module.exports}
 const noSave=()=>{throw Error('UI rendering must not save')},render=(C,p)=>renderToStaticMarkup(React.createElement(C,p))
 const {ProjectDetailView}=load('src/views/ProjectDetail.tsx'),{Modal}=load('src/components/Modal.tsx'),{AccountControls}=load('src/components/BillingAccessGate.tsx')
@@ -36,4 +36,16 @@ assert.ok(!app.includes('管理終了・変更履歴・今後の予定'),'All-ta
 assert.ok(project.includes("editSection === 'billing'")&&project.includes('type="checkbox"'),'Existing billing edit controls must remain')
 assert.ok(!gate.includes('justifyContent:\'flex-end\''),'Logout must not add a top-level row')
 assert.ok(gate.includes('supabase.auth.signOut()')&&gate.includes('onAuthStateChange'),'Original authentication remains in place')
+const {InvoiceCorrectionEditor}=load('src/components/InvoiceCorrectionEditor.tsx')
+const correctionUnit={id:'11',serviceYear:2023,roundLabel:'第1回',recipientId:1,revision:4,
+ scheduledDate:'2023-09-01',issuedOn:'2023-09-16',paymentDueOn:'2023-09-30',receivedOn:'2023-09-17',
+ frozenLineItems:[{name:'保守料',amount:187000}]}
+const correctionBefore=JSON.stringify(correctionUnit)
+const correction=render(InvoiceCorrectionEditor,{unit:correctionUnit,recipients:[{id:1,name:'検証顧客'}],onSave:noSave,onClose:noSave})
+assert.match(correction,/<div class="invoice-correction-dates"><div role="group" aria-label="請求の日付"><label>請求予定日<input[^>]*value="2023-09-01"[^>]*\/><\/label><label>請求日<input[^>]*value="2023-09-16"[^>]*\/><\/label><\/div><div role="group" aria-label="入金の日付"><label>入金予定日<input[^>]*value="2023-09-30"[^>]*\/><\/label><label>入金日<input[^>]*value="2023-09-17"[^>]*\/><\/label><\/div><\/div>/)
+assert.equal(JSON.stringify(correctionUnit),correctionBefore,'Date layout must not mutate saved financials')
+const layoutCss=fs.readFileSync(path.join(root,'src/styles.css'),'utf8')
+assert.match(layoutCss,/\.standard-editor \.invoice-correction-dates \{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/)
+assert.match(layoutCss,/@media\(max-width:620px\) \{ \.standard-editor \.invoice-correction-dates \{ grid-template-columns:1fr; \} \}/)
 console.log('PASS: management/history tab isolation, no permanent billing selector, sidebar logout, common accessible modal, immutable render fixtures and unchanged authentication hooks')
+console.log('PASS: correction dates grouped by billing/payment columns, mobile order, original date values and unchanged financial data')

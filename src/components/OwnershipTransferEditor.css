@@ -36,7 +36,7 @@
 .ownership-final-summary p { margin:5px 0; }
 .ownership-transfer-heading h2,.ownership-transfer-current strong,.ownership-final-summary { overflow-wrap:anywhere; }
 .ownership-new-customer-trigger { margin-top:8px; }
-.ownership-new-customer { margin-top:16px; padding:16px; background:#f8fafc; border:1px solid #dbe4ef; border-radius:8px; }
+.ownership-new-customer { min-width:0; overflow-wrap:anywhere; margin-top:16px; padding:16px; background:#f8fafc; border:1px solid #dbe4ef; border-radius:8px; }
 .ownership-new-customer h4 { margin:0 0 8px; }
 .ownership-new-customer p { margin:8px 0 14px; color:#475569; font-size:13px; }
 .ownership-customer-types { display:flex; gap:8px; grid-column:1/-1; }
@@ -46,5 +46,34 @@
 .ownership-customer-matches span { overflow-wrap:anywhere; }
 .ownership-customer-recovery { padding:12px; background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; }
 .ownership-customer-recovery label { display:block; margin-top:12px; }
+.ownership-transfer-shell { min-width:0; }
+.ownership-transfer-shell .btn { max-width:100%; white-space:normal; overflow-wrap:anywhere; }
+.ownership-new-customer .form-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.ownership-new-customer .form-grid > * { min-width:0; }
+.ownership-new-customer .editor-footer { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:8px; margin-top:18px; padding-top:14px; border-top:1px solid #e2e8f0; }
+.ownership-new-customer .editor-footer .btn { min-height:40px; }
+.ownership-customer-matches span { min-width:0; flex:1; }
+.ownership-customer-matches :is(button,small) { flex-shrink:0; }
+.ownership-customer-separate { align-items:flex-start; }
+.ownership-customer-separate input { flex:0 0 18px; width:18px; height:18px; margin-top:2px; }
+.ownership-transfer-shell .ownership-contract-fields { min-width:0; overflow-wrap:anywhere; }
+.ownership-transfer-shell .ownership-contract-fields summary { cursor:pointer; line-height:1.6; }
+.ownership-transfer-shell .ownership-contract-fields > p { margin:12px 0; font-size:13px; line-height:1.7; color:#475569; }
+.ownership-transfer-shell .ownership-contract-field > p { margin:10px 0; font-size:13px; color:#64748b; }
+.ownership-transfer-shell .ownership-contract-field > label { display:flex; flex-direction:column; gap:6px; margin:12px 0; font-size:13px; color:#475569; }
+.ownership-transfer-shell .ownership-contract-field .form-input { display:block; box-sizing:border-box; width:100%; min-width:0; min-height:40px; margin:8px 0; }
+.ownership-transfer-shell .ownership-contract-field > label > .form-input { margin:0; }
+.ownership-transfer-shell .ownership-contract-field textarea { min-height:80px; resize:vertical; }
+.ownership-transfer-shell .ownership-contract-flags { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:12px; }
+.ownership-transfer-shell .ownership-contract-flags label { display:flex; align-items:flex-start; gap:8px; font-size:13px; }
+.ownership-transfer-shell .ownership-contract-flags input { flex:0 0 18px; width:18px; height:18px; margin:2px 0 0; }
+.ownership-transfer-shell .ownership-contract-flags span { min-width:0; }
 @media(max-width:800px) { .ownership-transfer-grid { grid-template-columns:1fr; } .ownership-transfer-arrow { transform:rotate(90deg); } .ownership-transfer-steps { grid-template-columns:1fr; } .ownership-transfer-steps li { border-right:0; border-bottom:1px solid #dbe4ef; } .ownership-transfer-heading { flex-direction:column; } }
 @media(max-width:620px) { .ownership-occurrence-grid { grid-template-columns:minmax(0,1fr); } .ownership-transfer-card { padding:16px; } .ownership-occurrence-period { padding:12px; } }
+@media(max-width:620px) {
+  .ownership-new-customer { padding:12px; }
+  .ownership-new-customer .form-grid,.ownership-transfer-shell .ownership-contract-flags { grid-template-columns:minmax(0,1fr); }
+  .ownership-new-customer .editor-footer { flex-direction:column; align-items:stretch; }
+  .ownership-customer-matches > div { flex-direction:column; align-items:stretch; gap:8px; }
+  .ownership-transfer-shell .ownership-contract-fields { padding:16px!important; }
+}

@@ -8,18 +8,18 @@ export function ContractTransferFields({contract,choices,onChange,disabled=false
   const keys=Object.keys(contractTransferLabels) as (keyof Contract)[]
   function patch(key:keyof Contract,value:FieldChoice){onChange({...choices,[key]:value})}
   const show=(v:unknown):string=>v==null?'未記入':typeof v==='boolean'?(v?'あり':'なし'):Array.isArray(v)?v.join('、'):typeof v==='object'?Object.entries(v).map(([k,n])=>`${k}：${n}`).join('、'):String(v)
-  return <details className="card" style={{padding:20}}>
+  return <details className="card ownership-contract-fields" style={{padding:20}}>
     <summary>契約情報の引き継ぎ（変更・引き継がない：{Object.values(choices).filter(c=>c.mode!=='keep').length}項目）</summary>
     <p>初期設定はすべて「そのまま引き継ぐ」です。変更する項目だけ開いてください。どの選択でも、変更前の情報は履歴に残ります。</p>
     <p>購入日・販売経路を引き継いでも、新所有者の購入日として自動認定はしません。契約の金額を変更しても、保存済みの各回の請求額は変わりません。</p>
-    <fieldset disabled={disabled} style={{border:0,padding:0}}>
+    <fieldset disabled={disabled} style={{border:0,padding:0,minWidth:0}}>
       <button type="button" className="btn" onClick={()=>onChange({})}>すべて「そのまま引き継ぐ」に戻す</button>
       {keys.filter(key=>contractFieldKinds[key]!=='protected').map(key=>{
         const kind=contractFieldKinds[key],choice=choices[key]??{mode:'keep'},exists=Object.hasOwn(contract,key)
         const value=choice.mode==='change'?choice.value:contract[key]
         const change=(v:unknown)=>patch(key,{mode:'change',value:v})
         const inputLabel=`${contractTransferLabels[key]}（変更後）`,options=contractTransferOptions[key]
-        return <details key={key} style={{padding:'10px 0',borderBottom:'1px solid #e2e8f0'}}>
+        return <details key={key} className="ownership-contract-field" style={{padding:'10px 0',borderBottom:'1px solid #e2e8f0'}}>
           <summary>{contractTransferLabels[key]}：{choice.mode==='keep'?'そのまま引き継ぐ':choice.mode==='clear'?'引き継がない':'変更して引き継ぐ'}</summary>
           <p>現在：{show(contract[key])}</p>
           {!exists?<p>この保存先には項目がありません。DBの準備後に選択できます。</p>:<>
@@ -27,7 +27,7 @@ export function ContractTransferFields({contract,choices,onChange,disabled=false
             <option value="keep">そのまま引き継ぐ</option><option value="change">変更して引き継ぐ</option><option value="clear">引き継がない</option>
           </select></label>
           {choice.mode==='clear'&&<p>新所有者の現在欄は空欄になります。旧値は履歴に残ります。</p>}
-          {choice.mode==='change'&&(kind==='flags'?<div>{Object.entries(billingFlagLabels).map(([k,label])=><label key={k} style={{display:'block'}}><input type="checkbox" checked={(value as Record<string,boolean>)?.[k]!==false} onChange={e=>change({...value as object,[k]:e.target.checked})}/>{label}を含める</label>)}</div>
+          {choice.mode==='change'&&(kind==='flags'?<div className="ownership-contract-flags">{Object.entries(billingFlagLabels).map(([k,label])=><label key={k}><input type="checkbox" checked={(value as Record<string,boolean>)?.[k]!==false} onChange={e=>change({...value as object,[k]:e.target.checked})}/><span>{label}を含める</span></label>)}</div>
             :kind==='amounts'?<div><p>「回・月：金額」を1行ずつ入力（例：1:82500）。空欄は個別設定なしです。</p><textarea aria-label={inputLabel} className="form-input" defaultValue={Object.entries((value??{}) as object).map(([k,v])=>`${k}:${v}`).join('\n')} onChange={e=>{
               const entries=e.target.value.trim()?e.target.value.split('\n').map(line=>{const [k,v,...extra]=line.split(':');return [k?.trim(),extra.length||!/^\d+$/.test(v?.trim()??'')?NaN:Number(v)]}):[]
               const obj=Object.fromEntries(entries);change(entries.length!==Object.keys(obj).length?{invalid:NaN}:obj)

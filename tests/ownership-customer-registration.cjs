@@ -93,9 +93,35 @@ const submit=tree=>nodes(tree,e=>e.type==='form')[0].props.onSubmit({preventDefa
  const css=fs.readFileSync(path.join(root,'src/components/OwnershipTransferEditor.css'),'utf8')
  assert.match(css,/\.ownership-occurrence-grid\s*\{[^}]*repeat\(2,minmax\(0,1fr\)\)/)
  assert.match(css,/@media\(max-width:620px\)[^{]*\{\s*\.ownership-occurrence-grid\s*\{\s*grid-template-columns:minmax\(0,1fr\)/)
+ // Contract fields use a separate scope; flag labels remain checkboxes, not text controls.
+ const {ContractTransferFields}=load('src/components/ContractTransferFields.tsx')
+ let contractPatches=[]
+ const contractTree=ContractTransferFields({contract,choices:{billing_item_flags:{mode:'change',value:{}},annual_maintenance_inc:{mode:'change',value:82500}},onChange:v=>contractPatches.push(v)})
+ assert.ok(contractTree.props.className.includes('ownership-contract-fields'))
+ assert.equal(nodes(contractTree,e=>e.type==='fieldset')[0].props.style.minWidth,0)
+ const flagBox=nodes(contractTree,e=>e.props.className==='ownership-contract-flags')[0]
+ nodes(flagBox,e=>e.type==='input')[0].props.onChange({target:{checked:false}})
+ assert.ok(Object.values(contractPatches.at(-1).billing_item_flags.value).includes(false),'Flag layout preserves boolean callback')
+ nodes(contractTree,e=>e.type==='input'&&e.props['aria-label']==='年次保守料（税込）（変更後）')[0].props.onChange({target:{value:'90000'}})
+ assert.equal(contractPatches.at(-1).annual_maintenance_inc.value,90000,'Numeric layout preserves typed callback')
+ assert.match(css,/\.ownership-transfer-shell \.ownership-contract-field \.form-input\s*\{[^}]*width:100%;[^}]*min-width:0/)
+ assert.match(css,/\.ownership-new-customer \.editor-footer\s*\{[^}]*flex-wrap:wrap;[^}]*gap:8px/)
+ assert.match(css,/\.ownership-customer-matches :is\(button,small\)\s*\{\s*flex-shrink:0/)
+ const billingCss=fs.readFileSync(path.join(root,'src/components/OwnershipBillingPlanEditor.css'),'utf8')
+ assert.match(billingCss,/@media\(max-width:980px\)[^{]*\{\s*\.ownership-billing-fields\s*\{[^}]*repeat\(2,minmax\(0,1fr\)\)/)
+ assert.match(billingCss,/@media\(max-width:620px\)\s*\{\s*\.ownership-billing-fields\s*\{[^}]*minmax\(0,1fr\)/)
+ // Existing saved plans still review without saving and forward the exact occurrence and revision.
+ const savedUnit={id:'planned',projectId:1,serviceYear:2027,roundLabel:'第1回',method:'請求書',scheduledDate:'2026-12-01',recipientId:1,lifecycle:'planned',issuedOn:null,receivedOn:null,frozenAt:null,frozenAmount:null,frozenLineItems:null,plannedAmount:82500,revision:7,collectionState:'pending',periodStart:'2027-01-01',periodEnd:'2027-12-31',planNote:'元の備考'}
+ const planWrites=[]
+ const savedPlan=harness('src/components/OwnershipBillingPlanEditor.tsx',{projectId:1,oldOwner:customers[0],newOwner:customers[1],units:[savedUnit],onSave:async(...args)=>planWrites.push(plain(args))})
+ let savedTree=savedPlan.render();fill(savedTree,'予定額（税込）','0');fill(savedPlan.render(),'備考','長い備考を保持')
+ submit(savedPlan.render());assert.equal(planWrites.length,0)
+ fill(savedPlan.render(),'確認内容・変更理由','確認済み')
+ await button(savedPlan.render(),'検証用DBで予定と履歴を保存').props.onClick()
+ assert.deepEqual(planWrites[0],[ [{unitId:'planned',expectedRevision:7,recipientId:1,method:'請求書',scheduledDate:'2026-12-01',plannedAmount:0,periodStart:'2027-01-01',periodEnd:'2027-12-31',note:'長い備考を保持'}], '確認済み' ])
  const app=fs.readFileSync(path.join(root,'src/App.tsx'),'utf8')
  assert.ok(app.includes('closeDisabled={transferBusy}')&&app.includes('onBusyChange={setTransferBusy}'))
  assert.ok(app.includes('pendingCustomerInput={pendingCustomerInput} onPendingCustomerChange={setPendingCustomerInput}'))
  assert.ok(app.includes('const customer=await createCustomer(input);setCustomers('),'Successful creation goes directly into the customer list, without a fallible reload')
- console.log('PASS: customer validation, duplicate suggestions, single-flight insert, successful ID retention, uncertain-reply recovery, explicit selection, preserved transfer drafts and no premature ownership change')
+ console.log('PASS: customer registration/recovery, preserved transfer drafts, contract typed callbacks, responsive layout guards and saved plan payload/revision preservation without premature saves')
 })().catch(e=>{console.error(e);process.exitCode=1})

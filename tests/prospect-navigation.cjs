@@ -35,6 +35,9 @@ for(const [i,row] of rows.entries()){
  // Model real bubbling only when the child handler did not stop it.
  const cells=nodes(row,e=>e.type==='td')
  assert.equal(cells.length,9)
+ assert.equal(cells[1].props.style.fontSize,15,'Customer names remain readable in the compact table')
+ assert.equal(cells[2].props.style.fontSize,15,'Project names remain readable in the compact table')
+ assert.equal(cells[4].props.style.fontSize,15,'Amounts use the same readable body size')
  assert.ok(nodes(cells[0],e=>e===button).length,'Button must have its own column before the customer name')
  assert.equal(nodes(cells[2],e=>e===button).length,0,'No button stacked under the project name')
  assert.equal(cells[0].props.style.padding,'4px 6px')

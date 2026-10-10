@@ -569,5 +569,5 @@ const thStyle: React.CSSProperties = {
 }
 const tdStyle: React.CSSProperties = {
   textAlign: 'center', padding: '10px 12px', borderBottom: '1px solid #f1f5f9',
-  fontSize: 13.5, color: '#374151',
+  fontSize: 15, color: '#374151',
 }

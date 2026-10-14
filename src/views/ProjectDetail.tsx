@@ -16,6 +16,8 @@ import { contractSectionPatch } from '../lib/contract-section-patch'
 import { BILLING_ITEMS, annualBillableTotalInc } from '../lib/billing'
 import { StatusBadge } from '../components/StatusBadge'
 import { Modal } from '../components/Modal'
+import {BillingScheduleChangeReview} from '../components/BillingScheduleChangeReview'
+import {reviewScheduleDateChanges,saveScheduleDateChanges,ScheduleChangeSaveError,type ScheduleDateReview} from '../lib/billing-schedule-change'
 import {
   createMaintenanceResponse, deleteMaintenanceResponse,
   createPeriodicMaintenance, updatePeriodicMaintenance, deletePeriodicMaintenance,
@@ -116,6 +118,7 @@ type Props = {
   changeHistory?:ReactNode
   billingCycleSettings?:ReactNode
   onSaveInvoice?:(request:InvoiceWriteRequest)=>Promise<unknown>
+  onCheckBillingPending?:()=>Promise<boolean>
   onRecordRemoval?:(request:import('../lib/billing-record-removal').BillingRecordRemovalRequest)=>Promise<unknown>
   onSavePeriod?:(change:SavedMaintenancePeriodChange)=>Promise<unknown>
   onAddSchedule?:AddBillingOccurrence
@@ -154,8 +157,12 @@ function writeTabToHash(t: Tab) {
   }
 }
 
-export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, onViewMaintenance,billingHistory,onSaveInvoice,onSavePeriod,onAddSchedule,onAddRoutine,onOwnershipTransfer,billingUnits,onAddDebit,onSaveBillingPlan,managementTools,changeHistory,billingCycleSettings,onRecordRemoval }: Props) {
+export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, onViewMaintenance,billingHistory,onSaveInvoice,onCheckBillingPending,onSavePeriod,onAddSchedule,onAddRoutine,onOwnershipTransfer,billingUnits,onAddDebit,onSaveBillingPlan,managementTools,changeHistory,billingCycleSettings,onRecordRemoval }: Props) {
   const toast = useToast()
+  const [scheduleReview,setScheduleReview]=useState<ScheduleDateReview|null>(null)
+  const [scheduleFailure,setScheduleFailure]=useState('')
+  const [scheduleOutcome,setScheduleOutcome]=useState<ScheduleChangeSaveError|null>(null)
+  const sectionSaveLock=useRef(false)
   const { project, customer, contract, annualRecords, maintenanceResponses, periodicMaintenance } = detail
   // DB追加前は新列を送信しない。モックではDBを変更せず動作確認できる。
   const basicNotesAvailable = !hasSupabaseEnv || BASIC_NOTE_KEYS.every(key => Object.prototype.hasOwnProperty.call(project, key))
@@ -667,8 +674,13 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
   }
 
   /** 中項目編集モーダルを保存する。section に応じて projects / contracts / 両方 を更新。 */
-  async function handleSaveSection() {
+  async function handleSaveSection(scheduleRequests?:InvoiceWriteRequest[]) {
     if (!editSection) return
+    if(sectionSaveLock.current||scheduleFailure)return
+    if(editSection==='billing'&&!scheduleRequests&&contract&&billingHistory&&onSaveInvoice){
+      const review=reviewScheduleDateChanges(contract,{...contract,billing_method:contractForm.billing_method||null,billing_count:contractForm.billing_count?Number(contractForm.billing_count):null,billing_schedule_days:contractForm.billing_schedule_days},billingHistory.units,new Date().toLocaleDateString('sv-SE'),billingHistory.cycleRules)
+      if(review){setScheduleReview(review);setErr('');return}
+    }
     const writesProject = PROJECT_SECTIONS.includes(editSection)
     const writesContract = CONTRACT_SECTIONS.includes(editSection)
     // 概要 (summary) は plant_name が必須
@@ -676,8 +688,9 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
     // FIT期間は年4桁が揃うまで保存不可（入力途中の "20-01-01" 等が DATE として保存されるのを防ぐ）
     if (projForm.fit_end_date && !/^\d{4}-\d{2}-\d{2}$/.test(projForm.fit_end_date)) { setErr('FIT期間の年は西暦4桁で入力してください'); return }
     const toNum = (v: string) => v ? parseInt(v.replace(/,/g, ''), 10) : null
-    setSaving(true); setErr('')
+    sectionSaveLock.current=true;setSaving(true); setErr('')
     try {
+      if(editSection==='billing'&&await onCheckBillingPending?.())throw Error('前回の請求保存結果が未確認です。先に「保存結果を再確認」を行ってから、この変更を保存してください。')
       if (writesProject) {
         await updateProject(project.id, {
           ...projForm,
@@ -691,7 +704,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
         })
       }
       if (writesContract && contract) {
-        await updateContract(contract.id, contractSectionPatch(editSection, {
+        const patch=contractSectionPatch(editSection, {
           billing_method: contractForm.billing_method || null,
           billing_due_day: contractForm.billing_due_day || null,
           billing_amount_ex: toNum(contractForm.billing_amount_ex),
@@ -741,14 +754,23 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           billing_schedule_days: contractForm.billing_schedule_days.length > 0 ? contractForm.billing_schedule_days : null,
           billing_amount_overrides: Object.keys(contractForm.billing_amount_overrides).length > 0 ? contractForm.billing_amount_overrides : null,
           billing_item_flags: Object.keys(contractForm.billing_item_flags).length > 0 ? contractForm.billing_item_flags : null,
-        }))
+        })
+        if(editSection==='billing'&&scheduleRequests){
+          await saveScheduleDateChanges(()=>updateContract(contract.id,patch,true),async request=>{
+            if(!onSaveInvoice)throw Error('請求予定を保存できません。画面を読み直してください。')
+            await onSaveInvoice(request)
+          },scheduleRequests)
+        }else await updateContract(contract.id,patch)
       }
+      setScheduleReview(null)
       setEditSection(null)
       onReload()
-      toast('保存しました')
+      toast(scheduleRequests?(scheduleRequests.length?`請求情報と選択した予定${scheduleRequests.length}件を保存しました。`:'請求情報だけ保存しました。保存済み予定は変更していません。'):'保存しました')
     } catch (e: unknown) {
+      if(e instanceof ScheduleChangeSaveError){setScheduleFailure(e.message);setScheduleOutcome(e)}
       setErr(e instanceof Error ? e.message : JSON.stringify(e))
     } finally {
+      sectionSaveLock.current=false
       setSaving(false)
     }
   }
@@ -1005,6 +1027,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               <h3 className="section-title" style={{ margin: 0 }}>請求情報</h3>
               {contract && <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('billing')}>編集</button>}
             </div>
+            {billingHistory&&<p className="invoice-reference-help">今後の基本設定です。請求予定日を変更して保存すると、保存済みの未発行予定も変更するか確認できます。すでに設定だけ変更した回や個別の予定は「請求詳細」の「予定を変更」から修正してください。</p>}
             {(() => {
               const annualInc = annualBillableTotalInc(contract)
               const excludedItems = contract ? BILLING_ITEMS.filter(it => contract.billing_item_flags?.[it.key] === false && (contract[it.field] ?? 0) > 0) : []
@@ -1812,8 +1835,9 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
 
       {/* ── 中項目ごとの編集モーダル（ステップ C-2） ── */}
       {editSection && (
-        <Modal title={SECTION_TITLES[editSection]} onClose={() => setEditSection(null)}>
+        <Modal title={SECTION_TITLES[editSection]} closeDisabled={saving} onClose={() => {setEditSection(null);setScheduleReview(null);setScheduleOutcome(null);if(scheduleFailure){setScheduleFailure('');onReload()}}}>
           {err && <div className="form-error">{err}</div>}
+          {scheduleFailure?<section className="schedule-change-review">{scheduleOutcome?.requests.map((q,i)=>{const c=scheduleReview?.changes.find(c=>Number(c.unit.id)===q.unitId);return <p key={q.unitId}><strong>{scheduleOutcome.settingsSaved?(i<scheduleOutcome.completed?'保存確認済み':i===scheduleOutcome.completed?'保存結果要確認':'未着手'):'未着手'}</strong>：{c?`${c.unit.serviceYear}年・${c.unit.roundLabel} ／ ${c.unit.scheduledDate} → ${c.date}`:`請求記録ID ${q.unitId}`}</p>})}<button type="button" className="btn btn-sub" onClick={()=>{setEditSection(null);setScheduleReview(null);setScheduleFailure('');setScheduleOutcome(null);onReload()}}>閉じて最新の情報を確認</button></section>:scheduleReview?<BillingScheduleChangeReview review={scheduleReview} name={project.plant_name||project.project_name} recipientName={id=>billingHistory?.recipientName(id)??`顧客ID ${id}`} busy={saving} onBack={()=>{setScheduleReview(null);setErr('')}} onSave={requests=>void handleSaveSection(requests)}/>:<>
           <div className="form-grid">
 
             {/* 概要 */}
@@ -2642,9 +2666,10 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
 
           </div>
           <div className="modal-footer">
-            <button className="btn btn-sub" onClick={() => setEditSection(null)}>キャンセル</button>
-            <button className="btn btn-main" onClick={handleSaveSection} disabled={saving}>{saving ? '保存中...' : '保存する'}</button>
+            <button className="btn btn-sub" disabled={saving} onClick={() => setEditSection(null)}>キャンセル</button>
+            <button className="btn btn-main" onClick={()=>void handleSaveSection()} disabled={saving}>{saving ? '保存中...' : '保存する'}</button>
           </div>
+          </>}
         </Modal>
       )}
     </>

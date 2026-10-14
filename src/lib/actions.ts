@@ -534,10 +534,11 @@ export async function createContract(projectId: number, input: Partial<Omit<Cont
   return data as Contract
 }
 
-export async function updateContract(id: number, input: Partial<Omit<Contract, 'id' | 'created_at'>>): Promise<void> {
+export async function updateContract(id: number, input: Partial<Omit<Contract, 'id' | 'created_at'>>, verifyResult = false): Promise<void> {
   if (!hasSupabaseEnv) { contractStore.update(id, input) }
   else {
-    const { error } = await db().from('contracts').update(input).eq('id', id)
+    const query = db().from('contracts').update(input).eq('id', id)
+    const { error } = await (verifyResult ? query.select('id').single() : query)
     if (error) throw error
   }
   // 契約日の変更を見込みへ書き戻す（見込みの売買契約日/土地契約日 → contracts 同期の逆方向）

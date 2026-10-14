@@ -13,7 +13,7 @@ async function main(){
  for(const section of Object.keys(contractSectionKeys)){
   let saved;const form=new Proxy({...original,billing_count:'12',subcontract_notes:'備考だけ変更'},{get:(t,k)=>k in t?t[k]:''});
   const context={editSection:section,PROJECT_SECTIONS:[],CONTRACT_SECTIONS:Object.keys(contractSectionKeys),projForm:{},contractForm:form,contract:{id:1},
-   contractSectionPatch,setSaving(){},setErr(e){if(e)throw Error(e)},setEditSection(){},onReload(){},toast(){},updateContract:async(id,p)=>{assert.equal(id,1);saved=p}};
+   contractSectionPatch,sectionSaveLock:{current:false},scheduleFailure:'',billingHistory:undefined,onCheckBillingPending:undefined,setScheduleReview(){},ScheduleChangeSaveError:class extends Error{},setSaving(){},setErr(e){if(e)throw Error(e)},setEditSection(){},onReload(){},toast(){},updateContract:async(id,p)=>{assert.equal(id,1);saved=p}};
   vm.createContext(context);vm.runInContext(fn('src/views/ProjectDetail.tsx','handleSaveSection')+';globalThis.run=handleSaveSection',context);await context.run();
   assert.deepEqual(Object.keys(saved).sort(),[...contractSectionKeys[section]].sort());
   if(section!=='billing')for(const k of ['billing_method','billing_schedule_days','billing_count','billing_item_flags','billing_amount_overrides','notes'])assert(!Object.hasOwn(saved,k),`${section} resubmitted ${k}`);

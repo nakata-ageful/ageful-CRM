@@ -28,6 +28,29 @@ for(const patch of [{lifecycle:'issued',issuedOn:'2026-10-01'},{lifecycle:'recei
 assert.throws(()=>request({...mismatch.editable[0],date:''}),/予定日/);assert.throws(()=>request({...mismatch.editable[0],date:'2026-02-30'}),/予定日/);
 assert.throws(()=>request({...mismatch.editable[0],date:'2026-12-01'}),/同じ/);
 assert.throws(()=>request({...mismatch.editable[0],unit:{...unit,paymentDueOn:'2026-10-31'},date:'2026-11-01'}),/入金予定日/);
+// Empty confirmation cases must explain the actual next unsaved candidate,
+// using the same selector as Billing Detail, without writing guessed records.
+const annual={...before,billing_count:1,maintenance_start_date:'2020-01-01',billing_schedule_days:['12月1日']},nov={...annual,billing_schedule_days:['11月1日']};
+const annualPaid={...paid,roundLabel:'第1回',serviceYear:2026,periodStart:'2026-01-01',periodEnd:'2026-12-31'};
+const emptyReview=review(annual,nov,[],'2026-10-15');assert.equal(emptyReview.impact.before.date,'2026-12-01');assert.equal(emptyReview.impact.after.date,'2026-11-01');assert.equal(emptyReview.impact.savedCount,0);
+const paidReview=review(annual,nov,[annualPaid],'2026-10-15');assert.equal(paidReview.impact.after.date,'2027-11-01');assert.equal(paidReview.impact.protectedCount,1);assert.equal(paidReview.changes.length+paidReview.editable.length,0);
+const calendarRule={...rule,effective_year:2027};const overrideReview=review(annual,nov,[annualPaid],'2026-10-15',[calendarRule]);assert.equal(overrideReview.impact.after.date,'2026-12-01');assert(overrideReview.impact.warnings.some(w=>w.includes('優先')));
+const aligned=review(annual,nov,[{...unit,roundLabel:'第1回',scheduledDate:'2026-11-01'}],'2026-10-15');assert.equal(aligned.editable.length,0);assert.equal(aligned.impact.alignedCount,1);
+const endEvent={id:1,project_id:1,scope:'all',action:'end',effective_date:'2025-12-31',reason:'合成終了'};
+assert.equal(review(annual,nov,[],'2026-10-15',[],[endEvent]).impact.after,null,'Ended management must not promise a next plan');
+const midPeriodEnd=review(annual,nov,[],'2026-10-15',[],[{...endEvent,effective_date:'2026-06-30'}]);assert.equal(midPeriodEnd.impact.after.date,'2026-11-01');assert(midPeriodEnd.impact.warnings.some(w=>w.includes('すべての取引が終了'))&&midPeriodEnd.impact.warnings.some(w=>w.includes('期間・金額')),'A date preview must not hide a mid-period management change');
+assert(review({...annual,maintenance_start_date:null},{...nov,maintenance_start_date:null},[],'2026-10-15').impact.warnings.length,'Missing period remains explicitly unconfirmed');
+assert(review(annual,{...nov,billing_schedule_days:[]},[],'2026-10-15').impact.warnings.some(w=>w.includes('予定日が未登録')));
+for(const history of [[{...annualPaid,lifecycle:'cancelled',issuedOn:null,receivedOn:null}],[{...annualPaid,removedAt:'2026-10-01'}]])assert.equal(review(annual,nov,history,'2026-10-15').impact.after.year,2027,'Never recreate a removed or cancelled annual identity');
+const debit={...annual,billing_method:'口座振替',billing_count:12,billing_schedule_days:['15日']};assert(review(annual,{...annual,billing_method:'口座振替'},[],'2026-10-15'),'Method-only changes require confirmation too');
+const debitReview=review(debit,{...debit,billing_schedule_days:['20日']},[{...unit,method:'口座振替'}],'2026-10-15');assert.equal(debitReview.manual.length,1);
+const ReviewComponent=load('src/components/BillingScheduleChangeReview.tsx').BillingScheduleChangeReview;
+const renderReview=review=>require('react-dom/server').renderToStaticMarkup(React.createElement(ReviewComponent,{review,name:'合成発電所',recipientName:()=> '合成顧客',busy:false,onSave(){throw Error('Rendering may not save')},onBack(){}}));
+const emptyHtml=renderReview(emptyReview);assert(emptyHtml.includes('2026-12-01')&&emptyHtml.includes('2026-11-01')&&emptyHtml.includes('請求情報を保存'));assert(!emptyHtml.includes('選択した0件'));
+const paidHtml=renderReview(paidReview);assert(paidHtml.includes('2027-11-01')&&paidHtml.includes('入金済みの1件は変更しません'));
+assert(renderReview(overrideReview).includes('12月1日のまま'));assert(renderReview(aligned).includes('変更後の設定と一致'));
+assert(renderReview(debitReview).includes('管理設定')&&renderReview(debitReview).includes('請求先・方法・予定額を変更する'));
+assert.deepEqual(plain([unit,paid]),original,'All preview operations leave source financial history unchanged');
 (async()=>{
  let calls=[];await save(async()=>calls.push('settings'),async q=>calls.push(q.unitId),[request(r.changes[0])]);assert.deepEqual(calls,['settings',123]);
  calls=[];await save(async()=>calls.push('settings'),async()=>calls.push('unexpected'),[]);assert.deepEqual(calls,['settings']);

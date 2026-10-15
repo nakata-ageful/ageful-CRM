@@ -679,7 +679,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
     if (!editSection) return
     if(sectionSaveLock.current||scheduleFailure)return
     if(editSection==='billing'&&!scheduleRequests&&contract&&billingHistory&&onSaveInvoice){
-      const review=reviewScheduleDateChanges(contract,{...contract,billing_method:contractForm.billing_method||null,billing_count:contractForm.billing_count?Number(contractForm.billing_count):null,billing_schedule_days:contractForm.billing_schedule_days},billingHistory.units,new Date().toLocaleDateString('sv-SE'),billingHistory.cycleRules)
+      const review=reviewScheduleDateChanges(contract,{...contract,billing_method:contractForm.billing_method||null,billing_count:contractForm.billing_count?Number(contractForm.billing_count):null,billing_schedule_days:contractForm.billing_schedule_days},billingHistory.units,new Date().toLocaleDateString('sv-SE'),billingHistory.cycleRules,billingHistory.managementEvents)
       if(review){setScheduleReview(review);setErr('');return}
     }
     const writesProject = PROJECT_SECTIONS.includes(editSection)

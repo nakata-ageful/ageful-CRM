@@ -343,7 +343,7 @@ export function ProspectDetailView({
       {p.new_project_id!=null&&<section className="card">
         <h3>{p.converted_customer_id?'新規案件':'新規案件・顧客未定'}</h3>
         <div className="management-action-grid">
-          {onViewExistingProject&&<button type="button" className="btn btn-sub" onClick={()=>onViewExistingProject(p.new_project_id!)}>発電所を開く</button>}
+          {onViewExistingProject&&<button type="button" className="btn btn-sub" onClick={()=>onViewExistingProject(p.new_project_id!)}>発電所詳細へ</button>}
           {!p.converted_customer_id&&onLoadOwnershipProject&&onSetNewCustomer&&<button type="button" className="btn btn-main" disabled={candidateBusy||saving} onClick={async()=>{
             setCandidateBusy(true);setError('');try{setCandidateProject(await onLoadOwnershipProject(p.new_project_id!));setCandidateOpen(true)}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setCandidateBusy(false)}
           }}>顧客を設定</button>}
@@ -359,7 +359,7 @@ export function ProspectDetailView({
         <h3>既存発電所の引継ぎ：{ownershipProspectLabel(p)}</h3>
         <p>引継ぎ先：{p.candidate_customer_id?p.customer_name:'未定'}</p>
         <div className="management-action-grid">
-          {onViewExistingProject&&<button type="button" className="btn btn-sub" onClick={()=>onViewExistingProject(p.ownership_project_id!)}>発電所を開く</button>}
+          {onViewExistingProject&&<button type="button" className="btn btn-sub" onClick={()=>onViewExistingProject(p.ownership_project_id!)}>発電所詳細へ</button>}
           {p.ownership_state==='open'&&onOwnershipAction&&<>
             {!p.candidate_customer_id&&onLoadOwnershipProject&&<button type="button" className="btn btn-main" disabled={saving||candidateBusy} onClick={async()=>{
               setCandidateBusy(true);setError('');try{setCandidateProject(await onLoadOwnershipProject(p.ownership_project_id!));setCandidateOpen(true)}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setCandidateBusy(false)}

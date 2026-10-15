@@ -1,261 +1,56 @@
-import { useState, useMemo } from 'react'
-import type { Customer, CustomerInput } from '../types'
-import { Modal } from '../components/Modal'
-import { Confirm } from '../components/Confirm'
-import { createCustomer, updateCustomer, deleteCustomer } from '../lib/actions'
-import { useToast } from '../components/Toast'
+import {useState} from 'react'
+import type {Customer,CustomerInput} from '../types'
+import {Modal} from '../components/Modal'
+import {Confirm} from '../components/Confirm'
+import {CustomerFields} from '../components/CustomerFields'
+import {createCustomer,updateCustomer,deleteCustomer} from '../lib/actions'
+import {useToast} from '../components/Toast'
+import {customerDisplayName,searchCustomers,sortCustomersByKana} from '../lib/customer-search'
+import {emptyCustomerInput,validateCustomerRegistration} from '../lib/customer-registration'
 
-type Props = {
-  customers: Customer[]
-  onReload: () => void
-  onViewDetail: (customerId: number) => void
-}
-
-/** スペースを全て除去して正規化 */
-function normalizeName(name: string): string {
-  return name.replace(/[\s\u3000]/g, '')
-}
-
-type CustomerGroup = {
-  primary: Customer
-  all: Customer[]
-  totalProjects: number
-}
-
-const emptyForm: CustomerInput = {
-  name: '',
-  name_kana: '',
-  company_name: '',
-  is_corporate: false,
-  email: '',
-  phone: '',
-  postal_code: '',
-  address: '',
-  notes: '',
-}
-
-export function Customers({ customers, onReload, onViewDetail }: Props) {
-  const toast = useToast()
-  const [search, setSearch] = useState('')
-  const [modal, setModal] = useState<'create' | 'edit' | null>(null)
-  const [editTarget, setEditTarget] = useState<Customer | null>(null)
-  const [form, setForm] = useState<CustomerInput>(emptyForm)
-  const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-
-  const filtered = customers.filter(c => {
-    const q = search.toLowerCase()
-    return (
-      c.name.toLowerCase().includes(q) ||
-      (c.company_name ?? '').toLowerCase().includes(q) ||
-      (c.phone ?? '').includes(q) ||
-      (c.email ?? '').toLowerCase().includes(q)
-    )
-  })
-
-  // 同一名の顧客をグループ化
-  const groups: CustomerGroup[] = useMemo(() => {
-    const map = new Map<string, CustomerGroup>()
-    for (const c of filtered) {
-      const key = normalizeName(c.name)
-      if (!map.has(key)) {
-        map.set(key, { primary: c, all: [c], totalProjects: c.project_count ?? 0 })
-      } else {
-        const g = map.get(key)!
-        g.all.push(c)
-        g.totalProjects += (c.project_count ?? 0)
-      }
-    }
-    return Array.from(map.values())
-  }, [filtered])
-
-  function openCreate() {
-    setForm(emptyForm)
-    setEditTarget(null)
-    setModal('create')
-    setError('')
+type Props={customers:Customer[];onReload:()=>void;onViewDetail:(customerId:number)=>void}
+export function Customers({customers,onReload,onViewDetail}:Props){
+  const toast=useToast()
+  const [search,setSearch]=useState(''),[modal,setModal]=useState<'create'|'edit'|null>(null)
+  const [editTarget,setEditTarget]=useState<Customer|null>(null),[form,setForm]=useState<CustomerInput>(emptyCustomerInput)
+  const [deleteTarget,setDeleteTarget]=useState<Customer|null>(null),[saving,setSaving]=useState(false),[error,setError]=useState('')
+  const matches=new Set(searchCustomers(customers,search).map(c=>c.id))
+  const filtered=sortCustomersByKana(customers.filter(c=>matches.has(c.id)||!!search.trim()&&[c.phone,c.email].some(v=>v?.normalize('NFKC').toLowerCase().includes(search.normalize('NFKC').toLowerCase().trim()))))
+  function openCreate(){setForm({...emptyCustomerInput});setEditTarget(null);setModal('create');setError('')}
+  function openEdit(c:Customer){
+    setForm({name:c.name,name_kana:c.name_kana??'',company_name:c.company_name??'',company_name_kana:c.company_name_kana??'',is_corporate:c.is_corporate,email:c.email??'',phone:c.phone??'',postal_code:c.postal_code??'',address:c.address??'',notes:c.notes??''})
+    setEditTarget(c);setModal('edit');setError('')
   }
-
-  function openEdit(c: Customer) {
-    setForm({
-      name: c.name,
-      name_kana: c.name_kana ?? '',
-      company_name: c.company_name ?? '',
-      is_corporate: c.is_corporate,
-      email: c.email ?? '',
-      phone: c.phone ?? '',
-      postal_code: c.postal_code ?? '',
-      address: c.address ?? '',
-      notes: c.notes ?? '',
-    })
-    setEditTarget(c)
-    setModal('edit')
-    setError('')
-  }
-
-  async function handleSave() {
-    if (!form.name.trim()) { setError(form.is_corporate ? '担当者名は必須です' : '顧客名は必須です'); return }
-    if (form.is_corporate && !form.company_name.trim()) { setError('会社名は必須です'); return }
+  async function handleSave(){
+    if(saving)return
+    let input:CustomerInput
+    try{input=validateCustomerRegistration(form,modal==='edit'&&editTarget?{email:editTarget.email}:undefined)}catch(e){setError(e instanceof Error?e.message:String(e));return}
     setSaving(true)
-    try {
-      if (modal === 'create') await createCustomer(form)
-      else if (modal === 'edit' && editTarget) await updateCustomer(editTarget.id, form)
-      setModal(null)
-      onReload()
-      toast(modal === 'create' ? '顧客を追加しました' : '顧客情報を保存しました')
-    } catch (e) {
-      setError(String(e))
-    } finally {
-      setSaving(false)
-    }
+    try{if(modal==='create')await createCustomer(input);else if(modal==='edit'&&editTarget)await updateCustomer(editTarget.id,input)
+      setModal(null);onReload();toast(modal==='create'?'顧客を追加しました':'顧客情報を保存しました')
+    }catch(e){setError(String(e))}finally{setSaving(false)}
   }
-
-  async function handleDelete() {
-    if (!deleteTarget) return
-    await deleteCustomer(deleteTarget.id)
-    setDeleteTarget(null)
-    onReload()
-    toast('顧客を削除しました')
-  }
-
-  return (
-    <>
-      <div className="toolbar">
-        <input
-          className="search-input"
-          type="search"
-          placeholder="顧客名・会社名・電話番号・メールで検索..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
-        <button className="btn btn-main" onClick={openCreate}>＋ 新規顧客</button>
+  async function handleDelete(){if(!deleteTarget)return;await deleteCustomer(deleteTarget.id);setDeleteTarget(null);onReload();toast('顧客を削除しました')}
+  return <>
+    <div className="toolbar"><input className="search-input" type="search" placeholder="顧客名・フリガナ・電話番号・メールで検索..." value={search} onChange={e=>setSearch(e.target.value)}/><button className="btn btn-main" onClick={openCreate}>＋ 新規顧客</button></div>
+    <div className="card customer-list"><div className="table-meta">{filtered.length} 件<span>顧客名のフリガナ順（未登録は末尾）</span></div>
+      <table><thead><tr><th>顧客名</th><th>担当者名</th><th className="customer-phone">電話番号</th><th>メール</th><th>案件数</th><th>操作</th></tr></thead>
+        <tbody>{!filtered.length&&<tr><td colSpan={6} className="empty-cell">該当する顧客がいません</td></tr>}
+          {filtered.map(c=><tr key={c.id} className="clickable-row" onClick={()=>onViewDetail(c.id)}>
+            <td><button className="customer-name-link" onClick={e=>{e.stopPropagation();onViewDetail(c.id)}}>{customerDisplayName(c)}</button></td>
+            <td>{c.is_corporate?c.name:'-'}</td><td className="customer-phone">{c.phone||'-'}</td><td className="customer-email">{c.email||'-'}</td><td className="center">{c.project_count??0}</td>
+            <td onClick={e=>e.stopPropagation()}><button className="btn-icon" title="編集" aria-label={`${customerDisplayName(c)}の顧客情報を編集`} onClick={()=>openEdit(c)}>✎</button></td>
+          </tr>)}
+        </tbody>
+      </table>
+    </div>
+    {modal&&<Modal title={modal==='create'?'新規顧客登録':'顧客情報を編集'} width={840} closeDisabled={saving} onClose={()=>setModal(null)}>
+      {error&&<div className="form-error" role="alert">{error}</div>}
+      <fieldset disabled={saving} className="customer-fields-fieldset"><CustomerFields value={form} onChange={patch=>setForm(f=>({...f,...patch}))}/></fieldset>
+      <div className="modal-footer">{modal==='edit'&&editTarget&&<button className="btn btn-sub modal-delete-btn" disabled={saving} onClick={()=>{setModal(null);setDeleteTarget(editTarget)}}>削除</button>}
+        <button className="btn btn-sub" disabled={saving} onClick={()=>setModal(null)}>キャンセル</button><button className="btn btn-main" disabled={saving} onClick={()=>void handleSave()}>{saving?'保存中...':'保存する'}</button>
       </div>
-
-      <div className="card">
-        <div className="table-meta">{groups.length} 件</div>
-        <table>
-          <thead>
-            <tr>
-              <th>会社名</th><th>担当者名</th><th>種別</th><th>電話番号</th>
-              <th>メール</th><th>案件数</th><th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {groups.length === 0 && (
-              <tr><td colSpan={7} className="empty-cell">該当する顧客がいません</td></tr>
-            )}
-            {groups.map(g => (
-              <tr key={g.primary.id} className="clickable-row" onClick={() => onViewDetail(g.primary.id)}>
-                <td><strong>{g.primary.is_corporate ? g.primary.company_name ?? '-' : g.primary.name}</strong></td>
-                <td>{g.primary.is_corporate ? g.primary.name : '-'}</td>
-                <td>{g.primary.is_corporate ? '法人' : '個人'}</td>
-                <td>{g.primary.phone ?? '-'}</td>
-                <td>{g.primary.email ?? '-'}</td>
-                <td className="center">{g.totalProjects}</td>
-                <td onClick={e => e.stopPropagation()}>
-                  <button className="btn-icon" title="編集" onClick={() => openEdit(g.primary)}>✎</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {(modal === 'create' || modal === 'edit') && (
-        <Modal
-          title={modal === 'create' ? '新規顧客登録' : '顧客情報を編集'}
-          onClose={() => setModal(null)}
-        >
-          {error && <div className="form-error">{error}</div>}
-          <div className="form-grid">
-            <div style={{ display: 'flex', gap: 8, gridColumn: '1/-1' }}>
-              <button
-                type="button"
-                className={`filter-tab ${!form.is_corporate ? 'active' : ''}`}
-                onClick={() => setForm(f => ({ ...f, is_corporate: false, company_name: '' }))}
-              >
-                個人
-              </button>
-              <button
-                type="button"
-                className={`filter-tab ${form.is_corporate ? 'active' : ''}`}
-                onClick={() => setForm(f => ({ ...f, is_corporate: true }))}
-              >
-                法人
-              </button>
-            </div>
-            {form.is_corporate && (
-              <label className="form-label required" style={{ gridColumn: '1/-1' }}>
-                会社名
-                <input
-                  className="form-input"
-                  value={form.company_name}
-                  onChange={e => setForm(f => ({ ...f, company_name: e.target.value }))}
-                  placeholder="株式会社〇〇"
-                />
-              </label>
-            )}
-            <label className="form-label required">
-              {form.is_corporate ? '担当者名' : '顧客名（個人名）'}
-              <input className="form-input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
-            </label>
-            <label className="form-label">
-              {form.is_corporate ? '担当者フリガナ' : 'フリガナ'}
-              <input className="form-input" value={form.name_kana} onChange={e => setForm(f => ({ ...f, name_kana: e.target.value }))} placeholder="やまだ たろう" />
-            </label>
-            <label className="form-label">
-              電話番号
-              <input className="form-input" type="tel" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
-            </label>
-            <label className="form-label">
-              メールアドレス
-              <input className="form-input" type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
-            </label>
-            <label className="form-label">
-              郵便番号
-              <input
-                className="form-input"
-                inputMode="numeric"
-                placeholder="000-0000"
-                value={form.postal_code}
-                onChange={e => {
-                  const half = e.target.value.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
-                  const digits = half.replace(/\D/g, '').slice(0, 7)
-                  const formatted = digits.length <= 3 ? digits : digits.slice(0, 3) + '-' + digits.slice(3)
-                  setForm(f => ({ ...f, postal_code: formatted }))
-                }}
-              />
-            </label>
-            <label className="form-label" style={{ gridColumn: '1/-1' }}>
-              住所
-              <input className="form-input" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} />
-            </label>
-          </div>
-          <div className="modal-footer">
-            {modal === 'edit' && editTarget && (
-              <button
-                className="btn btn-sub modal-delete-btn"
-                onClick={() => { setModal(null); setDeleteTarget(editTarget) }}
-              >
-                削除
-              </button>
-            )}
-            <button className="btn btn-sub" onClick={() => setModal(null)}>キャンセル</button>
-            <button className="btn btn-main" onClick={handleSave} disabled={saving}>
-              {saving ? '保存中...' : '保存する'}
-            </button>
-          </div>
-        </Modal>
-      )}
-
-      {deleteTarget && (
-        <Confirm
-          message={`「${deleteTarget.name}」を削除しますか？関連する案件・保守記録もすべて削除されます。`}
-          onConfirm={handleDelete}
-          onCancel={() => setDeleteTarget(null)}
-        />
-      )}
-    </>
-  )
+    </Modal>}
+    {deleteTarget&&<Confirm message={`「${deleteTarget.name}」を削除しますか？関連する案件・保守記録もすべて削除されます。`} onConfirm={handleDelete} onCancel={()=>setDeleteTarget(null)}/>}
+  </>
 }

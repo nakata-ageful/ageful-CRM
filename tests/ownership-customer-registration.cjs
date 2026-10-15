@@ -4,7 +4,7 @@ const React=require('react'),{renderToStaticMarkup}=require('react-dom/server'),
 function load(file,hooks){file=path.resolve(root,file);const m={exports:{}}
  vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText,
  {module:m,exports:m.exports,Date,structuredClone,require:n=>{if(n==='react')return hooks??React;if(n==='react/jsx-runtime')return require(n);if(n.endsWith('.css'))return {};if(!n.startsWith('.'))throw Error('External access forbidden');const p=path.resolve(path.dirname(file),n);if(/\/(actions|data|supabase)$/.test(p))throw Error('Business access forbidden');return load(p+(fs.existsSync(p+'.ts')?'.ts':'.tsx'),hooks)}});return m.exports}
-const plain=v=>JSON.parse(JSON.stringify(v)),nodes=(e,p)=>Array.isArray(e)?e.flatMap(v=>nodes(v,p)):!e?.props?[]:[...(p(e)?[e]:[]),...nodes(e.props.children,p)]
+const plain=v=>JSON.parse(JSON.stringify(v)),nodes=(e,p)=>Array.isArray(e)?e.flatMap(v=>nodes(v,p)):!e?.props?[]:[...(p(e)?[e]:[]),...nodes(typeof e.type==='function'&&e.type.name==='CustomerFields'?e.type(e.props):e.props.children,p)]
 const {emptyCustomerInput:empty,validateCustomerRegistration:validate,registrationMatches:matches}=load('src/lib/customer-registration.ts')
 const customers=[{id:1,name:'旧 顧客',phone:'090-1111-2222'},{id:2,name:'同名 顧客',company_name:'株式会社検証',email:'test@example.com'}]
 assert.throws(()=>validate(empty),/顧客名/);assert.throws(()=>validate({...empty,is_corporate:true,name:'担当者'}),/会社名/)

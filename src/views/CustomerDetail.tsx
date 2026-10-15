@@ -6,6 +6,8 @@ import { createProject, updateCustomer, uploadAttachment, deleteAttachment } fro
 import { fmtDate, dateInputRange } from '../lib/utils'
 import { useToast } from '../components/Toast'
 import { BillingHistorySection, type BillingHistoryData } from '../components/BillingHistorySection'
+import {CustomerFields} from '../components/CustomerFields'
+import {validateCustomerRegistration} from '../lib/customer-registration'
 
 /** 郵便番号を「〒xxx-xxxx」形式で表示。値が空なら「-」を返す。 */
 function fmtPostalDisplay(v: string | null | undefined): string {
@@ -46,6 +48,7 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject, bi
     name: customer.name,
     name_kana: customer.name_kana ?? '',
     company_name: customer.company_name ?? '',
+    company_name_kana: customer.company_name_kana ?? '',
     is_corporate: customer.is_corporate,
     email: customer.email ?? '',
     phone: customer.phone ?? '',
@@ -70,11 +73,12 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject, bi
   const [error, setError] = useState('')
 
   async function handleSaveCustomer() {
-    if (!editForm.name.trim()) { setError(editForm.is_corporate ? '担当者名は必須です' : '顧客名は必須です'); return }
-    if (editForm.is_corporate && !editForm.company_name.trim()) { setError('会社名は必須です'); return }
+    if(saving)return
+    let input:CustomerInput
+    try{input=validateCustomerRegistration(editForm,{email:customer.email})}catch(e){setError(e instanceof Error?e.message:String(e));return}
     setSaving(true)
     try {
-      await updateCustomer(customer.id, editForm)
+      await updateCustomer(customer.id, input)
       setEditModal(false)
       onReload()
       toast('顧客情報を保存しました')
@@ -144,6 +148,7 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject, bi
             name: customer.name,
             name_kana: customer.name_kana ?? '',
             company_name: customer.company_name ?? '',
+            company_name_kana: customer.company_name_kana ?? '',
             is_corporate: customer.is_corporate,
             email: customer.email ?? '',
             phone: customer.phone ?? '',
@@ -155,26 +160,27 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject, bi
           </button>
         </div>
         {customer.is_corporate ? (
-          <div className="info-grid">
+          <div className="info-grid customer-info-grid">
             <div className="info-field"><span>種別</span><b>法人</b></div>
             <div className="info-field"><span>会社名</span><b>{customer.company_name ?? '-'}</b></div>
-            <div className="info-field"><span>担当者名</span><b>{customer.name}</b></div>
-            <div className="info-field"><span>担当者フリガナ</span><b>{customer.name_kana ?? '-'}</b></div>
-            <div className="info-field"><span>電話</span><b>{customer.phone ?? '-'}</b></div>
-            <div className="info-field"><span>メール</span><b>{customer.email ?? '-'}</b></div>
-            <div className="info-field"><span>郵便番号</span><b>{fmtPostalDisplay(customer.postal_code)}</b></div>
-            <div className="info-field"><span>住所</span><b>{customer.address ?? '-'}</b></div>
+            <div className="info-field"><span>会社名フリガナ</span><b>{customer.company_name_kana || '-'}</b></div>
+            <div className="info-field customer-row-start"><span>担当者名</span><b>{customer.name}</b></div>
+            <div className="info-field customer-span-two"><span>担当者フリガナ</span><b>{customer.name_kana ?? '-'}</b></div>
+            <div className="info-field customer-row-start"><span>電話</span><b>{customer.phone ?? '-'}</b></div>
+            <div className="info-field customer-span-two"><span>メール</span><b>{customer.email ?? '-'}</b></div>
+            <div className="info-field customer-row-start"><span>郵便番号</span><b>{fmtPostalDisplay(customer.postal_code)}</b></div>
+            <div className="info-field customer-span-two"><span>住所</span><b>{customer.address ?? '-'}</b></div>
             <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap', minHeight: '5lh' }}>{customer.notes || '-'}</b></div>
           </div>
         ) : (
-          <div className="info-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+          <div className="info-grid customer-info-grid">
             <div className="info-field"><span>種別</span><b>個人</b></div>
             <div className="info-field"><span>顧客名</span><b>{customer.name}</b></div>
             <div className="info-field"><span>フリガナ</span><b>{customer.name_kana ?? '-'}</b></div>
             <div className="info-field"><span>電話</span><b>{customer.phone ?? '-'}</b></div>
-            <div className="info-field" style={{ gridColumn: '2 / -1' }}><span>メール</span><b>{customer.email ?? '-'}</b></div>
+            <div className="info-field customer-span-two"><span>メール</span><b>{customer.email ?? '-'}</b></div>
             <div className="info-field"><span>郵便番号</span><b>{fmtPostalDisplay(customer.postal_code)}</b></div>
-            <div className="info-field" style={{ gridColumn: '2 / -1' }}><span>住所</span><b>{customer.address ?? '-'}</b></div>
+            <div className="info-field customer-span-two"><span>住所</span><b>{customer.address ?? '-'}</b></div>
             <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap', minHeight: '5lh' }}>{customer.notes || '-'}</b></div>
           </div>
         )}
@@ -254,71 +260,9 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject, bi
 
       {/* 顧客編集モーダル */}
       {editModal && (
-        <Modal title="顧客情報を編集" onClose={() => setEditModal(false)}>
+        <Modal title="顧客情報を編集" width={840} closeDisabled={saving} onClose={() => setEditModal(false)}>
           {error && <div className="form-error">{error}</div>}
-          <div className="form-grid">
-            <div style={{ display: 'flex', gap: 8, gridColumn: '1/-1' }}>
-              <button
-                type="button"
-                className={`filter-tab ${!editForm.is_corporate ? 'active' : ''}`}
-                onClick={() => setEditForm(f => ({ ...f, is_corporate: false, company_name: '' }))}
-              >
-                個人
-              </button>
-              <button
-                type="button"
-                className={`filter-tab ${editForm.is_corporate ? 'active' : ''}`}
-                onClick={() => setEditForm(f => ({ ...f, is_corporate: true }))}
-              >
-                法人
-              </button>
-            </div>
-            {editForm.is_corporate && (
-              <label className="form-label required" style={{ gridColumn: '1/-1' }}>
-                会社名
-                <input className="form-input" value={editForm.company_name} onChange={e => setEditForm(f => ({ ...f, company_name: e.target.value }))} placeholder="株式会社〇〇" />
-              </label>
-            )}
-            <label className="form-label required">
-              {editForm.is_corporate ? '担当者名' : '顧客名'}
-              <input className="form-input" value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
-            </label>
-            <label className="form-label">
-              {editForm.is_corporate ? '担当者フリガナ' : 'フリガナ'}
-              <input className="form-input" value={editForm.name_kana} onChange={e => setEditForm(f => ({ ...f, name_kana: e.target.value }))} placeholder="やまだ たろう" />
-            </label>
-            <label className="form-label">
-              電話番号
-              <input className="form-input" type="tel" value={editForm.phone} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} />
-            </label>
-            <label className="form-label">
-              メールアドレス
-              <input className="form-input" type="email" value={editForm.email} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} />
-            </label>
-            <label className="form-label">
-              郵便番号
-              <input
-                className="form-input"
-                inputMode="numeric"
-                placeholder="000-0000"
-                value={editForm.postal_code}
-                onChange={e => {
-                  const half = e.target.value.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
-                  const digits = half.replace(/\D/g, '').slice(0, 7)
-                  const formatted = digits.length <= 3 ? digits : digits.slice(0, 3) + '-' + digits.slice(3)
-                  setEditForm(f => ({ ...f, postal_code: formatted }))
-                }}
-              />
-            </label>
-            <label className="form-label" style={{ gridColumn: '1/-1' }}>
-              住所
-              <input className="form-input" value={editForm.address} onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))} />
-            </label>
-            <label className="form-label" style={{ gridColumn: '1/-1' }}>
-              備考
-              <textarea className="form-input" rows={3} value={editForm.notes} onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))} />
-            </label>
-          </div>
+          <fieldset disabled={saving} className="customer-fields-fieldset"><CustomerFields value={editForm} onChange={patch=>setEditForm(f=>({...f,...patch}))}/></fieldset>
           <div className="modal-footer">
             <button className="btn btn-sub" onClick={() => setEditModal(false)}>キャンセル</button>
             <button className="btn btn-main" onClick={handleSaveCustomer} disabled={saving}>{saving ? '保存中...' : '保存する'}</button>

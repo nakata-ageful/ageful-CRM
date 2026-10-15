@@ -39,6 +39,12 @@ try{
     insert into billing_runtime_control(owner_user_id,enabled,future_schedule_coverage_verified,cutover_on) values('${actor}',true,true,'2026-09-01');`)
   await db.exec(read('migrations/20261003_billing_cycle_rules.sql'))
   await db.exec(read('migrations/20261010083859_billing_record_removal.sql'))
+  const beforeKana=await rows('customers'),beforeKanaBills=await rows('billing_units')
+  await db.exec(read('migrations/20261015031506_customer_company_kana.sql'))
+  assert.deepEqual((await rows('customers')).map(({company_name_kana,...c})=>c),beforeKana,'Kana migration must not change existing customers')
+  assert.deepEqual(await rows('billing_units'),beforeKanaBills,'Kana migration must not alter billing')
+  await db.query("update customers set company_name_kana='ビー' where id=2")
+  assert.equal((await one('customers',2)).company_name_kana,'ビー')
   const facts=await rows('billing_units'),legacy=await one('prospects',100),oldProject=await one('projects',2),oldCustomers=await rows('customers')
   await db.exec(read('migrations/20261015025017_ownership_workflow.sql'))
   const initial=await snap(),startKey=key(),startRequest={action:'ownership_workflow',value:{action:'start',value:{projectId:1,project:await one('projects',1),customerId:null,reason:'未定で募集'}}}

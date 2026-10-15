@@ -1,6 +1,7 @@
 import {useRef,useState} from 'react'
 import type {CustomerInput} from '../types'
 import {customerChoiceLabel} from '../lib/customer-search'
+import {CustomerFields} from './CustomerFields'
 import {definiteCustomerRejection,emptyCustomerInput,registrationMatches,validateCustomerRegistration,type RegistrationCustomer} from '../lib/customer-registration'
 
 export function CustomerRegistration({customers,currentOwnerId,onCreate,onReload,onSelect,onCancel,onBusyChange,pendingInput,onPendingChange}:{
@@ -46,17 +47,7 @@ export function CustomerRegistration({customers,currentOwnerId,onCreate,onReload
       {checkedEmpty&&<label><input type="checkbox" disabled={busy} onChange={e=>{if(e.target.checked){setUncertain(false);setCheckedEmpty(false);onPendingChange?.(null)}}}/> 最新の一覧に登録されていないことを確認したので、再登録する</label>}
     </div>}
     <form onSubmit={save}><fieldset disabled={busy||uncertain} style={{border:0,padding:0,minWidth:0}}>
-      <div className="form-grid">
-        <div className="ownership-customer-types"><button type="button" className={`filter-tab ${!form.is_corporate?'active':''}`} onClick={()=>change({is_corporate:false,company_name:''})}>個人</button><button type="button" className={`filter-tab ${form.is_corporate?'active':''}`} onClick={()=>change({is_corporate:true})}>法人</button></div>
-        {form.is_corporate&&<label className="form-label required">会社名<input className="form-input" required value={form.company_name} onChange={e=>change({company_name:e.target.value})}/></label>}
-        <label className="form-label required">{form.is_corporate?'担当者名':'顧客名（個人名）'}<input className="form-input" required value={form.name} onChange={e=>change({name:e.target.value})}/></label>
-        <label className="form-label">{form.is_corporate?'担当者フリガナ':'フリガナ'}<input className="form-input" value={form.name_kana} onChange={e=>change({name_kana:e.target.value})}/></label>
-        <label className="form-label">電話番号<input className="form-input" type="tel" value={form.phone} onChange={e=>change({phone:e.target.value})}/></label>
-        <label className="form-label">メールアドレス<input className="form-input" type="email" value={form.email} onChange={e=>change({email:e.target.value})}/></label>
-        <label className="form-label">郵便番号<input className="form-input" inputMode="numeric" value={form.postal_code} onChange={e=>{const digits=e.target.value.normalize('NFKC').replace(/\D/g,'').slice(0,7);change({postal_code:digits.length<=3?digits:digits.slice(0,3)+'-'+digits.slice(3)})}}/></label>
-        <label className="form-label" style={{gridColumn:'1/-1'}}>住所<input className="form-input" value={form.address} onChange={e=>change({address:e.target.value})}/></label>
-        <label className="form-label" style={{gridColumn:'1/-1'}}>備考（任意）<textarea className="form-input" value={form.notes} onChange={e=>change({notes:e.target.value})}/></label>
-      </div>
+      <CustomerFields value={form} onChange={change}/>
       {!!matches.length&&<label className="ownership-customer-separate"><input type="checkbox" checked={separate} onChange={e=>setSeparate(e.target.checked)}/> 下の既存顧客とは別の顧客として登録する</label>}
       <div className="editor-footer">{!uncertain&&<button type="button" className="btn btn-sub" onClick={onCancel}>登録をやめて戻る</button>}<button type="submit" className="btn btn-main" disabled={!!matches.length&&!separate}>{busy?'登録中…':'顧客を登録して選択'}</button></div>
     </fieldset></form>

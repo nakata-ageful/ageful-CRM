@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "test:customer-directory": "node tests/customer-directory.cjs",
     "test:ownership-workflow": "node tests/ownership-workflow.cjs && node tests/ownership-workflow-postgres.mjs",
     "test:schedule-change": "node tests/billing-schedule-change.cjs",
     "test:billing-removal": "node tests/billing-record-removal.cjs && node tests/billing-record-removal-postgres.mjs",

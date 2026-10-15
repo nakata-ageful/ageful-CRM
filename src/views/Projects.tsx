@@ -27,6 +27,7 @@ const emptyCustomerForm: CustomerInput = {
   name: '',
   name_kana: '',
   company_name: '',
+  company_name_kana: '',
   is_corporate: false,
   email: '',
   phone: '',
@@ -293,8 +294,10 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
               </label>
               <label className="form-label">
                 会社名（法人の場合）
-                <input className="form-input" value={customerForm.company_name} onChange={e => setCustomerForm(f => ({ ...f, company_name: e.target.value, is_corporate: !!e.target.value }))} />
+                <input className="form-input" value={customerForm.company_name} onChange={e => setCustomerForm(f => ({ ...f, company_name: e.target.value, is_corporate: !!e.target.value,company_name_kana:e.target.value?f.company_name_kana:'' }))} />
               </label>
+              {customerForm.is_corporate&&<label className="form-label">会社名フリガナ<input className="form-input" value={customerForm.company_name_kana??''} onChange={e=>setCustomerForm(f=>({...f,company_name_kana:e.target.value}))}/></label>}
+              <label className="form-label">{customerForm.is_corporate?'担当者フリガナ':'フリガナ'}<input className="form-input" value={customerForm.name_kana} onChange={e=>setCustomerForm(f=>({...f,name_kana:e.target.value}))}/></label>
               <label className="form-label">
                 電話番号
                 <input className="form-input" type="tel" value={customerForm.phone} onChange={e => setCustomerForm(f => ({ ...f, phone: e.target.value }))} />

@@ -2,15 +2,15 @@ import type {Customer,CustomerInput} from '../types'
 import type {CustomerChoice} from './customer-search'
 
 export type RegistrationCustomer=CustomerChoice&Partial<Pick<Customer,'email'|'phone'|'is_corporate'>>
-export const emptyCustomerInput:CustomerInput={name:'',name_kana:'',company_name:'',is_corporate:false,email:'',phone:'',postal_code:'',address:'',notes:''}
+export const emptyCustomerInput:CustomerInput={name:'',name_kana:'',company_name:'',company_name_kana:'',is_corporate:false,email:'',phone:'',postal_code:'',address:'',notes:''}
 const normalize=(value:string)=>value.normalize('NFKC').toLocaleLowerCase('ja').replace(/\s+/g,'')
 const phoneDigits=(value:string)=>value.normalize('NFKC').replace(/\D/g,'')
-export function validateCustomerRegistration(form:CustomerInput):CustomerInput{
+export function validateCustomerRegistration(form:CustomerInput,existing?:{email:string|null}):CustomerInput{
   const input=Object.fromEntries(Object.entries(form).map(([k,v])=>[k,typeof v==='string'?v.trim():v])) as CustomerInput
   if(!input.name)throw Error(input.is_corporate?'担当者名は必須です':'顧客名は必須です')
   if(input.is_corporate&&!input.company_name)throw Error('会社名は必須です')
-  if(input.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email))throw Error('メールアドレスの形式を確認してください')
-  if(!input.is_corporate)input.company_name=''
+  if(input.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email)&&input.email!==existing?.email?.trim())throw Error('メールアドレスの形式を確認してください')
+  if(!input.is_corporate){input.company_name='';input.company_name_kana=''}
   return input
 }
 /** Suggestions only: never equate people, merge rows or auto-select by name. */

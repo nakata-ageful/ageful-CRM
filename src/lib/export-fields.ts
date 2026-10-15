@@ -18,6 +18,7 @@ export const EXPORT_FIELD_DEFS: ExportTableDef[] = [
       { key: 'name', label: '顧客名' },
       { key: 'name_kana', label: 'フリガナ' },
       { key: 'company_name', label: '会社名' },
+      { key: 'company_name_kana', label: '会社名フリガナ' },
       { key: 'is_corporate', label: '法人区分' },
       { key: 'email', label: 'メール' },
       { key: 'phone', label: '電話番号' },
@@ -256,6 +257,7 @@ export const JOINED_EXPORT_DEF: ExportTableDef = {
   fields: [
     { key: 'customer.name', label: '顧客名' },
     { key: 'customer.company_name', label: '会社名' },
+    { key: 'customer.company_name_kana', label: '会社名フリガナ' },
     // customer_id / project_id は結合済みなので冗長。除外する
     ...projectsDef.fields.filter(f => f.key !== 'customer_id').map(f => ({ key: `project.${f.key}`, label: joinedLabel('project', f) })),
     ...contractsDef.fields.filter(f => f.key !== 'project_id').map(f => ({ key: `contract.${f.key}`, label: joinedLabel('contract', f) })),

@@ -47,6 +47,14 @@ const debitReview=review(debit,{...debit,billing_schedule_days:['20日']},[{...u
 const ReviewComponent=load('src/components/BillingScheduleChangeReview.tsx').BillingScheduleChangeReview;
 const renderReview=review=>require('react-dom/server').renderToStaticMarkup(React.createElement(ReviewComponent,{review,name:'合成発電所',recipientName:()=> '合成顧客',busy:false,onSave(){throw Error('Rendering may not save')},onBack(){}}));
 const emptyHtml=renderReview(emptyReview);assert(emptyHtml.includes('2026-12-01')&&emptyHtml.includes('2026-11-01')&&emptyHtml.includes('請求情報を保存'));assert(!emptyHtml.includes('選択した0件'));
+// Saved dates to change come first; unchanged future references never distract from them.
+const unchangedPreview={year:2027,round:1,date:'2028-05-01',period:'2027-06-27 ～ 2028-06-26',method:'invoice'};
+const unchangedHtml=renderReview({...r,impact:{...r.impact,before:unchangedPreview,after:unchangedPreview,warnings:['必要な注意は残す']}});
+assert(!unchangedHtml.includes('これから登録する予定'));assert(!unchangedHtml.includes('2028-05-01'));assert(unchangedHtml.includes('必要な注意は残す'));assert(unchangedHtml.includes('2026-11-01'));
+const changedHtml=renderReview({...r,impact:{...r.impact,before:unchangedPreview,after:{...unchangedPreview,date:'2028-06-01'}}});
+assert(changedHtml.indexOf('schedule-change-row')<changedHtml.indexOf('schedule-setting-impact'));assert(changedHtml.includes('2028-06-01'));
+const methodHtml=renderReview({...r,changes:[],impact:{...r.impact,before:unchangedPreview,after:{...unchangedPreview,method:'direct_debit'}}});
+assert(methodHtml.includes('請求書 → 口座振替'));assert(!methodHtml.includes('2028-05-01 →'));
 const paidHtml=renderReview(paidReview);assert(paidHtml.includes('2027-11-01')&&paidHtml.includes('入金済みの1件は変更しません'));
 assert(renderReview(overrideReview).includes('12月1日のまま'));assert(renderReview(aligned).includes('変更後の設定と一致'));
 assert(renderReview(debitReview).includes('管理設定')&&renderReview(debitReview).includes('請求先・方法・予定額を変更する'));

@@ -37,7 +37,7 @@ const ast=ts.createSourceFile('actions.ts',actions,ts.ScriptTarget.Latest,true);
 function visit(n){if(ts.isFunctionDeclaration(n)&&n.name?.text==='updateProspect')update=n;ts.forEachChild(n,visit)}visit(ast)
 let sync=0,writes=0
 const query={select(){return this},eq(){return this},single:async()=>({data:p,error:null}),update(){writes++;return this}}
-const context={exports:{},hasSupabaseEnv:true,db:()=>({from:table=>{assert.equal(table,'prospects');return query}}),isOwnershipProspect:x=>x.ownership_project_id!=null,assertOwnershipProspectEdit,syncProspectToCustomerProject:()=>sync++}
+const context={exports:{},hasSupabaseEnv:true,db:()=>({from:table=>{if(table==='projects')return{select(){return this},eq(){return this},single:async()=>({data:{archived_at:null},error:null})};assert.equal(table,'prospects');return query}}),isOwnershipProspect:x=>x.ownership_project_id!=null,assertOwnershipProspectEdit,syncProspectToCustomerProject:()=>sync++}
 vm.createContext(context);vm.runInContext(ts.transpileModule(update.getText(ast),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText+';globalThis.run=updateProspect',context)
 ;(async()=>{await context.run(1,{equipment:200},1);assert.equal(writes,1);assert.equal(sync,0)
  console.log('PASS: undecided identity, protected edits, null-owner dated alerts/detail, explicit payer selection, owner-independent plan edit, shared customer refresh, and real prospect writer isolates legacy sync')

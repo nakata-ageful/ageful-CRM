@@ -12,7 +12,7 @@ async function main(){
   ownership_transfer_date:'2026-09-01',subcontract_notes:'変更前',subcontract_billing_day:'12月1日',notes:'請求の備考'};
  for(const section of Object.keys(contractSectionKeys)){
   let saved;const form=new Proxy({...original,billing_count:'12',subcontract_notes:'備考だけ変更'},{get:(t,k)=>k in t?t[k]:''});
-  const context={editSection:section,PROJECT_SECTIONS:[],CONTRACT_SECTIONS:Object.keys(contractSectionKeys),projForm:{},contractForm:form,contract:{id:1},
+  const context={readOnly:false,editSection:section,PROJECT_SECTIONS:[],CONTRACT_SECTIONS:Object.keys(contractSectionKeys),projForm:{},contractForm:form,contract:{id:1},
    contractSectionPatch,sectionSaveLock:{current:false},scheduleFailure:'',billingHistory:undefined,onCheckBillingPending:undefined,setScheduleReview(){},ScheduleChangeSaveError:class extends Error{},setSaving(){},setErr(e){if(e)throw Error(e)},setEditSection(){},onReload(){},toast(){},updateContract:async(id,p)=>{assert.equal(id,1);saved=p}};
   vm.createContext(context);vm.runInContext(fn('src/views/ProjectDetail.tsx','handleSaveSection')+';globalThis.run=handleSaveSection',context);await context.run();
   assert.deepEqual(Object.keys(saved).sort(),[...contractSectionKeys[section]].sort());

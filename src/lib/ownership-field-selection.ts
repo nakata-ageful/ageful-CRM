@@ -5,6 +5,7 @@ import { isBillingDate } from './billing-unit'
 type Kind = 'text' | 'number' | 'boolean' | 'date' | 'strings' | 'amounts' | 'flags' | 'protected'
 // Explicit keys: adding a model field must require a policy review at type-check time.
 export const contractFieldKinds = {
+  archived_at:'protected', archive_reason:'protected', canonical_contract_id:'protected',
   id:'protected', project_id:'protected', created_at:'protected', updated_at:'protected', ownership_transfer_date:'protected',
   billing_method:'text', billing_due_day:'text', billing_amount_ex:'number', billing_amount_inc:'number',
   annual_maintenance_ex:'number', annual_maintenance_inc:'number', land_cost_monthly:'number',
@@ -22,6 +23,7 @@ export const contractFieldKinds = {
   billing_amount_overrides:'amounts', billing_item_flags:'flags',
 } as const satisfies Record<keyof Contract, Kind>
 export const projectFieldKinds = {
+  archived_at:'protected', archive_reason:'protected', canonical_project_id:'protected',
   previous_owner_customer_id:'protected',owner_unconfirmed_on:'protected',customer_pending:'protected',
   id:'protected', customer_id:'protected', old_owner:'protected', created_at:'protected',updated_at:'protected',
   summary_notes:'text', meti_notes:'text', power_company_notes:'text', project_no:'text', project_name:'text',

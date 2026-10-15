@@ -42,6 +42,7 @@ const emptyProject: Omit<ProjectInput, 'customer_id'> = {
 export function CustomerDetailView({ detail, onBack, onReload, onViewProject, billingHistory }: Props) {
   const toast = useToast()
   const { customer, projects, attachments } = detail
+  const activeProjects=projects.filter(p=>!p.archived_at)
 
   const [editModal, setEditModal] = useState(false)
   const [editForm, setEditForm] = useState<CustomerInput>({
@@ -188,12 +189,12 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject, bi
 
       <div className="card">
         <div className="card-header-row">
-          <h3 className="section-title" style={{ margin: 0 }}>案件一覧（{projects.length} 件）</h3>
+          <h3 className="section-title" style={{ margin: 0 }}>案件一覧（{activeProjects.length} 件）</h3>
           <button className="btn btn-main btn-sm" onClick={() => { setProjectForm(emptyProject); setError(''); setProjectModal(true) }}>
             ＋ 案件を追加
           </button>
         </div>
-        {projects.length === 0 ? (
+        {activeProjects.length === 0 ? (
           <p className="empty-cell">案件がありません</p>
         ) : (
           <table>
@@ -201,7 +202,7 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject, bi
               <tr><th>案件名</th><th>都道府県</th><th>FIT</th><th>委託先</th><th>保守開始日</th></tr>
             </thead>
             <tbody>
-              {projects.map(p => (
+              {activeProjects.map(p => (
                 <tr key={p.id} className="clickable-row" onClick={() => onViewProject(p.id)}>
                   <td>
                     <strong>{p.project_name}</strong>

@@ -19,6 +19,9 @@ export type Customer = {
 }
 
 export type Project = {
+  archived_at?: string | null
+  archive_reason?: string | null
+  canonical_project_id?: number | null
   updated_at?: string | null
   id: number
   customer_id: number | null
@@ -89,6 +92,9 @@ export type Project = {
 export type MaintenancePlanLevel = 'なし' | '年1回' | '年2回' | '年3回' | '年4回' | '無制限'
 
 export type Contract = {
+  archived_at?: string | null
+  archive_reason?: string | null
+  canonical_contract_id?: number | null
   updated_at?: string | null
   id: number
   project_id: number
@@ -251,6 +257,9 @@ export type DashboardStats = {
 }
 
 export type ProjectRow = {
+  archived_at?: string | null
+  archive_reason?: string | null
+  canonical_project_id?: number | null
   id: number
   customer_id: number | null
   project_no: string | null

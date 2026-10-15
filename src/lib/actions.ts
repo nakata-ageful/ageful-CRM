@@ -256,11 +256,12 @@ export async function updateProject(id: number, input: Omit<ProjectInput, 'custo
   const payload = projectPayload(input)
   let updated: Project
   if (!hasSupabaseEnv) {
+    if (projectStore.getById(id)?.archived_at) throw Error('保管中の発電所は変更できません。元の発電所を開いてください')
     const u = projectStore.update(id, payload)
     if (!u) throw new Error('Not found')
     updated = u
   } else {
-    const { data, error } = await db().from('projects').update(payload).eq('id', id).select().single()
+    const { data, error } = await db().from('projects').update(payload).eq('id', id).is('archived_at', null).select().single()
     if (error) throw error
     updated = data as Project
   }
@@ -279,7 +280,10 @@ export async function updateProject(id: number, input: Omit<ProjectInput, 'custo
 }
 
 export async function deleteProject(id: number): Promise<void> {
-  if (!hasSupabaseEnv) { projectStore.delete(id); return }
+  if (!hasSupabaseEnv) {
+    if (projectStore.getById(id)?.archived_at) throw Error('保管中の発電所は削除できません')
+    projectStore.delete(id); return
+  }
   const { error } = await db().from('projects').delete().eq('id', id)
   if (error) throw error
 }
@@ -530,18 +534,26 @@ export async function saveAnnualRecord(
 // ── Contract CRUD ─────────────────────────────────────────
 
 export async function createContract(projectId: number, input: Partial<Omit<Contract, 'id' | 'created_at' | 'project_id'>>): Promise<Contract> {
-  const payload = { project_id: projectId, ...input }
-  if (!hasSupabaseEnv) return contractStore.create(payload as Omit<Contract, 'id' | 'created_at'>)
+  const payload = { ...input, project_id: projectId }
+  if (!hasSupabaseEnv) {
+    if (projectStore.getById(projectId)?.archived_at) throw Error('保管中の発電所には契約を追加できません')
+    if (contractStore.getAll().some(c => c.project_id === projectId && !c.archived_at)) throw Error('この発電所の契約は登録済みです。既存の契約を編集してください')
+    return contractStore.create(payload as Omit<Contract, 'id' | 'created_at'>)
+  }
   const { data, error } = await db().from('contracts').insert(payload).select().single()
   if (error) throw error
   return data as Contract
 }
 
-export async function updateContract(id: number, input: Partial<Omit<Contract, 'id' | 'created_at'>>, verifyResult = false): Promise<void> {
-  if (!hasSupabaseEnv) { contractStore.update(id, input) }
+export async function updateContract(id: number, input: Partial<Omit<Contract, 'id' | 'created_at'>>, _verifyResult = false): Promise<void> {
+  if (!hasSupabaseEnv) {
+    const c = contractStore.getAll().find(c => c.id === id)
+    if (c?.archived_at || (c && projectStore.getById(c.project_id)?.archived_at)) throw Error('保管中の契約は変更できません')
+    contractStore.update(id, input)
+  }
   else {
-    const query = db().from('contracts').update(input).eq('id', id)
-    const { error } = await (verifyResult ? query.select('id').single() : query)
+    const query = db().from('contracts').update(input).eq('id', id).is('archived_at', null)
+    const { error } = await query.select('id').single()
     if (error) throw error
   }
   // 契約日の変更を見込みへ書き戻す（見込みの売買契約日/土地契約日 → contracts 同期の逆方向）
@@ -693,7 +705,7 @@ export async function bulkImportProjects(
       let projectId: number
       // 既存案件の重複チェック（案件名 + 顧客ID）
       if (!hasSupabaseEnv) {
-        const existingProj = projectStore.getAll().find(p => p.project_name === projPayload.project_name && p.customer_id === customerId)
+        const existingProj = projectStore.getAll().find(p => !p.archived_at && p.project_name === projPayload.project_name && p.customer_id === customerId)
         if (existingProj) {
           projectId = existingProj.id
         } else {
@@ -706,6 +718,7 @@ export async function bulkImportProjects(
           .select('id')
           .eq('project_name', projPayload.project_name)
           .eq('customer_id', customerId)
+          .is('archived_at', null)
           .limit(1)
         if (existingProj?.[0]) {
           projectId = (existingProj[0] as { id: number }).id
@@ -759,18 +772,22 @@ export async function bulkImportProjects(
         }
         // 既存契約があれば更新、なければ作成
         if (!hasSupabaseEnv) {
-          const existingContract = contractStore.getByProjectId(projectId)
+          const activeContracts = contractStore.getAll().filter(c => c.project_id === projectId && !c.archived_at)
+          if(activeContracts.length>1)throw Error('契約が複数あります。対応を確認してから取り込んでください')
+          const existingContract = activeContracts[0]
           if (existingContract) {
             contractStore.update(existingContract.id, contractPayload)
           } else {
             contractStore.create(contractPayload)
           }
         } else {
-          const { data: existingContracts } = await db()
+          const { data: existingContracts, error: contractReadError } = await db()
             .from('contracts')
             .select('id')
             .eq('project_id', projectId)
-            .limit(1)
+            .is('archived_at', null)
+          if(contractReadError)throw contractReadError
+          if((existingContracts?.length??0)>1)throw Error('契約が複数あります。対応を確認してから取り込んでください')
           if (existingContracts?.[0]) {
             const { error: cErr } = await db().from('contracts').update(contractPayload).eq('id', (existingContracts[0] as { id: number }).id)
             if (cErr) throw cErr
@@ -880,7 +897,7 @@ export async function createProspect(input: ProspectInput, operationKey:string=c
     })
   }
 
-  const project = await createProject({
+  await createProject({
     customer_id: customer.id,
     project_no: '', project_name: input.project_name, plant_name: input.project_name,
     site_postal_code: '', site_prefecture: '', site_address: input.site_address || '',
@@ -899,11 +916,8 @@ export async function createProspect(input: ProspectInput, operationKey:string=c
     amuras_member_no: '', notes: '',
   })
 
-  // 「契約レコードがない」状態を作らない設計（Phase 2）。
-  // 見込み追加モーダルでは契約日系の入力がないため、空の契約レコードのみ作成。
-  // 見込み詳細で sale_contract_date / land_contract_date を編集した時は
-  // syncProspectToCustomerProject 側で contracts に同期する想定。
-  await createContract(project.id, {})
+  // createProject creates the initial contract in the same transaction.
+  // Do not insert a second contract here.
 
   const payload = {
     customer_name: input.customer_name,
@@ -944,6 +958,13 @@ export async function createProspect(input: ProspectInput, operationKey:string=c
 export async function updateProspect(id: number, data: Partial<Omit<Prospect, 'id' | 'created_at'>>, customerId?: number | null): Promise<void> {
   const current=hasSupabaseEnv?(await db().from('prospects').select('*').eq('id',id).single()).data as Prospect|null:prospectStore.getAll().find(p=>p.id===id)
   if(!current)throw Error('見込みを取得できません')
+  const linkedProjectId = current.new_project_id ?? current.ownership_project_id
+  if (linkedProjectId != null) {
+    const linkedProject = hasSupabaseEnv
+      ? (await db().from('projects').select('archived_at').eq('id', linkedProjectId).single()).data
+      : projectStore.getById(linkedProjectId)
+    if (!linkedProject || linkedProject.archived_at) throw Error('保管中の発電所の見込みは変更できません。元の発電所を開いてください')
+  }
   if(current.new_project_id!=null){
     const identity=['new_project_id','ownership_project_id','candidate_customer_id','ownership_state','converted_customer_id','converted_at','customer_name','customer_name_kana','project_name']
     if(Object.keys(data).some(k=>identity.includes(k)))throw Error('顧客は「顧客を設定」から変更してください')
@@ -962,13 +983,13 @@ export async function updateProspect(id: number, data: Partial<Omit<Prospect, 'i
   if (!hasSupabaseEnv) {
     prospectStore.update(id, data)
     // モック: 顧客・案件への同期
-    if (customerId) syncProspectToCustomerProject(data, customerId)
+    if (customerId) await syncProspectToCustomerProject(data, customerId)
     return
   }
   const { error } = await db().from('prospects').update(data).eq('id', id)
   if (error) throw error
   // 顧客・案件への同期
-  if (customerId) syncProspectToCustomerProject(data, customerId)
+  if (customerId) await syncProspectToCustomerProject(data, customerId)
 }
 
 /** 見込みの共有フィールド変更を顧客・案件に反映 */
@@ -1023,13 +1044,14 @@ async function syncProspectToCustomerProject(
   let projectId: number | null = null
   if (Object.keys(projectUpdate).length > 0) {
     if (!hasSupabaseEnv) {
-      const proj = projectStore.getAll().find(p => p.customer_id === customerId)
+      const proj = projectStore.getAll().find(p => p.customer_id === customerId && !p.archived_at)
       if (proj) {
         projectStore.update(proj.id, projectUpdate)
         projectId = proj.id
       }
     } else {
-      await db().from('projects').update(projectUpdate).eq('customer_id', customerId)
+      const {error}=await db().from('projects').update(projectUpdate).eq('customer_id', customerId).is('archived_at', null)
+      if(error)throw error
     }
   }
 
@@ -1042,19 +1064,20 @@ async function syncProspectToCustomerProject(
     if (!hasSupabaseEnv) {
       // mockではprojectId経由でcontract取得→更新
       if (projectId == null) {
-        const proj = projectStore.getAll().find(p => p.customer_id === customerId)
+        const proj = projectStore.getAll().find(p => p.customer_id === customerId && !p.archived_at)
         projectId = proj?.id ?? null
       }
       if (projectId != null) {
-        const con = contractStore.getByProjectId(projectId)
+        const con = contractStore.getAll().find(c => c.project_id === projectId && !c.archived_at)
         if (con) contractStore.update(con.id, contractUpdate)
       }
     } else {
       // Supabaseでは customer_id 経由で contracts を絞り込む（projects 経由）
-      const { data: projs } = await db().from('projects').select('id').eq('customer_id', customerId).limit(1)
+      const { data: projs } = await db().from('projects').select('id').eq('customer_id', customerId).is('archived_at', null).limit(1)
       const pid = (projs?.[0] as { id: number } | undefined)?.id
       if (pid != null) {
-        await db().from('contracts').update(contractUpdate).eq('project_id', pid)
+        const {error}=await db().from('contracts').update(contractUpdate).eq('project_id', pid).is('archived_at', null)
+        if(error)throw error
       }
     }
   }
@@ -1079,6 +1102,7 @@ async function maySyncLegacyProspect(customerId:number):Promise<boolean>{
 }
 
 export async function convertProspectToCustomer(prospect: Prospect): Promise<number> {
+  if(prospect.converted_customer_id!=null)return prospect.converted_customer_id
   if(prospect.new_project_id!=null)throw Error('新規案件の顧客は「顧客を設定」から登録してください')
   if(isOwnershipProspect(prospect))throw Error('既存発電所の引継ぎは「所有者を確定する」から行ってください')
   // 顧客作成
@@ -1114,7 +1138,7 @@ export async function convertProspectToCustomer(prospect: Prospect): Promise<num
     amuras_member_no: '', notes: '',
   })
 
-  // 契約作成（ローン情報を備考へ）
+  // Update the contract already created atomically with the project.
   const contractPayload = {
     project_id: project.id,
     billing_method: null, billing_due_day: null,
@@ -1142,9 +1166,14 @@ export async function convertProspectToCustomer(prospect: Prospect): Promise<num
     subcontract_notes: null,
   }
   if (!hasSupabaseEnv) {
-    contractStore.create(contractPayload)
+    const contracts=contractStore.getAll().filter(c=>c.project_id===project.id&&!c.archived_at)
+    if(contracts.length!==1)throw Error('契約を確認できません。新しい契約は作成しません')
+    contractStore.update(contracts[0].id,contractPayload)
   } else {
-    const { error } = await db().from('contracts').insert(contractPayload)
+    const {data:contracts,error:readError}=await db().from('contracts').select('id').eq('project_id',project.id).is('archived_at',null)
+    if(readError)throw readError
+    if(contracts?.length!==1)throw Error('契約を確認できません。新しい契約は作成しません')
+    const { error } = await db().from('contracts').update(contractPayload).eq('id',contracts[0].id).is('archived_at',null).select('id').single()
     if (error) throw error
   }
 
@@ -1230,6 +1259,7 @@ export async function exportAllData(): Promise<ExportData> {
     if(data?.version!==2||!Array.isArray(data.billing_units)||!Array.isArray(data.ownership_transfers))throw Error('新しい請求記録を含むバックアップを取得できませんでした')
     if(data.ownership_workflow_ready===true&&!Array.isArray(data.ownership_workflow_events))throw Error('引継ぎ履歴を含むバックアップを取得できませんでした')
     if(data.new_prospect_ready===true&&!Array.isArray(data.new_prospect_events))throw Error('顧客未定の設定履歴を含むバックアップを取得できませんでした')
+    if(data.duplicate_archive_ready===true&&(!Array.isArray(data.duplicate_archive_events)||!Array.isArray(data.archive_function_patches)))throw Error('保管記録と変更履歴を含むバックアップを取得できませんでした')
     return data as ExportData
   }
   if (!hasSupabaseEnv) {

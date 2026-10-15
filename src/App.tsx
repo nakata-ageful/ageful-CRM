@@ -182,6 +182,7 @@ function MainApp() {
     }
   }, [])
 
+  const projectReadOnly=!!(projectDetail?.project.archived_at||projectDetail?.contract?.archived_at)
   const billingHistory:BillingHistoryData|undefined=runtime?{
     units:runtime.units,recipients:customers,plannedAmount:()=>null,
     cutoverOn:runtime.cutoverOn,managementEvents:runtime.managementEvents,cycleRules:runtime.cycleRules,
@@ -394,15 +395,17 @@ function MainApp() {
             )}
             {view === 'project-detail' && projectDetail && (
               <ProjectDetailView
+                onViewCanonicalProject={navToProjectDetail}
+                canonicalProjectName={projectRows.find(p=>p.id===projectDetail.project.canonical_project_id)?.plant_name||projectRows.find(p=>p.id===projectDetail.project.canonical_project_id)?.project_name}
                 ownershipStatus={runtime?.ownershipWorkflowReady&&prospects.some(p=>p.ownership_project_id===projectDetail.project.id&&p.ownership_state==='open')?<div className="notice">
                   引継ぎの見込み：{prospects.filter(p=>p.ownership_project_id===projectDetail.project.id&&p.ownership_state==='open').map(p=><button type="button" className="link-btn" key={p.id} onClick={()=>void navToProspectDetail(p.id)}>{p.candidate_customer_id?`${p.customer_name}（手続き中）`:'引継ぎ先未定'}</button>)}
                 </div>:projectDetail.project.customer_pending?<div className="notice">顧客未定：{prospects.filter(p=>p.new_project_id===projectDetail.project.id).map(p=><button type="button" className="link-btn" key={p.id} onClick={()=>void navToProspectDetail(p.id)}>見込みを開いて顧客を設定</button>)}</div>:undefined}
-                onAddRoutine={runtime?addRoutineInvoice:undefined}
-                billingCycleSettings={runtime&&projectDetail.contract?<BillingCycleSettings key={`${projectDetail.project.id}:${JSON.stringify(runtime.cycleRules)}`} contract={projectDetail.contract} units={runtime.units} rules={runtime.cycleRules??[]}
+                onAddRoutine={runtime&&!projectReadOnly?addRoutineInvoice:undefined}
+                billingCycleSettings={runtime&&projectDetail.contract&&!projectReadOnly?<BillingCycleSettings key={`${projectDetail.project.id}:${JSON.stringify(runtime.cycleRules)}`} contract={projectDetail.contract} units={runtime.units} rules={runtime.cycleRules??[]}
                   onSave={runtime.cycleRulesReady?async value=>{await saveRuntime({action:'cycle_rule',value:{projectId:projectDetail.project.id,contract:projectDetail.contract,
                     versions:Object.fromEntries(runtime.units.filter(u=>u.projectId===projectDetail.project.id).map(u=>[u.id,u.revision])),
                     expectedRule:Math.max(0,...(runtime.cycleRules??[]).filter(r=>r.project_id===projectDetail.project.id).map(r=>r.id)),...value}})}:undefined}/>:undefined}
-                managementTools={runtime?<ProjectManagementActions key={projectDetail.project.id} projectId={projectDetail.project.id}
+                managementTools={runtime&&!projectReadOnly?<ProjectManagementActions key={projectDetail.project.id} projectId={projectDetail.project.id}
                   row={projectDetail.contract&&billingRows.find(r=>r.project_id===projectDetail.project.id)?{...billingRows.find(r=>r.project_id===projectDetail.project.id)!,contract:projectDetail.contract}:undefined}
                   customers={customers} units={runtime.units} events={runtime.managementEvents}
                   onManagementSave={async request=>{await saveRuntime({action:'management',value:request})}}
@@ -411,18 +414,18 @@ function MainApp() {
                 changeHistory={runtime&&billingHistory?<><OwnershipWorkflowHistory events={(runtime.ownershipWorkflowEvents??[]).filter(e=>e.project_id===projectDetail.project.id)} recipientName={billingHistory.recipientName} onViewProspect={navToProspectDetail}/><OwnershipTransferHistory expanded
                   key={projectDetail.project.id} managementEvents={runtime.managementEvents.filter(e=>e.project_id===projectDetail.project.id)} transfers={runtime.transfers.filter(t=>t.project_id===projectDetail.project.id)} events={runtime.events.filter(e=>e.project_id===projectDetail.project.id)} recipientName={billingHistory.recipientName}/></>:undefined}
                 billingHistory={billingHistory}
-                onSaveInvoice={billingHistory?request=>saveRuntime({action:'invoice',value:request}):undefined}
+                onSaveInvoice={billingHistory&&!projectReadOnly?request=>saveRuntime({action:'invoice',value:request}):undefined}
                 onCheckBillingPending={billingHistory?hasPendingBillingRuntime:undefined}
-                onRecordRemoval={runtime?.recordRemovalReady?request=>saveRuntime({action:'record_removal',value:request}):undefined}
-                onAddSchedule={runtime&&projectDetail.contract?async(item,reason)=>{await saveRuntime({action:'future_schedule',value:{projectId:projectDetail.project.id,contract:projectDetail.contract,
+                onRecordRemoval={runtime?.recordRemovalReady&&!projectReadOnly?request=>saveRuntime({action:'record_removal',value:request}):undefined}
+                onAddSchedule={runtime&&projectDetail.contract&&!projectReadOnly?async(item,reason)=>{await saveRuntime({action:'future_schedule',value:{projectId:projectDetail.project.id,contract:projectDetail.contract,
                   versions:Object.fromEntries(runtime.units.filter(u=>u.projectId===projectDetail.project.id).map(u=>[u.id,u.revision])),
                   last:Math.max(0,...runtime.managementEvents.filter(e=>e.project_id===projectDetail.project.id).map(e=>e.id)),items:[item],reason,
                   ...(runtime.cycleRulesReady?{cycleRevision:Math.max(0,...(runtime.cycleRules??[]).filter(r=>r.project_id===projectDetail.project.id).map(r=>r.id))}:{})}})}:undefined}
-                onSavePeriod={runtime&&projectDetail.contract?async change=>{await saveRuntime({action:'service_period',value:{projectId:projectDetail.project.id,contract:projectDetail.contract,versions:Object.fromEntries(runtime.units.filter(u=>u.projectId===projectDetail.project.id).map(u=>[u.id,u.revision])),...change}})}:undefined}
-                onOwnershipTransfer={billingHistory?()=>{setTransferEntry('choose');setTransferProspect(null);setTransferOpen(true)}:undefined}
+                onSavePeriod={runtime&&projectDetail.contract&&!projectReadOnly?async change=>{await saveRuntime({action:'service_period',value:{projectId:projectDetail.project.id,contract:projectDetail.contract,versions:Object.fromEntries(runtime.units.filter(u=>u.projectId===projectDetail.project.id).map(u=>[u.id,u.revision])),...change}})}:undefined}
+                onOwnershipTransfer={billingHistory&&!projectReadOnly?()=>{setTransferEntry('choose');setTransferProspect(null);setTransferOpen(true)}:undefined}
                 billingUnits={runtime?.units.filter(u=>u.projectId===projectDetail.project.id)}
-                onAddDebit={runtime&&projectDetail.contract?async input=>{await saveRuntime({action:'debit_add',value:{...input,projectId:projectDetail.project.id,contractId:projectDetail.contract!.id}})}:undefined}
-                onSaveBillingPlan={runtime?async(choices,reason)=>{await saveRuntime({action:'plan',value:{projectId:projectDetail.project.id,choices,reason}})}:undefined}
+                onAddDebit={runtime&&projectDetail.contract&&!projectReadOnly?async input=>{await saveRuntime({action:'debit_add',value:{...input,projectId:projectDetail.project.id,contractId:projectDetail.contract!.id}})}:undefined}
+                onSaveBillingPlan={runtime&&!projectReadOnly?async(choices,reason)=>{await saveRuntime({action:'plan',value:{projectId:projectDetail.project.id,choices,reason}})}:undefined}
                 detail={projectDetail}
                 onBack={() => {
                   // ブラウザ履歴を1つ戻す。popstate ハンドラで view が直前の画面に復元される。
@@ -522,8 +525,10 @@ function MainApp() {
                 onViewExistingProject={navToProjectDetail}
                 onCreateCustomer={createOwnershipCustomer}
                 onReloadCustomers={reloadOwnershipCustomers}
-                onLoadOwnershipProject={async id=>{const detail=await getProjectDetail(id);if(!detail)throw Error('発電所を取得できません');return detail.project}}
+                onLoadOwnershipProject={async id=>{const detail=await getProjectDetail(id);if(!detail)throw Error('発電所を取得できません');if(detail.project.archived_at||detail.contract?.archived_at)throw Error('保管中の発電所は変更できません。使用中の発電所を開いてください');return detail.project}}
                 onSetNewCustomer={runtime?.newProspectReady?async(pr,project,customerId,operationKey)=>{
+                  const current=await getProjectDetail(project.id)
+                  if(!current||current.project.archived_at||current.contract?.archived_at)throw Error('保管中または取得できない発電所は変更できません')
                   const updated=await assignNewProspectCustomer(pr,project,customerId,operationKey)
                   setProspectDetail(updated);await loadAll(true);return updated
                 }:undefined}
@@ -531,11 +536,13 @@ function MainApp() {
                 onOwnershipComplete={runtime?.ownershipWorkflowReady?async pr=>{
                   const detail=await getProjectDetail(pr.ownership_project_id!)
                   if(!detail)throw Error('発電所を取得できません')
+                  if(detail.project.archived_at||detail.contract?.archived_at)throw Error('保管中の発電所は変更できません。使用中の発電所を開いてください')
                   setProjectDetail(detail);setTransferProspect(pr);setTransferEntry('direct');setTransferOpen(true)
                 }:undefined}
                 onOwnershipAction={runtime?.ownershipWorkflowReady?async(pr,action,customerId)=>{
                   const detail=await getProjectDetail(pr.ownership_project_id!)
                   if(!detail)throw Error('発電所を取得できません')
+                  if(detail.project.archived_at||detail.contract?.archived_at)throw Error('保管中の発電所は変更できません。使用中の発電所を開いてください')
                   await saveRuntime({action:'ownership_workflow',value:{action,value:{projectId:detail.project.id,project:detail.project,
                     prospectId:pr.id,prospect:pr,customerId,reason:action==='cancel'?'この候補の引継ぎを取りやめ':'引継ぎ先の顧客を設定'}}})
                   const updated=await getProspectById(pr.id)
@@ -550,7 +557,7 @@ function MainApp() {
             )}
           </>
         )}
-        {transferOpen&&runtime&&projectDetail?.contract&&<Modal title="所有者を変更" width={1100} closeDisabled={transferBusy} onClose={()=>setTransferOpen(false)}>
+        {transferOpen&&runtime&&projectDetail?.contract&&!projectReadOnly&&<Modal title="所有者を変更" width={1100} closeDisabled={transferBusy} onClose={()=>setTransferOpen(false)}>
           {runtime.ownershipWorkflowReady&&transferEntry==='choose'?<OwnershipWorkflowPanel project={projectDetail.project} customers={customers}
             onBusyChange={setTransferBusy} pendingCustomerInput={pendingCustomerInput} onPendingCustomerChange={setPendingCustomerInput}
             onCreateCustomer={createOwnershipCustomer} onReloadCustomers={reloadOwnershipCustomers}

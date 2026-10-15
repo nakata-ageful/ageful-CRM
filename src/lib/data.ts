@@ -16,6 +16,19 @@ function db() {
   return supabase
 }
 
+function orderedContracts<T extends { id: number; archived_at?: string | null }>(contracts: T[], includeArchived = false): T[] {
+  return contracts.filter(c => includeArchived || !c.archived_at).sort((a, b) => a.id - b.id)
+}
+
+function mockContracts(projectId: number, includeArchived = false) {
+  return orderedContracts(contractStore.getAll().filter(c => c.project_id === projectId), includeArchived)
+}
+
+function activeMockProject(projectId: number) {
+  const project = projectStore.getById(projectId)
+  return project && !project.archived_at ? project : null
+}
+
 // 発電所一覧の検索用テキストを生成する。
 // 基本情報・設備情報は projects テーブルの全カラム、契約情報は contracts 側の
 // 各項目（契約日・販売経路・備考など）と顧客名を連結して小文字化する。
@@ -46,12 +59,13 @@ function buildProjectSearchText(
 
 export async function getDashboard(): Promise<DashboardStats> {
   if (!hasSupabaseEnv) {
-    const all = maintenanceResponseStore.getAll()
+    const all = maintenanceResponseStore.getAll().filter(m => activeMockProject(m.project_id))
     const currentYear = new Date().getFullYear()
-    const allRecords = annualRecordStore.getAll()
+    const activeContractIds = new Set(contractStore.getAll().filter(c => !c.archived_at && activeMockProject(c.project_id)).map(c => c.id))
+    const allRecords = annualRecordStore.getAll().filter(r => activeContractIds.has(r.contract_id))
     return {
       totalCustomers: customerStore.getAll().length,
-      totalProjects: projectStore.getAll().length,
+      totalProjects: projectStore.getAll().filter(p => !p.archived_at).length,
       activeMaintenanceCount: all.filter(m => m.status === '対応中').length,
       pendingBillingCount: allRecords.filter(r => r.year === currentYear && r.status !== '入金済').length,
     }
@@ -60,10 +74,11 @@ export async function getDashboard(): Promise<DashboardStats> {
   const currentYear = new Date().getFullYear()
   const [cust, proj, maint, billing] = await Promise.all([
     client.from('customers').select('id', { count: 'exact', head: true }),
-    client.from('projects').select('id', { count: 'exact', head: true }),
-    client.from('maintenance_responses').select('id', { count: 'exact', head: true }).eq('status', '対応中'),
-    client.from('annual_records').select('id', { count: 'exact', head: true }).eq('year', currentYear).neq('status', '入金済'),
+    client.from('projects').select('id', { count: 'exact', head: true }).is('archived_at', null),
+    client.from('maintenance_responses').select('id, projects!inner(id)', { count: 'exact', head: true }).is('projects.archived_at', null).eq('status', '対応中'),
+    client.from('annual_records').select('id, contracts!inner(id, projects!inner(id))', { count: 'exact', head: true }).is('contracts.archived_at', null).is('contracts.projects.archived_at', null).eq('year', currentYear).neq('status', '入金済'),
   ])
+  for (const result of [cust, proj, maint, billing]) if (result.error) throw result.error
   return {
     totalCustomers: cust.count ?? 0,
     totalProjects: proj.count ?? 0,
@@ -75,7 +90,7 @@ export async function getDashboard(): Promise<DashboardStats> {
 // ── Customers ─────────────────────────────────────────────
 
 export async function getCustomers(): Promise<Customer[]> {
-  if (!hasSupabaseEnv) return customerStore.getAll()
+  if (!hasSupabaseEnv) return customerStore.getAll().map(c => ({ ...c, project_count: projectStore.getByCustomerId(c.id).filter(p => !p.archived_at).length }))
   const client = db()
   // customers と projects を別クエリで取得して案件数をローカル集計する。
   // 以前は select('*, projects(id)') の埋め込みカウントを使っていたが、
@@ -87,12 +102,13 @@ export async function getCustomers(): Promise<Customer[]> {
       .order('created_at', { ascending: false })
       // TODO: 大規模データセットに対しては適切なページネーションを実装すべき
       .limit(1000),
-    client.from('projects').select('customer_id'),
+    client.from('projects').select('customer_id').is('archived_at', null),
   ])
   if (custErr) throw custErr
   if (projErr) throw projErr
   const counts = new Map<number, number>()
-  for (const p of (projData ?? []) as { customer_id: number }[]) {
+  for (const p of (projData ?? []) as { customer_id: number | null }[]) {
+    if (p.customer_id == null) continue
     counts.set(p.customer_id, (counts.get(p.customer_id) ?? 0) + 1)
   }
   return (custData ?? []).map((row: Record<string, unknown>) => ({
@@ -107,8 +123,8 @@ export async function getCustomerDetail(customerId: number): Promise<CustomerDet
   if (!hasSupabaseEnv) {
     const customer = customerStore.getById(customerId)
     if (!customer) return null
-    const projs = projectStore.getByCustomerId(customerId).map(p => {
-      const contract = contractStore.getByProjectId(p.id)
+    const projs = projectStore.getByCustomerId(customerId).filter(p => !p.archived_at).map(p => {
+      const contract = mockContracts(p.id)[0]
       return {
         id: p.id,
         customer_id: p.customer_id,
@@ -133,13 +149,15 @@ export async function getCustomerDetail(customerId: number): Promise<CustomerDet
   const client = db()
   const { data: customer } = await client.from('customers').select('*').eq('id', customerId).single()
   if (!customer) return null
-  const { data: projData } = await client
+  const { data: projData, error: projectError } = await client
     .from('projects')
-    .select('*, contracts(subcontractor, maintenance_start_date)')
+    .select('*, contracts(id, archived_at, subcontractor, maintenance_start_date)')
+    .is('archived_at', null)
     .eq('customer_id', customerId)
     .order('created_at', { ascending: false })
+  if (projectError) throw projectError
   const projects: ProjectRow[] = (projData ?? []).map((row: Record<string, unknown>) => {
-    const con = (Array.isArray(row.contracts) ? row.contracts[0] : row.contracts) as Record<string, unknown> | null
+    const con = orderedContracts((Array.isArray(row.contracts) ? row.contracts : row.contracts ? [row.contracts] : []) as { id: number; archived_at?: string | null; [key: string]: unknown }[])[0] ?? null
     return {
       id: row.id as number,
       customer_id: row.customer_id as number,
@@ -170,9 +188,9 @@ export async function getCustomerDetail(customerId: number): Promise<CustomerDet
 
 export async function getProjects(): Promise<ProjectRow[]> {
   if (!hasSupabaseEnv) {
-    return projectStore.getAll().map(p => {
+    return projectStore.getAll().filter(p => !p.archived_at).map(p => {
       const c = (p.customer_id==null?null:customerStore.getById(p.customer_id))
-      const contract = contractStore.getByProjectId(p.id)
+      const contract = mockContracts(p.id)[0]
       return {
         id: p.id,
         customer_id: p.customer_id,
@@ -203,14 +221,15 @@ export async function getProjects(): Promise<ProjectRow[]> {
   const client = db()
   const { data, error } = await client
     .from('projects')
-    .select('*, customers:customers!projects_customer_id_fkey(name, company_name), contracts(subcontractor, maintenance_start_date, sale_contract_date, equipment_contract_date, land_contract_date, ownership_transfer_date, sales_to_neosys, neosys_to_referrer, equipment_contract_notes, land_contract_notes)')
+    .select('*, customers:customers!projects_customer_id_fkey(name, company_name), contracts(id, archived_at, subcontractor, maintenance_start_date, sale_contract_date, equipment_contract_date, land_contract_date, ownership_transfer_date, sales_to_neosys, neosys_to_referrer, equipment_contract_notes, land_contract_notes)')
+    .is('archived_at', null)
     .order('created_at', { ascending: false })
     // TODO: 大規模データセットに対しては適切なページネーションを実装すべき
     .limit(1000)
   if (error) throw error
   return (data ?? []).map((row: Record<string, unknown>) => {
     const cust = row.customers as Record<string, unknown> | null
-    const con = (Array.isArray(row.contracts) ? row.contracts[0] : row.contracts) as Record<string, unknown> | null
+    const con = orderedContracts((Array.isArray(row.contracts) ? row.contracts : row.contracts ? [row.contracts] : []) as { id: number; archived_at?: string | null; [key: string]: unknown }[])[0] ?? null
     const customerName = (cust?.company_name as string) ?? (cust?.name as string) ?? (row.customer_pending?'顧客未定（新規案件）':'所有者未確認')
     const companyName = (cust?.company_name as string) ?? null
     // ネストした customers / contracts は検索テキストから除外して project 本体のみ渡す
@@ -239,10 +258,11 @@ export async function getProjects(): Promise<ProjectRow[]> {
 
 export async function getProjectIdByCustomerId(customerId: number): Promise<number | null> {
   if (!hasSupabaseEnv) {
-    const proj = projectStore.getAll().find(p => p.customer_id === customerId)
+    const proj = projectStore.getAll().filter(p => !p.archived_at).sort((a, b) => a.id - b.id).find(p => p.customer_id === customerId)
     return proj?.id ?? null
   }
-  const { data } = await db().from('projects').select('id').eq('customer_id', customerId).limit(1).single()
+  const { data, error } = await db().from('projects').select('id').eq('customer_id', customerId).is('archived_at', null).order('id', { ascending: true }).limit(1).maybeSingle()
+  if (error) throw error
   return data?.id ?? null
 }
 
@@ -254,7 +274,7 @@ export async function getProjectDetail(projectId: number): Promise<ProjectDetail
     if (!project) return null
     const customer = (project.customer_id==null?null:customerStore.getById(project.customer_id))
     if (project.customer_id!=null&&!customer) throw Error('所有者の情報を取得できません')
-    const contract = contractStore.getByProjectId(projectId)
+    const contract = mockContracts(projectId, !!project.archived_at)[0] ?? null
     const annualRecords = contract ? annualRecordStore.getByContractId(contract.id) : []
     const maintenanceResponses = maintenanceResponseStore.getByProjectId(projectId)
     const periodic = periodicMaintenanceStore.getByProjectId(projectId)
@@ -266,7 +286,10 @@ export async function getProjectDetail(projectId: number): Promise<ProjectDetail
   const { data: customer, error: customerError } = project.customer_id==null?{data:null,error:null}:await client.from('customers').select('*').eq('id', project.customer_id).single()
   if(customerError)throw customerError
   if(project.customer_id!=null&&!customer)throw Error('所有者の情報を取得できません')
-  const { data: conArr } = await client.from('contracts').select('*').eq('project_id', projectId).limit(1)
+  let contractQuery = client.from('contracts').select('*').eq('project_id', projectId)
+  if (!project.archived_at) contractQuery = contractQuery.is('archived_at', null)
+  const { data: conArr, error: contractError } = await contractQuery.order('id', { ascending: true }).limit(1)
+  if (contractError) throw contractError
   const contract = conArr?.[0] ?? null
   const annualRecords = contract
     ? ((await client.from('annual_records').select('*').eq('contract_id', contract.id).order('year', { ascending: false })).data ?? []).map(annualRecordFromStorage)
@@ -286,11 +309,12 @@ export async function getProjectDetail(projectId: number): Promise<ProjectDetail
 // ── Maintenance Responses ─────────────────────────────────
 
 export async function getMaintenanceResponses(): Promise<MaintenanceResponse[]> {
-  if (!hasSupabaseEnv) return maintenanceResponseStore.getAll()
+  if (!hasSupabaseEnv) return maintenanceResponseStore.getAll().filter(m => activeMockProject(m.project_id))
   const client = db()
   const { data, error } = await client
     .from('maintenance_responses')
-    .select('*, projects(project_name, plant_name, customers:customers!projects_customer_id_fkey(name, company_name))')
+    .select('*, projects!inner(project_name, plant_name, customers:customers!projects_customer_id_fkey(name, company_name))')
+    .is('projects.archived_at', null)
     .order('response_no', { ascending: false, nullsFirst: false })
     // TODO: 大規模データセットに対しては適切なページネーションを実装すべき
     .limit(1000)
@@ -308,11 +332,15 @@ export async function getMaintenanceResponses(): Promise<MaintenanceResponse[]> 
 }
 
 export async function getMaintenanceResponseById(id: number): Promise<MaintenanceResponse | null> {
-  if (!hasSupabaseEnv) return maintenanceResponseStore.getById(id)
+  if (!hasSupabaseEnv) {
+    const record = maintenanceResponseStore.getById(id)
+    return record && activeMockProject(record.project_id) ? record : null
+  }
   const client = db()
   const { data } = await client
     .from('maintenance_responses')
-    .select('*, projects(project_name, plant_name, customer_id, panel_maker, panel_model, pcs_maker, pcs_model, monitoring_system, monitoring_model, customers:customers!projects_customer_id_fkey(name, company_name))')
+    .select('*, projects!inner(project_name, plant_name, customer_id, panel_maker, panel_model, pcs_maker, pcs_model, monitoring_system, monitoring_model, customers:customers!projects_customer_id_fkey(name, company_name))')
+    .is('projects.archived_at', null)
     .eq('id', id)
     .single()
   if (!data) return null
@@ -338,7 +366,7 @@ export async function getMaintenanceResponseById(id: number): Promise<Maintenanc
 
 export async function getPeriodicMaintenance(): Promise<PeriodicMaintenance[]> {
   if (!hasSupabaseEnv) {
-    return periodicMaintenanceStore.getAll().map(m => {
+    return periodicMaintenanceStore.getAll().filter(m => activeMockProject(m.project_id)).map(m => {
       const proj = projectStore.getById(m.project_id)
       const cust = proj ? (proj.customer_id==null?null:customerStore.getById(proj.customer_id)) : null
       return {
@@ -352,7 +380,8 @@ export async function getPeriodicMaintenance(): Promise<PeriodicMaintenance[]> {
   const client = db()
   const { data, error } = await client
     .from('periodic_maintenance')
-    .select('*, projects(project_name, plant_name, customers:customers!projects_customer_id_fkey(name, company_name))')
+    .select('*, projects!inner(project_name, plant_name, customers:customers!projects_customer_id_fkey(name, company_name))')
+    .is('projects.archived_at', null)
     .order('record_date', { ascending: false, nullsFirst: false })
     // TODO: 大規模データセットに対しては適切なページネーションを実装すべき
     .limit(1000)
@@ -374,9 +403,10 @@ export async function getPeriodicMaintenance(): Promise<PeriodicMaintenance[]> {
 export async function getBillingRows(): Promise<BillingRow[]> {
   if (!hasSupabaseEnv) {
     const currentYear = new Date().getFullYear()
-    return projectStore.getAll().map(p => {
+    return projectStore.getAll().filter(p => !p.archived_at).map(p => {
       const c = (p.customer_id==null?null:customerStore.getById(p.customer_id))
-      const storedContract = contractStore.getByProjectId(p.id)
+      const activeContracts = mockContracts(p.id)
+      const storedContract = activeContracts[0]
       // The legacy mock data predates per-round schedule days. Keep production
       // behavior strict, but give the isolated UI preview one representative
       // near-term item so the cutover/setup panel can be reviewed end to end.
@@ -392,7 +422,7 @@ export async function getBillingRows(): Promise<BillingRow[]> {
         customer_name: c?.company_name ?? c?.name ?? '所有者未確認',
         company_name: c?.company_name ?? null,
         contract: contract ?? null,
-        contract_count: contract ? 1 : 0,
+        contract_count: activeContracts.length,
         currentYearRecord,
         currentYearRecords,
         records,
@@ -405,13 +435,14 @@ export async function getBillingRows(): Promise<BillingRow[]> {
   const { data: projData, error } = await client
     .from('projects')
     .select('id, project_name, customer_id, customers:customers!projects_customer_id_fkey(name, company_name), contracts(*, annual_records(*))')
+    .is('archived_at', null)
     .order('created_at', { ascending: false })
     // TODO: 大規模データセットに対しては適切なページネーションを実装すべき
     .limit(1000)
   if (error) throw error
   return (projData ?? []).map((row: Record<string, unknown>) => {
     const cust = row.customers as Record<string, unknown> | null
-    const conArr = row.contracts as Record<string, unknown>[] | null
+    const conArr = orderedContracts((row.contracts ?? []) as { id: number; archived_at?: string | null; [key: string]: unknown }[])
     const con = conArr?.[0] ?? null
     const records = ((con?.annual_records as Record<string, unknown>[] | null) ?? []).map(annualRecordFromStorage)
     const currentYearRecords = records.filter(r => (r.year as number) === currentYear) as import('../types').AnnualRecord[]
@@ -434,7 +465,7 @@ export async function getBillingRows(): Promise<BillingRow[]> {
 // ── Prospects ─────────────────────────────────────────────
 
 export async function getProspects(): Promise<Prospect[]> {
-  if (!hasSupabaseEnv) return prospectStore.getAll()
+  if (!hasSupabaseEnv) return prospectStore.getAll().filter(p => [p.new_project_id, p.ownership_project_id].every(id => id == null || activeMockProject(id)))
   const client = supabase!
   const { data, error } = await client
     .from('prospects')
@@ -443,7 +474,13 @@ export async function getProspects(): Promise<Prospect[]> {
     // TODO: 大規模データセットに対しては適切なページネーションを実装すべき
     .limit(1000)
   if (error) throw error
-  return (data ?? []) as Prospect[]
+  const rows = (data ?? []) as Prospect[]
+  const linkedIds = [...new Set(rows.flatMap(p => [p.new_project_id, p.ownership_project_id]).filter((id): id is number => id != null))]
+  if (!linkedIds.length) return rows
+  const { data: projects, error: projectError } = await client.from('projects').select('id, archived_at').in('id', linkedIds)
+  if (projectError) throw projectError
+  const activeIds = new Set((projects ?? []).filter((p: { archived_at?: string | null }) => !p.archived_at).map((p: { id: number }) => p.id))
+  return rows.filter(p => [p.new_project_id, p.ownership_project_id].every(id => id == null || activeIds.has(id)))
 }
 
 export async function getProspectById(id: number): Promise<Prospect | null> {
@@ -455,11 +492,11 @@ export async function getProspectById(id: number): Promise<Prospect | null> {
 
 export async function getBillingDetail(projectId: number): Promise<BillingDetail | null> {
   if (!hasSupabaseEnv) {
-    const project = projectStore.getById(projectId)
+    const project = activeMockProject(projectId)
     if (!project) return null
     const customer = (project.customer_id==null?null:customerStore.getById(project.customer_id))
     if (project.customer_id!=null&&!customer) throw Error('所有者の情報を取得できません')
-    const contract = contractStore.getByProjectId(projectId)
+    const contract = mockContracts(projectId)[0]
     if (!contract) return null
     const annualRecords = annualRecordStore.getByContractId(contract.id)
       .sort((a, b) => b.year - a.year)
@@ -468,12 +505,13 @@ export async function getBillingDetail(projectId: number): Promise<BillingDetail
     return { project, customer, contract, annualRecords, maintenanceResponses, periodicMaintenance }
   }
   const client = db()
-  const { data: project } = await client.from('projects').select('*').eq('id', projectId).single()
+  const { data: project } = await client.from('projects').select('*').eq('id', projectId).is('archived_at', null).single()
   if (!project) return null
   const { data: customer, error: customerError } = project.customer_id==null?{data:null,error:null}:await client.from('customers').select('*').eq('id', project.customer_id).single()
   if(customerError)throw customerError
   if(project.customer_id!=null&&!customer)throw Error('所有者の情報を取得できません')
-  const { data: conArr } = await client.from('contracts').select('*').eq('project_id', projectId).limit(1)
+  const { data: conArr, error: contractError } = await client.from('contracts').select('*').eq('project_id', projectId).is('archived_at', null).order('id', { ascending: true }).limit(1)
+  if (contractError) throw contractError
   const contract = conArr?.[0]
   if (!contract) return null
   const { data: arData } = await client.from('annual_records').select('*').eq('contract_id', contract.id).order('year', { ascending: false })

@@ -3,6 +3,7 @@ import { type FieldChoice } from './ownership-field-selection'
 
 /** Every model key needs a human label; additions fail type checking until classified. */
 export const contractTransferLabels = {
+  archived_at:'保管日時',archive_reason:'保管理由',canonical_contract_id:'使用する契約ID',
   id:'内部ID',project_id:'発電所ID',created_at:'登録日時',updated_at:'更新日時',ownership_transfer_date:'所有権移転日（自動更新）',
   billing_method:'請求方法',billing_due_day:'請求日（旧設定）',billing_amount_ex:'請求金額（税抜）',billing_amount_inc:'請求金額（税込）',
   annual_maintenance_ex:'年次保守料（税抜）',annual_maintenance_inc:'年次保守料（税込）',land_cost_monthly:'土地代',

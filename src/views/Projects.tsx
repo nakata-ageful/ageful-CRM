@@ -115,7 +115,8 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
     sessionStorage.setItem('projects_sort', k)
   }
   // 案件番号が1件も入っていない間は「案件番号順」を選択肢に出さない（登録順とほぼ同じ並びになり紛らわしいため）
-  const hasProjectNo = projects.some(p => p.project_no && p.project_no.trim() !== '')
+  const activeProjects=projects.filter(p=>!p.archived_at)
+  const hasProjectNo = activeProjects.some(p => p.project_no && p.project_no.trim() !== '')
   const sortOptions = SORT_OPTIONS.filter(o => o.key !== 'project_no_asc' || hasProjectNo)
   const effectiveSortKey: SortKey = (sortKey === 'project_no_asc' && !hasProjectNo) ? 'created_desc' : sortKey
   const [modal, setModal] = useState(false)
@@ -126,7 +127,7 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  const filtered = projects.filter(p => projectMatchesSearch(p, search))
+  const filtered = activeProjects.filter(p => projectMatchesSearch(p, search))
 
   // 選択された並び順を適用（空の日付・番号は常に末尾へ）
   const sorted = [...filtered].sort((a, b) => {

@@ -126,6 +126,8 @@ type Props = {
   onAddRoutine?:AddRoutineInvoice
   onOwnershipTransfer?:()=>void
   ownershipStatus?:ReactNode
+  onViewCanonicalProject?:(projectId:number)=>void
+  canonicalProjectName?:string
   billingUnits?:readonly TransferBillingUnit[]
   onAddDebit?:(input:NewDebitPlan)=>Promise<void>
   onSaveBillingPlan?:(choices:TransferBillingChoice[],reason:string)=>Promise<void>
@@ -159,13 +161,14 @@ function writeTabToHash(t: Tab) {
   }
 }
 
-export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, onViewMaintenance,billingHistory,onSaveInvoice,onCheckBillingPending,onSavePeriod,onAddSchedule,onAddRoutine,onOwnershipTransfer,billingUnits,onAddDebit,onSaveBillingPlan,managementTools,changeHistory,billingCycleSettings,onRecordRemoval,ownershipStatus }: Props) {
+export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, onViewMaintenance,billingHistory,onSaveInvoice,onCheckBillingPending,onSavePeriod,onAddSchedule,onAddRoutine,onOwnershipTransfer,billingUnits,onAddDebit,onSaveBillingPlan,managementTools,changeHistory,billingCycleSettings,onRecordRemoval,ownershipStatus,onViewCanonicalProject,canonicalProjectName }: Props) {
   const toast = useToast()
   const [scheduleReview,setScheduleReview]=useState<ScheduleDateReview|null>(null)
   const [scheduleFailure,setScheduleFailure]=useState('')
   const [scheduleOutcome,setScheduleOutcome]=useState<ScheduleChangeSaveError|null>(null)
   const sectionSaveLock=useRef(false)
   const { project, customer, contract, annualRecords, maintenanceResponses, periodicMaintenance } = detail
+  const readOnly=!!(project.archived_at||contract?.archived_at)
   // DB追加前は新列を送信しない。モックではDBを変更せず動作確認できる。
   const basicNotesAvailable = !hasSupabaseEnv || BASIC_NOTE_KEYS.every(key => Object.prototype.hasOwnProperty.call(project, key))
   const [tab, setTabState] = useState<Tab>(() => readTabFromHash())
@@ -369,6 +372,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
   // ── 案件基本情報編集 ──────────────────────────────────────
 
   async function handleSaveProject() {
+    if(readOnly)return
     if (!projForm.plant_name.trim()) { setErr('発電所名は必須です'); return }
     setSaving(true); setErr('')
     try {
@@ -392,6 +396,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
   // ── 保守対応 ─────────────────────────────────────────────
 
   async function handleCreateMR() {
+    if(readOnly)return
     setSaving(true); setErr('')
     try {
       await createMaintenanceResponse({ ...mrForm, project_id: project.id })
@@ -402,6 +407,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
   }
 
   async function handleDeleteMR(id: number) {
+    if(readOnly)return
     if (!confirm('この保守対応記録を削除しますか？')) return
     await deleteMaintenanceResponse(id)
     onReload()
@@ -411,6 +417,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
   // ── 定期保守 ─────────────────────────────────────────────
 
   async function handleSavePM() {
+    if(readOnly)return
     if (!pmForm.record_date) { setErr('実施日は必須です'); return }
     setSaving(true); setErr('')
     try {
@@ -427,6 +434,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
   }
 
   function openPmEdit(m: { id: number; record_date: string; work_type: string | null; content: string | null; status?: string | null }) {
+    if(readOnly)return
     setPmForm({ record_date: m.record_date, work_type: m.work_type ?? '', content: m.content ?? '', status: m.status ?? null })
     setPmEditId(m.id)
     setErr('')
@@ -434,6 +442,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
   }
 
   function openPmCreate(workType: string) {
+    if(readOnly)return
     setPmForm({ record_date: '', work_type: workType, content: '', status: workType === '経産省定期報告' ? '未' : null })
     setPmEditId(null)
     setErr('')
@@ -441,6 +450,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
   }
 
   async function handleDeletePM(id: number) {
+    if(readOnly)return
     if (!confirm('この定期保守記録を削除しますか？')) return
     await deletePeriodicMaintenance(id)
     onReload()
@@ -455,6 +465,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
    * - 引数 record: 既存レコードを編集
    */
   function openArModal(record?: { id: number; year: number; billing_date: string | null; received_date: string | null; maintenance_record: string | null; escort_record: string | null; status: '' | '請求済' | '入金済' }) {
+    if(readOnly)return
     setArForm({
       id: record?.id ?? null,
       year: record?.year ?? currentYear,
@@ -469,6 +480,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
   }
 
   async function handleUpsertAR() {
+    if(readOnly)return
     if (!contract) return
     setSaving(true); setErr('')
     try {
@@ -480,11 +492,13 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
   }
 
   async function handleARStatusChange(id: number, status: '' | '請求済' | '入金済') {
+    if(readOnly)return
     await updateAnnualRecordStatus(id, status)
     onReload()
   }
 
   async function handleDeleteAR(id: number, year: number) {
+    if(readOnly)return
     if (!confirm(`${year}年度の年次記録を削除しますか？`)) return
     await deleteAnnualRecord(id)
     onReload()
@@ -494,6 +508,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
   // ── 契約 ─────────────────────────────────────────────────
 
   async function handleSaveContract() {
+    if(readOnly)return
     setSaving(true); setErr('')
     try {
       const toNum = (v: string) => v ? parseInt(v.replace(/,/g, ''), 10) : null
@@ -562,6 +577,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
   // ── 中項目ごとの編集モーダル（ステップC-2）─────────────
   /** 中項目編集モーダルを開く。projForm/contractForm を最新値で再初期化してから開く。 */
   function openSectionEdit(key: EditSectionKey) {
+    if(readOnly)return
     // projects フォームを最新値で初期化
     setProjForm({
       summary_notes: basicNotesAvailable ? (project.summary_notes ?? '') : undefined,
@@ -677,6 +693,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
 
   /** 中項目編集モーダルを保存する。section に応じて projects / contracts / 両方 を更新。 */
   async function handleSaveSection(scheduleRequests?:InvoiceWriteRequest[]) {
+    if(readOnly)return
     if (!editSection) return
     if(sectionSaveLock.current||scheduleFailure)return
     if(editSection==='billing'&&!scheduleRequests&&contract&&billingHistory&&onSaveInvoice){
@@ -779,6 +796,10 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
 
   return (
     <>
+      {readOnly&&<div className="notice" role="status"><strong>保管中（重複登録）</strong>
+        <p>{project.archive_reason||contract?.archive_reason||'重複登録の記録を削除せず保管しています。'} 編集・所有者変更・請求追加はできません。管理終了とは別の扱いです。</p>
+        {project.canonical_project_id&&onViewCanonicalProject&&<button type="button" className="btn btn-main" onClick={()=>onViewCanonicalProject(project.canonical_project_id!)}>使用中の{canonicalProjectName||'発電所'}を開く</button>}
+      </div>}
       <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 13, color: '#64748b' }}>顧客：</span>
         {customer&&project.customer_id!=null?<button
@@ -789,7 +810,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
         </button>:<span>{project.customer_pending?'顧客未定（新規案件）':`現在の所有者：未確認${project.old_owner?` ／ 前の所有者：${project.old_owner}`:''}`}</span>}
         <span style={{ fontSize: 13, color: '#64748b' }}>発電所：</span>
         <b style={{ fontSize: 'inherit' }}>{project.plant_name || project.project_name}</b>
-        {onOwnershipTransfer&&contract&&!project.customer_pending&&<button className="btn btn-main" onClick={onOwnershipTransfer}>所有者を変更</button>}
+        {onOwnershipTransfer&&contract&&!project.customer_pending&&!readOnly&&<button className="btn btn-main" onClick={onOwnershipTransfer}>所有者を変更</button>}
         <button className="back-btn" onClick={onBack} style={{ marginLeft: 'auto' }}>← 戻る</button>
       </div>
 
@@ -817,7 +838,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           <div className="card">
             <div className="card-header-row">
               <h3 className="section-title" style={{ margin: 0 }}>概要</h3>
-              <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('summary')}>編集</button>
+              {!readOnly&&<button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('summary')}>編集</button>}
             </div>
             <div className="info-grid">
               <div className="info-field"><span>案件番号</span><b>{project.project_no ?? '-'}</b></div>
@@ -834,7 +855,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           <div className="card">
             <div className="card-header-row">
               <h3 className="section-title" style={{ margin: 0 }}>経済産業省</h3>
-              <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('meti')}>編集</button>
+              {!readOnly&&<button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('meti')}>編集</button>}
             </div>
             <div className="info-grid">
               <div className="info-field"><span>設備ID</span><b>{project.grid_id ?? '-'}</b></div>
@@ -847,7 +868,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           <div className="card">
             <div className="card-header-row">
               <h3 className="section-title" style={{ margin: 0 }}>電力会社</h3>
-              <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('power-company')}>編集</button>
+              {!readOnly&&<button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('power-company')}>編集</button>}
             </div>
             <div className="info-grid">
               <div className="info-field"><span>受給地点番号</span><b>{project.generation_point_id ?? '-'}</b></div>
@@ -870,7 +891,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           <div className="card">
             <div className="card-header-row">
               <h3 className="section-title" style={{ margin: 0 }}>パネル</h3>
-              <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('panel')}>編集</button>
+              {!readOnly&&<button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('panel')}>編集</button>}
             </div>
             <div className="info-grid">
               <div className="info-field"><span>KW</span><b>{project.panel_kw != null ? `${project.panel_kw.toFixed(3)}kW` : '-'}</b></div>
@@ -886,7 +907,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           <div className="card">
             <div className="card-header-row">
               <h3 className="section-title" style={{ margin: 0 }}>パワコン</h3>
-              <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('pcs')}>編集</button>
+              {!readOnly&&<button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('pcs')}>編集</button>}
             </div>
             <div className="info-grid">
               <div className="info-field"><span>KW</span><b>{project.pcs_kw != null ? `${project.pcs_kw.toFixed(3)}kW` : '-'}</b></div>
@@ -902,7 +923,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           <div className="card">
             <div className="card-header-row">
               <h3 className="section-title" style={{ margin: 0 }}>遠隔監視</h3>
-              <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('monitoring')}>編集</button>
+              {!readOnly&&<button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('monitoring')}>編集</button>}
             </div>
             <div className="info-grid">
               <div className="info-field"><span>メーカー</span><b>{project.monitoring_system ?? '-'}</b></div>
@@ -923,7 +944,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           <div className="card">
             <div className="card-header-row">
               <h3 className="section-title" style={{ margin: 0 }}>設備契約</h3>
-              {contract && <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('equipment-contract')}>編集</button>}
+              {contract&&!readOnly && <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('equipment-contract')}>編集</button>}
             </div>
             <div className="info-grid">
               <div className="info-field"><span>販売会社</span><b>{project.sales_company ?? '-'}</b></div>
@@ -944,7 +965,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           <div className="card">
             <div className="card-header-row">
               <h3 className="section-title" style={{ margin: 0 }}>土地契約</h3>
-              {contract && <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('land-contract')}>編集</button>}
+              {contract&&!readOnly && <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('land-contract')}>編集</button>}
             </div>
             <div className="info-grid">
               <div className="info-field"><span>土地代</span><b>{fmtYen(project.land_cost)}</b></div>
@@ -963,7 +984,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           <div className="card">
             <div className="card-header-row">
               <h3 className="section-title" style={{ margin: 0 }}>保守契約</h3>
-              {contract && <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('maintenance-contract')}>編集</button>}
+              {contract&&!readOnly && <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('maintenance-contract')}>編集</button>}
             </div>
             <div className="info-grid">
               <div className="info-field"><span>受託会社</span><b>{contract?.maintenance_contractor ?? '-'}</b></div>
@@ -979,7 +1000,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           <div className="card">
             <div className="card-header-row">
               <h3 className="section-title" style={{ margin: 0 }}>保守内容</h3>
-              {contract && <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('maintenance-content')}>編集</button>}
+              {contract&&!readOnly && <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('maintenance-content')}>編集</button>}
             </div>
             <div className="info-grid">
               <div className="info-field"><span>除草（回）</span><b>{contract?.plan_weeding ?? '-'}</b></div>
@@ -1008,7 +1029,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           <div className="card">
             <div className="card-header-row">
               <h3 className="section-title" style={{ margin: 0 }}>委託契約</h3>
-              {contract && <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('subcontract')}>編集</button>}
+              {contract&&!readOnly && <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('subcontract')}>編集</button>}
             </div>
             <div className="info-grid">
               <div className="info-field"><span>保守委託先</span><b>{contract?.subcontractor ?? '-'}</b></div>
@@ -1028,7 +1049,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           <div className="card">
             <div className="card-header-row">
               <h3 className="section-title" style={{ margin: 0 }}>請求情報</h3>
-              {contract && <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('billing')}>編集</button>}
+              {contract&&!readOnly && <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('billing')}>編集</button>}
             </div>
 
             {(() => {
@@ -1084,19 +1105,19 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
         </div>
       )}
 
-      {tab==='請求情報'&&billingCycleSettings}
+      {tab==='請求情報'&&!readOnly&&billingCycleSettings}
       {/* ── 請求詳細タブ（旧・独立の請求詳細画面を埋め込み） ── */}
       {tab === '請求詳細' && (
-        (billingDetailLoading && !billingDetail || billingDetail&&billingDetail.project.customer_id!==project.customer_id) ? (
+        (billingDetailLoading && !billingDetail || billingDetail&&(billingDetail.project.id!==project.id||billingDetail.project.customer_id!==project.customer_id)) ? (
           <div className="card loading-card">読み込み中...</div>
-        ) : billingDetail ? (
+        ) : billingDetail&&(!readOnly||billingHistory) ? (
           <BillingDetailView
             billingHistory={billingHistory}
-            onSaveInvoice={onSaveInvoice}
-            onRecordRemoval={onRecordRemoval}
-            onSavePeriod={onSavePeriod}
-            onAddSchedule={onAddSchedule}
-            onAddRoutine={onAddRoutine}
+            onSaveInvoice={readOnly?undefined:onSaveInvoice}
+            onRecordRemoval={readOnly?undefined:onRecordRemoval}
+            onSavePeriod={readOnly?undefined:onSavePeriod}
+            onAddSchedule={readOnly?undefined:onAddSchedule}
+            onAddRoutine={readOnly?undefined:onAddRoutine}
             detail={billingDetail}
             embedded
             onBack={() => {}}
@@ -1104,12 +1125,12 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             onViewProject={() => setTab('基本情報')}
           />
         ) : (
-          <div className="card" style={{ color: '#94a3b8', fontSize: 13 }}>請求詳細を表示できません（契約レコードがありません）</div>
+          <div className="card" style={{ color: '#94a3b8', fontSize: 13 }}>{readOnly?'保管中の重複登録は請求対象から外しています。請求の操作は使用中の発電所で行ってください。':'請求詳細を表示できません（契約レコードがありません）'}</div>
         )
       )}
 
       {/* ── その他タブ ── */}
-      {tab==='管理設定'&&<div className="project-management-tab">{managementTools}
+      {tab==='管理設定'&&!readOnly&&<div className="project-management-tab">{managementTools}
       {billingHistory&&(onAddDebit||(billingUnits&&onSaveBillingPlan))&&<BillingExceptionActions key={project.id} projectId={project.id} owner={customer??{id:0,name:'所有者未確認'}}
         recipients={billingHistory.recipients} units={billingUnits} onAddDebit={onAddDebit} onSavePlan={onSaveBillingPlan}/>}
       </div>}
@@ -1118,7 +1139,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
         <div className="card">
           <div className="card-header-row">
             <h3 className="section-title" style={{ margin: 0 }}>備考</h3>
-            <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('other-notes')}>編集</button>
+            {!readOnly&&<button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('other-notes')}>編集</button>}
           </div>
           <div className="info-grid">
             <div className="info-field" style={{ gridColumn: '1/-1' }}><b style={{ whiteSpace: 'pre-wrap' }}>{project.notes || '-'}</b></div>
@@ -1171,7 +1192,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                           <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>毎年申請</div>
                         )}
                       </div>
-                      <button className="btn btn-main btn-sm" onClick={() => openPmCreate(cat.key)}>
+                      <button className="btn btn-main btn-sm" disabled={readOnly} onClick={() => openPmCreate(cat.key)}>
                         ＋
                       </button>
                     </div>
@@ -1201,8 +1222,8 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                                 )}
                               </span>
                               <div style={{ display: 'flex', gap: 2 }}>
-                                <button className="btn-icon" title="編集" onClick={() => openPmEdit(m)} style={{ fontSize: 12 }}>✎</button>
-                                <button className="btn-icon" title="削除" onClick={() => handleDeletePM(m.id)} style={{ fontSize: 12 }}>🗑</button>
+                                <button className="btn-icon" title="編集" disabled={readOnly} onClick={() => openPmEdit(m)} style={{ fontSize: 12 }}>✎</button>
+                                <button className="btn-icon" title="削除" disabled={readOnly} onClick={() => handleDeletePM(m.id)} style={{ fontSize: 12 }}>🗑</button>
                               </div>
                             </div>
                             {m.content && <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>{m.content}</div>}
@@ -1219,7 +1240,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                 <div className="card" style={{ margin: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                     <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>その他</div>
-                    <button className="btn btn-main btn-sm" onClick={() => openPmCreate('その他')}>
+                    <button className="btn btn-main btn-sm" disabled={readOnly} onClick={() => openPmCreate('その他')}>
                       ＋
                     </button>
                   </div>
@@ -1237,8 +1258,8 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                             <span style={{ marginLeft: 6, fontSize: 10, color: '#8b5cf6', background: '#f5f3ff', borderRadius: 4, padding: '1px 5px' }}>{m.work_type}</span>
                           </span>
                           <div style={{ display: 'flex', gap: 2 }}>
-                            <button className="btn-icon" title="編集" onClick={() => openPmEdit(m)} style={{ fontSize: 12 }}>✎</button>
-                            <button className="btn-icon" title="削除" onClick={() => handleDeletePM(m.id)} style={{ fontSize: 12 }}>🗑</button>
+                            <button className="btn-icon" title="編集" disabled={readOnly} onClick={() => openPmEdit(m)} style={{ fontSize: 12 }}>✎</button>
+                            <button className="btn-icon" title="削除" disabled={readOnly} onClick={() => handleDeletePM(m.id)} style={{ fontSize: 12 }}>🗑</button>
                           </div>
                         </div>
                         {m.content && <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>{m.content}</div>}
@@ -1264,7 +1285,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                   <span style={{ fontSize: 12, color: '#64748b' }}>保守開始日: {contract.maintenance_start_date}</span>
                 )}
               </div>
-              <button className="btn btn-main btn-sm" onClick={() => { setMrForm({ inquiry_date: '', occurrence_date: '', target_area: '', serial_number: '', situation: '', response_content: '', report: '' }); setErr(''); setMrModal(true) }}>
+              <button className="btn btn-main btn-sm" disabled={readOnly} onClick={() => { if(readOnly)return;setMrForm({ inquiry_date: '', occurrence_date: '', target_area: '', serial_number: '', situation: '', response_content: '', report: '' }); setErr(''); setMrModal(true) }}>
                 ＋ 追加
               </button>
             </div>
@@ -1278,14 +1299,14 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                     <tr><td colSpan={6} className="empty-cell">保守対応記録がありません</td></tr>
                   )}
                   {maintenanceResponses.map(m => (
-                    <tr key={m.id} className="clickable-row" onClick={() => onViewMaintenance(m.id)}>
+                    <tr key={m.id} className={readOnly?undefined:'clickable-row'} onClick={readOnly?undefined:() => onViewMaintenance(m.id)}>
                       <td>{m.response_no ?? '-'}</td>
                       <td>{m.inquiry_date ?? '-'}</td>
                       <td>{m.occurrence_date ?? '-'}</td>
                       <td>{m.target_area ?? '-'}</td>
                       <td><StatusBadge status={m.status} /></td>
                       <td onClick={e => e.stopPropagation()}>
-                        <button className="btn-icon" title="削除" onClick={() => handleDeleteMR(m.id)}>🗑</button>
+                        <button className="btn-icon" title="削除" disabled={readOnly} onClick={() => handleDeleteMR(m.id)}>🗑</button>
                       </td>
                     </tr>
                   ))}
@@ -1303,7 +1324,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           <div className="card">
             <div className="card-header-row">
               <h3 className="section-title" style={{ margin: 0 }}>年次記録</h3>
-              <button className="btn btn-main btn-sm" onClick={() => { openArModal(); }}>
+              <button className="btn btn-main btn-sm" disabled={readOnly} onClick={() => { openArModal(); }}>
                 ＋ 追加
               </button>
             </div>
@@ -1317,13 +1338,14 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                 )}
                 {annualRecords.sort((a, b) => b.year - a.year).map(r => (
                   <tr key={r.id}>
-                    <td><button className="link-btn" onClick={() => openArModal(r)}>{r.year}年</button></td>
+                    <td><button className="link-btn" disabled={readOnly} onClick={() => openArModal(r)}>{r.year}年</button></td>
                     <td>{r.billing_date ?? '-'}</td>
                     <td>{r.received_date ?? '-'}</td>
                     <td><StatusBadge status={r.status} /></td>
                     <td>
                       <select
                         className="status-select"
+                        disabled={readOnly}
                         value={r.status}
                         onChange={e => handleARStatusChange(r.id, e.target.value as '' | '請求済' | '入金済')}
                         onClick={e => e.stopPropagation()}
@@ -1336,6 +1358,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                     <td>
                       <button
                         className="btn btn-danger btn-sm"
+                        disabled={readOnly}
                         style={{ fontSize: 11, padding: '2px 8px' }}
                         onClick={() => handleDeleteAR(r.id, r.year)}
                       >
@@ -1351,7 +1374,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       )}
 
       {/* 保守対応モーダル */}
-      {mrModal && (
+      {mrModal&&!readOnly && (
         <Modal title="保守対応記録を追加" onClose={() => setMrModal(false)}>
           {err && <div className="form-error">{err}</div>}
           <div className="form-grid">
@@ -1411,7 +1434,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       )}
 
       {/* 定期保守モーダル */}
-      {pmModal && (
+      {pmModal&&!readOnly && (
         <Modal title={pmEditId != null ? '定期保守記録を編集' : '定期保守記録を追加'} onClose={() => { setPmModal(false); setPmEditId(null) }}>
           {err && <div className="form-error">{err}</div>}
           <div className="form-grid">
@@ -1446,7 +1469,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       )}
 
       {/* 年次記録モーダル */}
-      {arModal && (
+      {arModal&&!readOnly && (
         <Modal title={`${arForm.year}年度 年次記録${arForm.id != null ? '（編集）' : '（追加）'}`} onClose={() => setArModal(false)}>
           {err && <div className="form-error">{err}</div>}
           <div className="form-grid">
@@ -1487,7 +1510,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       )}
 
       {/* 契約編集モーダル */}
-      {contractModal && (
+      {contractModal&&!readOnly && (
         <Modal title="契約情報を編集" onClose={() => setContractModal(false)}>
           {err && <div className="form-error">{err}</div>}
           <div className="form-grid">
@@ -1672,7 +1695,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       )}
 
       {/* 案件基本情報編集モーダル */}
-      {projModal && (
+      {projModal&&!readOnly && (
         <Modal title="案件情報を編集" onClose={() => setProjModal(false)}>
           {err && <div className="form-error">{err}</div>}
           <div className="form-grid">
@@ -1837,7 +1860,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       )}
 
       {/* ── 中項目ごとの編集モーダル（ステップ C-2） ── */}
-      {editSection && (
+      {editSection&&!readOnly && (
         <Modal title={SECTION_TITLES[editSection]} closeDisabled={saving} onClose={() => {setEditSection(null);setScheduleReview(null);setScheduleOutcome(null);if(scheduleFailure){setScheduleFailure('');onReload()}}}>
           {err && <div className="form-error">{err}</div>}
           {scheduleFailure?<section className="schedule-change-review">{scheduleOutcome?.requests.map((q,i)=>{const c=[...(scheduleReview?.changes??[]),...(scheduleReview?.editable??[])].find(c=>Number(c.unit.id)===q.unitId),nextDate=(q.value as {scheduled_date?:string}).scheduled_date;return <p key={q.unitId}><strong>{scheduleOutcome.settingsSaved?(i<scheduleOutcome.completed?'保存確認済み':i===scheduleOutcome.completed?'保存結果要確認':'未着手'):'未着手'}</strong>：{c?`${c.unit.serviceYear}年・${c.unit.roundLabel} ／ ${c.unit.scheduledDate||'未登録'} → ${nextDate??c.date}`:`請求記録ID ${q.unitId}`}</p>})}<button type="button" className="btn btn-sub" onClick={()=>{setEditSection(null);setScheduleReview(null);setScheduleFailure('');setScheduleOutcome(null);onReload()}}>閉じて最新の情報を確認</button></section>:scheduleReview?<BillingScheduleChangeReview review={scheduleReview} name={project.plant_name||project.project_name} recipientName={id=>billingHistory?.recipientName(id)??`顧客ID ${id}`} busy={saving} onBack={()=>{setScheduleReview(null);setErr('')}} onSave={requests=>void handleSaveSection(requests)}/>:<>

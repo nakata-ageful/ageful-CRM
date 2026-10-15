@@ -196,7 +196,9 @@ async function main(){
    assert.deepEqual(Object.keys(ck).sort(),Object.keys(labels).sort())
    const prepareFields=choices=>db.query('select prepare_transfer_detail_choices($1::jsonb,$2::jsonb,$3::jsonb)',[JSON.stringify(project),JSON.stringify(contract),JSON.stringify({contract:choices})])
    for(const [name,kind] of Object.entries(ck)){
-    if(kind==='protected'){await assert.rejects(prepareFields({[name]:{mode:'clear'}}),/選択できない/);continue}
+    // This migration-era fixture predates archive metadata. It must reject
+    // those newer system keys as unsupported as well as existing protected keys.
+    if(kind==='protected'){await assert.rejects(prepareFields({[name]:{mode:'clear'}}),/選択できない|追加検証/);continue}
     const value=kind==='number'?name==='billing_count'?1:200:kind==='boolean'?true:kind==='date'?'2026-01-01':kind==='flags'?{annual_maintenance:false}:kind==='amounts'?{'1':150}:kind==='strings'?['6月15日']:name==='billing_method'?'請求書':name.startsWith('plan_')?'年1回':name==='meti_setup_report_status'?'受理':'変更内容'
     await prepareFields({[name]:{mode:'change',value}})
     if(!['billing_method','billing_schedule_days'].includes(name))await prepareFields({[name]:{mode:'clear'}})

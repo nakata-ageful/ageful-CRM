@@ -15,7 +15,7 @@ try{
   create function auth.uid() returns uuid language sql as $$select nullif(current_setting('test.actor',true),'')::uuid$$;
   set test.actor='${actor}';set request.headers='{"x-ageful-client":"ledger-v1"}';`)
  await db.exec(read('schema.sql'))
- await db.exec('alter table contracts add column ownership_transfer_date date,add column billing_schedule_days text[]')
+ await db.exec('alter table contracts add column ownership_transfer_date date,add column billing_schedule_days text[],add column maintenance_contractor text')
  await db.transaction(async tx=>{await tx.exec("set local ageful.allow_draft_migration='yes'");
   for(const f of ['20260907_billing_ownership_foundation.sql','20260907_invoice_write_rpc.sql','20260907_invoice_import_rpc.sql',
    '20260907_preserve_maintenance_source.sql','20260907_invoice_recipient_initialization.sql','20260907_invoice_initialization_inspection.sql',
@@ -149,8 +149,55 @@ try{
  assert.deepEqual(afterRelink.new_prospect_events.filter(e=>e!==relinkAudit),beforeRelink.new_prospect_events,'Previous classification audit retained unchanged')
  assert.deepEqual(relinkAudit.before_snapshot.from_project,relinkAudit.after_snapshot.from_project)
  assert.deepEqual(relinkAudit.before_snapshot.to_project,relinkAudit.after_snapshot.to_project)
+ // Additive archive layer keeps all physical evidence but removes unused
+ // duplicates from operational contract selection and blocks fresh duplicates.
+ await db.exec("update contracts set maintenance_contractor='HUGエナジー' where id=100")
+ await db.exec("insert into projects(id,customer_id,project_name) values(123,1,'今回対象外の既存案件');insert into contracts(id,project_id) values(96,123),(97,123)")
+ await db.exec(read('migrations/20261015063227_archive_unused_duplicates.sql'))
+ await assert.rejects(db.exec('insert into contracts(project_id) values(124)'),/登録済み/)
+ await assert.rejects(db.exec("update contracts set archived_at=now(),archive_reason='重複',canonical_contract_id=98 where id=99"),/専用/)
+ const archiveSql=read('drafts/20261015_archive_izumi_duplicates.sql'),preArchive=await snap()
+ await db.exec('create trigger fail_archive before insert on duplicate_archive_events for each row execute function fail_new_audit()')
+ await assert.rejects(db.exec(archiveSql),/synthetic audit failure/);await db.exec('rollback')
+ assert.deepEqual(await snap(),preArchive,'Archive audit failure rolls back HUG copy and every archive flag')
+ await db.exec('drop trigger fail_archive on duplicate_archive_events')
+ await db.exec(archiveSql);const afterArchive=await snap(),archiveAudit=await rows('duplicate_archive_events')
+ assert.equal((await db.query('select count(*) n from active_contracts where project_id=123')).rows[0].n,2,'Unapproved duplicate contracts elsewhere are not silently archived')
+ await assert.rejects(db.exec('insert into contracts(project_id) values(123)'),/登録済み/)
+ await db.exec(archiveSql);assert.deepEqual(await snap(),afterArchive);assert.deepEqual(await rows('duplicate_archive_events'),archiveAudit)
+ assert.equal(archiveAudit.length,1);assert.equal((await one('contracts',98)).maintenance_contractor,'HUGエナジー')
+ assert.equal((await one('contracts',100)).maintenance_contractor,'HUGエナジー','The original HUG field is retained in archived source')
+ assert.equal((await db.query('select count(*) n from contracts where project_id=124')).rows[0].n,2)
+ assert.equal((await db.query('select count(*) n from active_contracts where project_id=124')).rows[0].n,1)
+ assert.equal((await db.query('select count(*) n from contracts where project_id=125')).rows[0].n,2)
+ assert.equal((await db.query('select count(*) n from active_contracts where project_id=125')).rows[0].n,0)
+ await assert.rejects(db.exec("update contracts set notes='保管後編集' where id=100"),/保管済み/)
+ await assert.rejects(db.exec("update projects set notes='保管後編集' where id=125"),/保管済み/)
+ await assert.rejects(db.exec('insert into contracts(project_id) values(125)'),/保管済み/)
+ await assert.rejects(db.exec("insert into maintenance_responses(project_id) values(125)"),/保管済み/)
+ const archiveWorkflow={action:'ownership_workflow',value:{action:'start',value:{projectId:125,project:await one('projects',125),customerId:null,reason:'保管後の登録テスト'}}}
+ await assert.rejects(db.query('select billing_runtime_write($1,$2::jsonb)',[key(),JSON.stringify(archiveWorkflow)]),/保管済み/)
+ await assert.rejects(db.transaction(async tx=>{await tx.exec("set local ageful.archive_unused_write='yes'");await tx.exec("update contracts set archived_at=now(),archive_reason='請求あり',canonical_contract_id=80 where id=98")}),/請求記録/)
+ const patches=(await db.query('select * from archive_function_patches')).rows
+ assert.ok(patches.some(p=>p.signature.includes('transfer_ownership_manual(')))
+ for(const p of patches.filter(p=>!p.signature.includes('prepare_transfer_detail_choices('))){assert.ok(p.after_definition.includes('public.active_contracts'));assert.ok(!p.after_definition.match(/(?:FROM|JOIN|UPDATE)\s+public\.contracts\s/i))}
+ await assert.rejects(db.query('select prepare_transfer_detail_choices($1,$2,$3)',[JSON.stringify(await one('projects',124)),JSON.stringify(await one('contracts',98)),JSON.stringify({contract:{archived_at:{mode:'keep'}}})]),/選択できない/)
+ assert.equal((await db.query('select billing_runtime_snapshot() value')).rows[0].value.duplicate_archive_ready,true)
+ const archivedBackup=(await db.query('select billing_runtime_backup() value')).rows[0].value
+ assert.equal(archivedBackup.contracts.filter(c=>c.project_id===125).length,2)
+ assert.equal(archivedBackup.projects.find(p=>p.id===125).canonical_project_id,124)
+ assert.deepEqual(await rows('billing_units'),afterRelink.billing_units,'Archive never changes actual invoices')
+ const workflowWrite=async(action,value)=>db.transaction(async tx=>{await tx.exec('set local role authenticated');return tx.query('select billing_runtime_write($1,$2::jsonb)',[key(),JSON.stringify({action:'ownership_workflow',value:{action,value}})])})
+ await workflowWrite('candidate',{projectId:124,project:await one('projects',124),prospectId:52,prospect:await one('prospects',52),customerId:2,reason:'実行経路の合成確認'})
+ const archived99=await one('contracts',99),archived100=await one('contracts',100),archived101=await one('contracts',101)
+ const transferProject=await one('projects',124),transferContract=await one('contracts',98)
+ await workflowWrite('complete',{projectId:124,project:transferProject,prospectId:52,prospect:await one('prospects',52),reason:'重複を保管した後の引継ぎテスト',
+  transfer:{project:transferProject,contract:transferContract,newOwner:2,futureRecipient:2,date:'2026-01-01',fields:{contract:{}},choices:[],reason:'合成確認',procedureConfirmed:true}})
+ assert.equal((await one('projects',124)).customer_id,2,'Real workflow/transfer RPC succeeds with one active and one archived contract')
+ assert.deepEqual(await one('contracts',99),archived99);assert.deepEqual(await one('contracts',100),archived100);assert.deepEqual(await one('contracts',101),archived101)
+ assert.deepEqual(await rows('billing_units'),afterRelink.billing_units,'Real transfer still preserves previous customer invoice exactly')
  await db.exec("set test.actor='22222222-2222-4222-8222-222222222222'");await assert.rejects(write(key(),request),/権限|利用/)
  await db.exec("set test.actor='';set role anon");await assert.rejects(db.query('select new_prospect_write($1,$2)',[key(),JSON.stringify(request)]),/permission denied/)
  await db.exec('reset role')
- console.log('PASS: new pending prospect exact SQL, no dummy customer, atomic project/contract/prospect, initial assignment not transfer, stale/replay/anonymous/other-user denial, audit rollback, legacy sync isolation, three-row repair/replay/rollback, Izumi relink/replay/candidate/duplicate/audit-rollback protection, billing/contract/customer/project unchanged.')
+ console.log('PASS: pending prospect, assignment, Izumi classification/relink/replay/rollback, archived duplicates kept physically, active-contract RPC selection, archived writes/new work/duplicate contract rejected, real invoice untouched.')
 }finally{await db.close()}

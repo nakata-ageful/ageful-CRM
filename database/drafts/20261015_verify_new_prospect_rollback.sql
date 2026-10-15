@@ -12,7 +12,7 @@ DO $$ DECLARE result jsonb;first_result jsonb;proj jsonb;pr jsonb;test_customer 
  k uuid:=gen_random_uuid();request jsonb:=jsonb_build_object('action','create','value',jsonb_build_object('customer_undecided',true,'customer_name','','project_name','検証専用・保存しない架空案件'));
  billing_before text;billing_after text;
 BEGIN
- SELECT md5(coalesce(jsonb_agg(to_jsonb(u) ORDER BY id),'[]'::jsonb)::text) INTO billing_before FROM public.billing_units u;
+ SELECT md5((public.billing_runtime_snapshot()->'units')::text) INTO billing_before;
  result:=public.new_prospect_write(k,request);first_result:=result;
  IF public.new_prospect_write(k,request) IS DISTINCT FROM result THEN RAISE EXCEPTION 'Replay mismatch'; END IF;
  SELECT to_jsonb(p) INTO STRICT proj FROM public.projects p WHERE id=(result->>'projectId')::bigint;
@@ -23,7 +23,7 @@ BEGIN
  IF result->>'projectId' IS DISTINCT FROM first_result->>'projectId' OR result->>'prospectId' IS DISTINCT FROM first_result->>'prospectId'
  OR NOT EXISTS(SELECT 1 FROM public.projects WHERE id=(result->>'projectId')::bigint AND customer_id=test_customer AND NOT customer_pending)
  OR (SELECT count(*) FROM public.contracts WHERE project_id=(result->>'projectId')::bigint)<>1 THEN RAISE EXCEPTION 'Assignment mismatch'; END IF;
- SELECT md5(coalesce(jsonb_agg(to_jsonb(u) ORDER BY id),'[]'::jsonb)::text) INTO billing_after FROM public.billing_units u;
+ SELECT md5((public.billing_runtime_snapshot()->'units')::text) INTO billing_after;
  IF billing_before IS DISTINCT FROM billing_after THEN RAISE EXCEPTION 'Billing changed'; END IF;
 END $$;
 SELECT 'PASS: authenticated create, same-key replay, initial assignment, single contract and unchanged billing; all test rows rolled back next' AS validation;

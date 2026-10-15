@@ -5,8 +5,8 @@ import {CustomerPicker} from './CustomerPicker'
 import {CustomerRegistration} from './CustomerRegistration'
 import './OwnershipTransferEditor.css'
 
-export function OwnershipWorkflowPanel({project,customers,onSave,onDirect,onCreateCustomer,onReloadCustomers,onBusyChange,pendingCustomerInput,onPendingCustomerChange,candidateOnly=false}:{
-  project:Pick<Project,'id'|'customer_id'|'plant_name'|'project_name'>;customers:readonly Customer[];candidateOnly?:boolean;onDirect?:()=>void;
+export function OwnershipWorkflowPanel({project,customers,onSave,onDirect,onCreateCustomer,onReloadCustomers,onBusyChange,pendingCustomerInput,onPendingCustomerChange,candidateOnly=false,initialCustomer=false}:{
+  project:Pick<Project,'id'|'customer_id'|'plant_name'|'project_name'>;customers:readonly Customer[];candidateOnly?:boolean;initialCustomer?:boolean;onDirect?:()=>void;
   onSave:(action:'start'|'candidate'|'unknown',customerId:number|null,date:string,reason:string)=>Promise<void>;
   onCreateCustomer:(input:CustomerInput)=>Promise<RegistrationCustomer>;onReloadCustomers:()=>Promise<readonly RegistrationCustomer[]>;
   onBusyChange?:(busy:boolean)=>void;pendingCustomerInput?:CustomerInput|null;onPendingCustomerChange?:(input:CustomerInput|null)=>void
@@ -20,15 +20,15 @@ export function OwnershipWorkflowPanel({project,customers,onSave,onDirect,onCrea
     if(busy||customerBusy)return
     setError('')
     if(mode==='unknown'&&(!date||!confirmed)){setError('所有が終了した日と確認のチェックを入力してください');return}
-    if(candidateOnly&&!target){setError('引継ぎ先の顧客を選択してください');return}
+    if(candidateOnly&&!target){setError(initialCustomer?'顧客を選択してください':'引継ぎ先の顧客を選択してください');return}
     setBusy(true);onBusyChange?.(true)
     try{await onSave(mode==='unknown'?'unknown':candidateOnly?'candidate':'start',mode==='unknown'?null:target?Number(target):null,mode==='unknown'?date:'',reason.trim()||
       (mode==='unknown'?'所有終了を確認。新所有者の氏名は未確認':candidateOnly?'引継ぎ先の顧客を選択':'既存発電所の引継ぎ見込みを登録'))}
     catch(e){setError(e instanceof Error?e.message:String(e))}finally{setBusy(false);onBusyChange?.(false)}
   }
   return <div className="standard-editor ownership-transfer-shell">
-    <h3>{candidateOnly?'引継ぎ先を設定':project.plant_name||project.project_name}</h3>
-    <p>現在の所有者：{customers.find(c=>c.id===project.customer_id)?.name??'未確認'}</p>
+    {!initialCustomer&&<h3>{candidateOnly?'引継ぎ先を設定':project.plant_name||project.project_name}</h3>}
+    {!initialCustomer&&<p>現在の所有者：{customers.find(c=>c.id===project.customer_id)?.name??'未確認'}</p>}
     {!candidateOnly&&<div className="management-action-grid">
       <button type="button" className={`btn ${mode==='start'?'btn-main':'btn-sub'}`} disabled={busy||customerBusy} onClick={()=>{setMode('start');setError('')}}>見込み管理へ戻す</button>
       {onDirect&&<button type="button" className="btn btn-sub" disabled={busy||customerBusy} onClick={onDirect}>決まった所有者へ直接変更</button>}
@@ -37,8 +37,8 @@ export function OwnershipWorkflowPanel({project,customers,onSave,onDirect,onCrea
     {error&&<p role="alert" className="form-error">{error}</p>}
     <fieldset disabled={busy||customerBusy} style={{border:0,padding:0,minWidth:0}}>
       {mode==='start'?<>
-        <p>{candidateOnly?'顧客を選んだだけでは、所有者や請求先は変わりません。':'現在の所有者・保守・請求は変えず、同じ発電所の見込みを登録します。'}</p>
-        <CustomerPicker label="次の所有者" value={target} onChange={setTarget} customers={choices} emptyLabel="引継ぎ先未定" disabled={creating}/>
+        <p>{initialCustomer?'この新規案件の顧客を設定します。請求・入金記録は変更しません。':candidateOnly?'顧客を選んだだけでは、所有者や請求先は変わりません。':'現在の所有者・保守・請求は変えず、同じ発電所の見込みを登録します。'}</p>
+        <CustomerPicker label={initialCustomer?'顧客':'次の所有者'} value={target} onChange={setTarget} customers={choices} emptyLabel={initialCustomer?'顧客を選択してください':'引継ぎ先未定'} disabled={creating}/>
         {!candidateOnly&&<button type="button" className="btn btn-sub btn-sm" onClick={()=>setTarget('')}>引継ぎ先未定にする</button>}
         <button type="button" className="btn btn-sub btn-sm" onClick={()=>setCreating(!creating)}>{creating?'登録欄を閉じる':'＋ 新規顧客を登録'}</button>
       </>:<>
@@ -47,10 +47,10 @@ export function OwnershipWorkflowPanel({project,customers,onSave,onDirect,onCrea
         <label className="form-label">前の所有者の所有が終了した日<input className="form-input" type="date" min="2000-01-01" max={new Date().toLocaleDateString('sv-SE')} value={date} onChange={e=>setDate(e.target.value)}/></label>
         <label className="ownership-transfer-check"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/><span>売却などで所有者が変わったことを確認しました（保守契約の終了とは別です）</span></label>
       </>}
-      <label className="form-label">メモ（任意）<textarea className="form-input" value={reason} onChange={e=>setReason(e.target.value)}/></label>
-      <button type="button" className="btn btn-main" disabled={creating||customerBusy} onClick={()=>void save()}>{busy?'保存中…':mode==='unknown'?'所有者を未確認として保存':candidateOnly?'引継ぎ先を設定':'引継ぎの見込みを登録'}</button>
+      {!initialCustomer&&<label className="form-label">メモ（任意）<textarea className="form-input" value={reason} onChange={e=>setReason(e.target.value)}/></label>}
+      <button type="button" className="btn btn-main" disabled={creating||customerBusy} onClick={()=>void save()}>{busy?'保存中…':initialCustomer?'顧客を設定':mode==='unknown'?'所有者を未確認として保存':candidateOnly?'引継ぎ先を設定':'引継ぎの見込みを登録'}</button>
     </fieldset>
-    {mode==='start'&&creating&&<CustomerRegistration customers={choices} currentOwnerId={project.customer_id??0}
+    {mode==='start'&&creating&&<CustomerRegistration initialCustomer={initialCustomer} customers={choices} currentOwnerId={project.customer_id??0}
       onCreate={onCreateCustomer} onReload={onReloadCustomers} pendingInput={pendingCustomerInput} onPendingChange={onPendingCustomerChange}
       onSelect={customer=>{setAdded(list=>[...list.filter(c=>c.id!==customer.id),customer]);setTarget(String(customer.id));setCreating(false);onPendingCustomerChange?.(null)}}
       onCancel={()=>setCreating(false)} onBusyChange={value=>{setCustomerBusy(value);onBusyChange?.(value)}}/>}

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import type { Prospect, ProspectApplyStatus, ProspectContractStatus, ProspectInput, Customer } from '../types'
 import { createProspect, deleteProspect } from '../lib/actions'
 import { fmtNum, dateInputRange } from '../lib/utils'
@@ -30,12 +30,13 @@ function ContractBadge({ status }: { status: ProspectContractStatus }) {
   return <span className={`prospect-badge prospect-contract-${status}`}>{status}</span>
 }
 
-function AddModal({ onSave, onClose, existingCustomers }: {
-  onSave: (input: ProspectInput) => Promise<void>
+function AddModal({ onSave, onClose, existingCustomers, newProspectReady }: {
+  onSave: (input: ProspectInput, operationKey: string) => Promise<void>
   onClose: () => void
   existingCustomers: ExistingCustomerOption[]
+  newProspectReady?: boolean
 }) {
-  const [mode, setMode] = useState<'new' | 'existing'>('new')
+  const [mode, setMode] = useState<'new' | 'existing' | 'undecided'>('new')
   const [customerType, setCustomerType] = useState<'individual' | 'corporate'>('individual')
   const [selectedCustomer, setSelectedCustomer] = useState('')
   const [customerSearch, setCustomerSearch] = useState('')
@@ -47,9 +48,16 @@ function AddModal({ onSave, onClose, existingCustomers }: {
     is_corporate: false, company_name: '',
   })
   const [saving, setSaving] = useState(false)
-  const set = (k: keyof ProspectInput, v: string) => setForm(f => ({ ...f, [k]: v }))
+  const savingRef = useRef(false)
+  const operationRef = useRef<{ signature: string; key: string } | null>(null)
+  const uncertainRef = useRef(false)
+  const [uncertain, setUncertain] = useState(false)
+  const [checkList, setCheckList] = useState(false)
+  const [error, setError] = useState('')
+  const set = (k: keyof ProspectInput, v: string) => { if (!uncertainRef.current) setForm(f => ({ ...f, [k]: v })) }
 
   function handleSelectExisting(value: string) {
+    if (savingRef.current || uncertainRef.current) return
     setSelectedCustomer(value)
     const id = Number(value)
     const cust = existingCustomers.find(c => c.id === id)
@@ -70,44 +78,78 @@ function AddModal({ onSave, onClose, existingCustomers }: {
     }
   }
 
-  function handleModeChange(newMode: 'new' | 'existing') {
+  function handleModeChange(newMode: 'new' | 'existing' | 'undecided') {
+    if (savingRef.current || uncertainRef.current || checkList || (newMode === 'undecided' && !newProspectReady)) return
     setMode(newMode)
+    setError('')
     setCustomerSearch('')
     setComboOpen(false)
-    if (newMode === 'new') {
-      setSelectedCustomer('')
-      setForm(f => ({ ...f, customer_name: '', customer_name_kana: '', company_name: '', existing_customer_id: undefined }))
-    } else {
-      setForm(f => ({ ...f, existing_customer_id: undefined }))
-    }
+    setSelectedCustomer('')
+    setForm(f => ({ ...f, customer_name: '', customer_name_kana: '', company_name: '',
+      is_corporate: newMode === 'new' && customerType === 'corporate', existing_customer_id: undefined }))
   }
 
   function handleCustomerTypeChange(t: 'individual' | 'corporate') {
+    if (savingRef.current || uncertainRef.current) return
     setCustomerType(t)
     setForm(f => ({ ...f, is_corporate: t === 'corporate', company_name: '' }))
   }
 
   async function handleSave() {
-    if (!form.customer_name.trim() || !form.project_name.trim()) return
+    if (savingRef.current || checkList || !form.project_name.trim()) return
+    if (mode === 'undecided' && !newProspectReady) return
+    if (mode !== 'undecided' && !form.customer_name.trim()) return
+    if (mode === 'existing' && (!selectedCustomer || !form.existing_customer_id)) return
     if (mode === 'new' && customerType === 'corporate' && !(form.company_name ?? '').trim()) return
+    savingRef.current = true
     setSaving(true)
+    setError('')
     try {
-      await onSave(form)
+      const input = { ...form, customer_undecided: mode === 'undecided',
+        ...(mode === 'undecided' ? { customer_name: '', customer_name_kana: '', company_name: '', is_corporate: false, existing_customer_id: undefined }
+          : mode === 'new' ? { existing_customer_id: undefined } : {}) }
+      const signature = JSON.stringify(input)
+      if (!operationRef.current || operationRef.current.signature !== signature) {
+        if (uncertainRef.current) throw Error('前回と同じ内容で保存結果を確認してください')
+        operationRef.current = { signature, key: crypto.randomUUID() }
+      }
+      await onSave(input, operationRef.current.key)
+      uncertainRef.current = false
+      setUncertain(false)
+      setCheckList(false)
+    } catch (e) {
+      const code = typeof e === 'object' && e && 'code' in e ? String(e.code) : ''
+      const rejected = /^(22|23|42)/.test(code) || code === 'P0001'
+      uncertainRef.current = mode === 'undecided' && !rejected
+      setUncertain(uncertainRef.current)
+      setCheckList(mode !== 'undecided' && !rejected)
+      setError(e instanceof Error ? e.message : typeof e === 'object' && e && 'message' in e ? String(e.message) : String(e))
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }
 
+  function close() {
+    if (savingRef.current) return
+    if (uncertainRef.current) { setError('保存結果が未確認です。再読み込みせず、下のボタンで同じ内容の保存結果を確認してください'); return }
+    onClose()
+  }
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={close}>
       <div className="modal-box" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h2 className="modal-title">案件を追加</h2>
-          <button className="modal-close" onClick={onClose}>✕</button>
+          <button className="modal-close" disabled={saving || uncertain} onClick={close}>✕</button>
         </div>
         <div className="modal-body">
-          {/* 既存/新規切り替え */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          {error && <p className="form-error" role="alert">{error}</p>}
+          {uncertain && <p role="alert">保存結果が未確認です。再読み込みや別の登録をせず、同じ内容で保存結果を確認してください。</p>}
+          {checkList && <p role="alert">保存結果が未確認です。再保存せず、この画面を閉じて見込み・顧客の一覧を確認してください。</p>}
+          <fieldset disabled={saving || uncertain || checkList} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+          {/* 既存/新規/顧客未定切り替え */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
             <button
               className={`filter-tab ${mode === 'existing' ? 'active' : ''}`}
               onClick={() => handleModeChange('existing')}
@@ -120,7 +162,15 @@ function AddModal({ onSave, onClose, existingCustomers }: {
             >
               新規顧客
             </button>
+            <button
+              className={`filter-tab ${mode === 'undecided' ? 'active' : ''}`}
+              disabled={!newProspectReady}
+              onClick={() => handleModeChange('undecided')}
+            >
+              顧客未定
+            </button>
           </div>
+          {!newProspectReady && <p>顧客未定の登録は準備中です</p>}
 
           <div className="form-grid">
             {mode === 'existing' ? (
@@ -228,7 +278,7 @@ function AddModal({ onSave, onClose, existingCustomers }: {
                   </>
                 )}
               </>
-            ) : (
+            ) : mode === 'new' ? (
               <>
                 <div style={{ display: 'flex', gap: 8, gridColumn: '1/-1' }}>
                   <button
@@ -261,7 +311,7 @@ function AddModal({ onSave, onClose, existingCustomers }: {
                   <input className="form-input" value={form.customer_name_kana} onChange={e => set('customer_name_kana', e.target.value)} placeholder="やまだ たろう" />
                 </label>
               </>
-            )}
+            ) : <p style={{ gridColumn: '1/-1' }}>顧客を作らずに新規案件を登録します。顧客が決まったら、この見込みの詳細から設定できます。既存発電所の引継ぎは、発電所詳細の「所有者を変更」から進めてください。</p>}
             <label className="form-label required">
               発電所名
               <input className="form-input" value={form.project_name} onChange={e => set('project_name', e.target.value)} placeholder="鹿嶋市武井" />
@@ -300,10 +350,15 @@ function AddModal({ onSave, onClose, existingCustomers }: {
               <input className="form-input" type="date" {...dateInputRange()} value={form.lead_date} onChange={e => set('lead_date', e.target.value)} />
             </label>
           </div>
+          </fieldset>
           <div className="modal-footer">
-            <button className="btn btn-sub" onClick={onClose}>キャンセル</button>
-            <button className="btn btn-main" onClick={handleSave} disabled={saving || !form.customer_name.trim() || !form.project_name.trim()}>
-              {saving ? '保存中...' : '保存する'}
+            <button className="btn btn-sub" disabled={saving || uncertain} onClick={close}>{checkList ? '閉じて一覧を確認' : 'キャンセル'}</button>
+            <button className="btn btn-main" onClick={handleSave} disabled={saving || checkList || !form.project_name.trim()
+              || (mode === 'undecided' && !newProspectReady)
+              || (mode !== 'undecided' && !form.customer_name.trim())
+              || (mode === 'existing' && (!selectedCustomer || !form.existing_customer_id))
+              || (mode === 'new' && customerType === 'corporate' && !(form.company_name ?? '').trim())}>
+              {saving ? '保存中...' : uncertain ? '同じ内容で保存結果を確認' : '保存する'}
             </button>
           </div>
         </div>
@@ -320,6 +375,7 @@ export function Prospects({
   onViewProject,
   onViewCustomer,
   onViewExistingProject,
+  newProspectReady,
 }: {
   prospects: Prospect[]
   customers: Customer[]
@@ -328,6 +384,7 @@ export function Prospects({
   onViewProject: (customerId: number) => void
   onViewCustomer: (customerId: number) => void
   onViewExistingProject?: (projectId:number)=>void
+  newProspectReady?: boolean
 }) {
   const toast = useToast()
   // 複数選択フィルター: 空配列 = 全件、非空 = OR 条件で絞り込み
@@ -413,9 +470,9 @@ export function Prospects({
     return result
   }, [prospects, customers])
 
-  async function handleAdd(input: ProspectInput) {
+  async function handleAdd(input: ProspectInput, operationKey: string) {
     try {
-      await createProspect(input)
+      await createProspect(input, operationKey)
       setShowAdd(false)
       onReload()
       toast('見込みを追加しました')
@@ -522,20 +579,22 @@ export function Prospects({
                   }}>
                     {prospectCustomerId(p) ? (
                       <span style={{ color: '#2563eb', cursor: 'pointer', textDecoration: 'underline' }}>{p.customer_name}</span>
-                    ) : p.customer_name}
+                    ) : p.new_project_id ? '顧客未定' : p.customer_name}
                   </td>
                   <td style={tdStyle} onClick={e => {
-                    if(p.ownership_project_id&&onViewExistingProject){e.stopPropagation();onViewExistingProject(p.ownership_project_id)}
+                    if(p.new_project_id&&onViewExistingProject){e.stopPropagation();onViewExistingProject(p.new_project_id)}
+                    else if(p.ownership_project_id&&onViewExistingProject){e.stopPropagation();onViewExistingProject(p.ownership_project_id)}
                     else if (p.converted_customer_id) {
                       e.stopPropagation()
                       onViewProject(p.converted_customer_id)
                     }
                   }}>
-                    {p.converted_customer_id||p.ownership_project_id ? (
+                    {p.converted_customer_id||p.ownership_project_id||p.new_project_id ? (
                       <span style={{ color: '#2563eb', cursor: 'pointer', textDecoration: 'underline' }}>{p.project_name}</span>
                     ) : p.project_name}
                   </td>
                   <td style={tdStyle}>
+                    {p.new_project_id!=null&&<span className="prospect-badge">{p.converted_customer_id?'新規案件':'新規案件・顧客未定'}</span>}
                     {p.ownership_project_id&&<span className="prospect-badge">{ownershipProspectLabel(p)}</span>}
                     {p.loan_company && (
                       <span style={{ background: '#e0f2fe', color: '#0369a1', fontSize: 11.5, fontWeight: 600, borderRadius: 99, padding: '2px 8px' }}>
@@ -549,7 +608,7 @@ export function Prospects({
                   <td style={tdStyle}><ContractBadge status={p.contract_status} /></td>
                   <td style={tdStyle} onClick={e => e.stopPropagation()}>
                     <div className="row-actions">
-                      {p.ownership_project_id?<button className="btn btn-sub btn-sm" onClick={e=>{e.stopPropagation();onViewDetail(p.id)}}>手続き</button>:<button className="btn-icon btn-icon--danger" onClick={e => handleDelete(e, p)}>✕</button>}
+                      {p.ownership_project_id||p.new_project_id?<button className="btn btn-sub btn-sm" onClick={e=>{e.stopPropagation();onViewDetail(p.id)}}>手続き</button>:<button className="btn-icon btn-icon--danger" onClick={e => handleDelete(e, p)}>✕</button>}
                     </div>
                   </td>
                 </tr>
@@ -562,7 +621,7 @@ export function Prospects({
         </div>
       </div>
 
-      {showAdd && <AddModal onSave={handleAdd} onClose={() => setShowAdd(false)} existingCustomers={existingCustomers} />}
+      {showAdd && <AddModal onSave={handleAdd} onClose={() => { setShowAdd(false); onReload() }} existingCustomers={existingCustomers} newProspectReady={newProspectReady} />}
     </div>
   )
 }

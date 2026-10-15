@@ -786,10 +786,10 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           onClick={() => onViewCustomer(customer.id)}
         >
           {customer.company_name ?? customer.name}
-        </button>:<span>現在の所有者：未確認{project.old_owner?` ／ 前の所有者：${project.old_owner}`:''}</span>}
+        </button>:<span>{project.customer_pending?'顧客未定（新規案件）':`現在の所有者：未確認${project.old_owner?` ／ 前の所有者：${project.old_owner}`:''}`}</span>}
         <span style={{ fontSize: 13, color: '#64748b' }}>発電所：</span>
         <b style={{ fontSize: 'inherit' }}>{project.plant_name || project.project_name}</b>
-        {onOwnershipTransfer&&contract&&<button className="btn btn-main" onClick={onOwnershipTransfer}>所有者を変更</button>}
+        {onOwnershipTransfer&&contract&&!project.customer_pending&&<button className="btn btn-main" onClick={onOwnershipTransfer}>所有者を変更</button>}
         <button className="back-btn" onClick={onBack} style={{ marginLeft: 'auto' }}>← 戻る</button>
       </div>
 

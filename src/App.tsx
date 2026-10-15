@@ -36,7 +36,7 @@ import {OwnershipTransferHistory} from './components/OwnershipTransferHistory'
 import {ProjectManagementActions} from './components/ProjectManagementActions'
 import {BillingCycleSettings} from './components/BillingCycleSettings'
 import {exactRoutinePlan,type AddRoutineInvoice} from './lib/routine-invoice'
-import {createCustomer} from './lib/actions'
+import {createCustomer,assignNewProspectCustomer} from './lib/actions'
 
 type ViewKey =
   | 'dashboard'
@@ -359,12 +359,12 @@ function MainApp() {
       </aside>
 
       <main className="main">
-        {!hasSupabaseEnv && (
+        {!hasSupabaseEnv && import.meta.env.MODE!=='operator-demo' && (
           <div className="notice">
             モックデータで表示中 — Supabase に接続するには <code>.env</code> を作成してください
           </div>
         )}
-        {billingRuntimePreview&&<div className="notice"><strong>新しい請求・所有者変更の確認用モード</strong><br/>本番DBは読み書きしません。表示・導線の確認専用です。</div>}
+        {billingRuntimePreview&&<div className="notice"><strong>{import.meta.env.MODE==='operator-demo'?'練習環境：本番と同じアプリ画面':'新しい請求・所有者変更の確認用モード'}</strong><br/>{import.meta.env.MODE==='operator-demo'?'保存はこの画面内の架空データだけに反映します。本番DBに接続しません。再読み込みで最初に戻ります。':'本番DBは読み書きしません。表示・導線の確認専用です。'}</div>}
         {error && <div className="notice notice-error">{error}</div>}
 
         {billingRuntimeEnabled&&pendingBilling&&<div className="notice"><p>前回の保存結果が未確認です。端末に一時保存した同じ操作で確認します（契約情報等を含み、確認完了後に削除します）。</p><button className="btn" onClick={()=>void saveRuntime(null).catch(e=>setError(e instanceof Error?e.message:String(e)))}>保存結果を再確認</button></div>}
@@ -396,7 +396,7 @@ function MainApp() {
               <ProjectDetailView
                 ownershipStatus={runtime?.ownershipWorkflowReady&&prospects.some(p=>p.ownership_project_id===projectDetail.project.id&&p.ownership_state==='open')?<div className="notice">
                   引継ぎの見込み：{prospects.filter(p=>p.ownership_project_id===projectDetail.project.id&&p.ownership_state==='open').map(p=><button type="button" className="link-btn" key={p.id} onClick={()=>void navToProspectDetail(p.id)}>{p.candidate_customer_id?`${p.customer_name}（手続き中）`:'引継ぎ先未定'}</button>)}
-                </div>:undefined}
+                </div>:projectDetail.project.customer_pending?<div className="notice">顧客未定：{prospects.filter(p=>p.new_project_id===projectDetail.project.id).map(p=><button type="button" className="link-btn" key={p.id} onClick={()=>void navToProspectDetail(p.id)}>見込みを開いて顧客を設定</button>)}</div>:undefined}
                 onAddRoutine={runtime?addRoutineInvoice:undefined}
                 billingCycleSettings={runtime&&projectDetail.contract?<BillingCycleSettings key={`${projectDetail.project.id}:${JSON.stringify(runtime.cycleRules)}`} contract={projectDetail.contract} units={runtime.units} rules={runtime.cycleRules??[]}
                   onSave={runtime.cycleRulesReady?async value=>{await saveRuntime({action:'cycle_rule',value:{projectId:projectDetail.project.id,contract:projectDetail.contract,
@@ -500,6 +500,7 @@ function MainApp() {
             )}
             {view === 'prospects' && (
               <Prospects
+                newProspectReady={runtime?.newProspectReady===true}
                 prospects={prospects}
                 customers={customers}
                 onReload={reloadProspects}
@@ -522,6 +523,10 @@ function MainApp() {
                 onCreateCustomer={createOwnershipCustomer}
                 onReloadCustomers={reloadOwnershipCustomers}
                 onLoadOwnershipProject={async id=>{const detail=await getProjectDetail(id);if(!detail)throw Error('発電所を取得できません');return detail.project}}
+                onSetNewCustomer={runtime?.newProspectReady?async(pr,project,customerId,operationKey)=>{
+                  const updated=await assignNewProspectCustomer(pr,project,customerId,operationKey)
+                  setProspectDetail(updated);await loadAll(true);return updated
+                }:undefined}
                 pendingCustomerInput={pendingCustomerInput} onPendingCustomerChange={setPendingCustomerInput}
                 onOwnershipComplete={runtime?.ownershipWorkflowReady?async pr=>{
                   const detail=await getProjectDetail(pr.ownership_project_id!)

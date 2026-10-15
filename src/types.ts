@@ -22,6 +22,7 @@ export type Project = {
   updated_at?: string | null
   id: number
   customer_id: number | null
+  customer_pending?: boolean
   previous_owner_customer_id?: number | null
   owner_unconfirmed_on?: string | null
   summary_notes?: string | null
@@ -362,6 +363,7 @@ export type ProspectContractStatus = '未' | '完了' | '不可'
 
 export type Prospect = {
   id: number
+  new_project_id?: number | null
   ownership_project_id?: number | null
   candidate_customer_id?: number | null
   ownership_state?: 'open' | 'completed' | 'cancelled' | null
@@ -397,6 +399,7 @@ export type Prospect = {
 }
 
 export type ProspectInput = {
+  customer_undecided?: boolean
   customer_name: string
   customer_name_kana: string
   project_name: string

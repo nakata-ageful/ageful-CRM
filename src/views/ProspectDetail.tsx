@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef,useState } from 'react'
 import type { Prospect, ProspectApplyStatus, ProspectContractStatus,Customer,CustomerInput,Project } from '../types'
 import {Modal} from '../components/Modal'
 import {OwnershipWorkflowPanel} from '../components/OwnershipWorkflowPanel'
@@ -281,7 +281,7 @@ export function ProspectDetailView({
   onViewCustomer,
   onViewProject,
   onViewExistingProject,customers=[],onOwnershipAction,onOwnershipComplete,onCreateCustomer,onReloadCustomers,
-  pendingCustomerInput,onPendingCustomerChange,onLoadOwnershipProject,
+  pendingCustomerInput,onPendingCustomerChange,onLoadOwnershipProject,onSetNewCustomer,
 }: {
   prospect: Prospect
   onBack: () => void
@@ -295,11 +295,13 @@ export function ProspectDetailView({
   onReloadCustomers?:()=>Promise<readonly RegistrationCustomer[]>
   pendingCustomerInput?:CustomerInput|null;onPendingCustomerChange?:(input:CustomerInput|null)=>void
   onLoadOwnershipProject?:(id:number)=>Promise<Project>
+  onSetNewCustomer?:(p:Prospect,project:Project,customerId:number,operationKey:string)=>Promise<Prospect>
 }) {
   const [p, setP] = useState<Prospect>(initial)
   const [saving, setSaving] = useState(false)
   const [error,setError]=useState(''),[candidateOpen,setCandidateOpen]=useState(false),[candidateBusy,setCandidateBusy]=useState(false)
   const [candidateProject,setCandidateProject]=useState<Project|null>(null)
+  const assignmentOperation=useRef<{customerId:number;key:string}|null>(null)
 
   async function save(updated: Partial<Omit<Prospect, 'id' | 'created_at'>>) {
     setError('')
@@ -333,11 +335,26 @@ export function ProspectDetailView({
         {saving && <span style={{ fontSize: 12, color: '#94a3b8' }}>保存中...</span>}
         {p.converted_customer_id && (<>
           <button className="btn btn-sub btn-sm" onClick={() => onViewCustomer(p.converted_customer_id!)}>顧客詳細 →</button>
-          <button className="btn btn-sub btn-sm" onClick={() => onViewProject(p.converted_customer_id!)}>案件詳細 →</button>
+          <button className="btn btn-sub btn-sm" onClick={() => p.new_project_id&&onViewExistingProject?onViewExistingProject(p.new_project_id):onViewProject(p.converted_customer_id!)}>案件詳細 →</button>
         </>)}
       </div>
 
       {error&&<p role="alert" className="form-error">{error}</p>}
+      {p.new_project_id!=null&&<section className="card">
+        <h3>{p.converted_customer_id?'新規案件':'新規案件・顧客未定'}</h3>
+        <div className="management-action-grid">
+          {onViewExistingProject&&<button type="button" className="btn btn-sub" onClick={()=>onViewExistingProject(p.new_project_id!)}>発電所を開く</button>}
+          {!p.converted_customer_id&&onLoadOwnershipProject&&onSetNewCustomer&&<button type="button" className="btn btn-main" disabled={candidateBusy||saving} onClick={async()=>{
+            setCandidateBusy(true);setError('');try{setCandidateProject(await onLoadOwnershipProject(p.new_project_id!));setCandidateOpen(true)}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setCandidateBusy(false)}
+          }}>顧客を設定</button>}
+        </div>
+        {candidateOpen&&candidateProject&&onSetNewCustomer&&onCreateCustomer&&onReloadCustomers&&<Modal title="顧客を設定" width={760} closeDisabled={candidateBusy} onClose={()=>setCandidateOpen(false)}>
+          <OwnershipWorkflowPanel candidateOnly initialCustomer project={candidateProject} customers={customers}
+            onBusyChange={setCandidateBusy} onCreateCustomer={onCreateCustomer} onReloadCustomers={onReloadCustomers}
+            pendingCustomerInput={pendingCustomerInput} onPendingCustomerChange={onPendingCustomerChange}
+            onSave={async(_action,id)=>{if(!id)throw Error('顧客を選択してください');if(assignmentOperation.current?.customerId!==id)assignmentOperation.current={customerId:id,key:crypto.randomUUID()};setP(await onSetNewCustomer(p,candidateProject,id,assignmentOperation.current.key));setCandidateOpen(false)}}/>
+        </Modal>}
+      </section>}
       {isOwnershipProspect(p)&&<section className="card">
         <h3>既存発電所の引継ぎ：{ownershipProspectLabel(p)}</h3>
         <p>引継ぎ先：{p.candidate_customer_id?p.customer_name:'未定'}</p>
@@ -409,7 +426,7 @@ export function ProspectDetailView({
             <input
               type="text" className="form-input" style={{ marginTop: 4 }}
               value={p.customer_name}
-              readOnly={isOwnershipProspect(p)}
+              readOnly={isOwnershipProspect(p)||p.new_project_id!=null}
               onChange={e => save({ customer_name: e.target.value })}
             />
           </div>
@@ -418,7 +435,7 @@ export function ProspectDetailView({
             <input
               type="text" className="form-input" style={{ marginTop: 4 }}
               value={p.customer_name_kana ?? ''}
-              readOnly={isOwnershipProspect(p)}
+              readOnly={isOwnershipProspect(p)||p.new_project_id!=null}
               onChange={e => save({ customer_name_kana: e.target.value || null })}
               placeholder="やまだ たろう"
             />
@@ -428,7 +445,7 @@ export function ProspectDetailView({
             <input
               type="text" className="form-input" style={{ marginTop: 4 }}
               value={p.project_name}
-              readOnly={isOwnershipProspect(p)}
+              readOnly={isOwnershipProspect(p)||p.new_project_id!=null}
               onChange={e => save({ project_name: e.target.value })}
             />
           </div>

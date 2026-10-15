@@ -802,7 +802,50 @@ export async function bulkImportBilling(
 
 // ── Prospect CRUD ─────────────────────────────────────────
 
-export async function createProspect(input: ProspectInput): Promise<Prospect> {
+const pendingDemoRequests=new Map<string,{fingerprint:string;id:number}>()
+async function createUndecidedProspect(input:ProspectInput,operationKey:string):Promise<Prospect>{
+  if(!input.project_name.trim()||input.existing_customer_id||input.customer_name.trim())throw Error('顧客未定では発電所名だけを指定し、顧客は選ばないでください')
+  if(hasSupabaseEnv){
+    const value={...input,equipment:toInt(input.equipment)?.toString()??'',land_cost:toInt(input.land_cost)?.toString()??'',loan_amount:toInt(input.loan_amount)?.toString()??'',panel_kw:toFloat(input.panel_kw)?.toString()??'',
+      apply_tasks:buildTaskMap('apply',input.loan_company),contract_tasks:buildTaskMap('contract',input.loan_company),apply_sub_tasks:buildSubTaskMap('apply',input.loan_company),contract_sub_tasks:buildSubTaskMap('contract',input.loan_company)}
+    const {data,error}=await db().rpc('new_prospect_write',{p_key:operationKey,p_request:{action:'create',value}})
+    if(error)throw error
+    const {data:row,error:readError}=await db().from('prospects').select('*').eq('id',data.prospectId).single()
+    if(readError)throw Error('案件の保存は完了しましたが、結果を読み込めませんでした。同じ内容で保存結果を確認してください')
+    return row as Prospect
+  }
+  const fingerprint=JSON.stringify(input),previous=pendingDemoRequests.get(operationKey)
+  if(previous){if(previous.fingerprint!==fingerprint)throw Error('同じ操作で別の内容は保存できません');return prospectStore.getById(previous.id)!}
+  const project=projectStore.create({customer_id:null,customer_pending:true,project_name:input.project_name.trim(),plant_name:input.project_name.trim(),site_address:input.site_address||null,panel_kw:toFloat(input.panel_kw)} as Omit<Project,'id'|'created_at'>)
+  contractStore.create({project_id:project.id} as Omit<Contract,'id'|'created_at'>)
+  const row=prospectStore.create({new_project_id:project.id,customer_name:'顧客未定',customer_name_kana:null,project_name:project.project_name,
+    loan_company:input.loan_company||null,equipment:toInt(input.equipment),land_cost:toInt(input.land_cost),loan_amount:toInt(input.loan_amount),
+    apply_status:'未',contract_status:'未',apply_tasks:buildTaskMap('apply',input.loan_company),contract_tasks:buildTaskMap('contract',input.loan_company),
+    apply_sub_tasks:buildSubTaskMap('apply',input.loan_company),contract_sub_tasks:buildSubTaskMap('contract',input.loan_company),apply_memo:null,contract_memo:null,
+    site_address:input.site_address||null,panel_kw:toFloat(input.panel_kw),sales_company:input.sales_company||null,referrer:input.referrer||null,lead_date:input.lead_date||null,
+    apply_submit_date:null,apply_result_date:null,sale_contract_date:null,land_contract_date:null,loan_apply_date:null,handover_date:null,converted_customer_id:null,converted_at:null})
+  pendingDemoRequests.set(operationKey,{fingerprint,id:row.id});return row
+}
+
+/** Initial customer assignment is not an ownership transfer and never recalculates invoices. */
+export async function assignNewProspectCustomer(prospect:Prospect,project:Project,customerId:number,operationKey:string):Promise<Prospect>{
+  if(!prospect.new_project_id||prospect.new_project_id!==project.id)throw Error('新規案件の発電所を確認してください')
+  if(hasSupabaseEnv){
+    const {error}=await db().rpc('new_prospect_write',{p_key:operationKey,p_request:{action:'assign',value:{prospect,project,customerId}}})
+    if(error)throw error
+    const {data,error:readError}=await db().from('prospects').select('*').eq('id',prospect.id).single()
+    if(readError)throw Error('顧客の設定は完了しましたが、結果を読み込めませんでした。見込みを開き直して確認してください')
+    return data as Prospect
+  }
+  const current=prospectStore.getById(prospect.id),p=projectStore.getById(project.id),c=customerStore.getById(customerId)
+  if(!current||!p||!c||!p.customer_pending||p.customer_id!=null||current.converted_customer_id!=null)throw Error('顧客の設定状態が変わりました。開き直してください')
+  if(JSON.stringify(current)!==JSON.stringify(prospect)||JSON.stringify(p)!==JSON.stringify(project))throw Error('案件が更新されています。開き直してください')
+  projectStore.update(p.id,{customer_id:c.id,customer_pending:false})
+  return prospectStore.update(current.id,{converted_customer_id:c.id,converted_at:new Date().toISOString(),customer_name:c.is_corporate&&c.company_name?c.company_name:c.name,customer_name_kana:c.is_corporate?c.company_name_kana??c.name_kana:c.name_kana})!
+}
+
+export async function createProspect(input: ProspectInput, operationKey:string=crypto.randomUUID()): Promise<Prospect> {
+  if(input.customer_undecided)return createUndecidedProspect(input,operationKey)
   // 顧客+案件を同時作成（見込み段階から案件情報を入力可能にするため）
   // 既存顧客IDが指定されていれば、新規顧客は作らずに使い回し、フリガナが未設定なら補完する。
   let customer: Customer
@@ -901,6 +944,14 @@ export async function createProspect(input: ProspectInput): Promise<Prospect> {
 export async function updateProspect(id: number, data: Partial<Omit<Prospect, 'id' | 'created_at'>>, customerId?: number | null): Promise<void> {
   const current=hasSupabaseEnv?(await db().from('prospects').select('*').eq('id',id).single()).data as Prospect|null:prospectStore.getAll().find(p=>p.id===id)
   if(!current)throw Error('見込みを取得できません')
+  if(current.new_project_id!=null){
+    const identity=['new_project_id','ownership_project_id','candidate_customer_id','ownership_state','converted_customer_id','converted_at','customer_name','customer_name_kana','project_name']
+    if(Object.keys(data).some(k=>identity.includes(k)))throw Error('顧客は「顧客を設定」から変更してください')
+    if(!hasSupabaseEnv){prospectStore.update(id,data);return}
+    const {error}=await db().from('prospects').update(data).eq('id',id).select('id').single()
+    if(error)throw error
+    return
+  }
   if(isOwnershipProspect(current)){
     assertOwnershipProspectEdit(current,data)
     if(!hasSupabaseEnv){prospectStore.update(id,data);return}
@@ -1010,6 +1061,9 @@ async function syncProspectToCustomerProject(
 }
 
 export async function deleteProspect(id: number): Promise<void> {
+  const prospect=hasSupabaseEnv?(await db().from('prospects').select('*').eq('id',id).single()).data as Prospect|null:prospectStore.getById(id)
+  if(prospect?.new_project_id!=null)throw Error('発電所に紐づく見込みは削除できません')
+  if(prospect&&isOwnershipProspect(prospect))throw Error('引継ぎの見込みは取下げ操作で残してください')
   if (!hasSupabaseEnv) { prospectStore.delete(id); return }
   const { error } = await db().from('prospects').delete().eq('id', id)
   if (error) throw error
@@ -1025,6 +1079,7 @@ async function maySyncLegacyProspect(customerId:number):Promise<boolean>{
 }
 
 export async function convertProspectToCustomer(prospect: Prospect): Promise<number> {
+  if(prospect.new_project_id!=null)throw Error('新規案件の顧客は「顧客を設定」から登録してください')
   if(isOwnershipProspect(prospect))throw Error('既存発電所の引継ぎは「所有者を確定する」から行ってください')
   // 顧客作成
   const customer = await createCustomer({
@@ -1174,6 +1229,7 @@ export async function exportAllData(): Promise<ExportData> {
     if(error)throw error
     if(data?.version!==2||!Array.isArray(data.billing_units)||!Array.isArray(data.ownership_transfers))throw Error('新しい請求記録を含むバックアップを取得できませんでした')
     if(data.ownership_workflow_ready===true&&!Array.isArray(data.ownership_workflow_events))throw Error('引継ぎ履歴を含むバックアップを取得できませんでした')
+    if(data.new_prospect_ready===true&&!Array.isArray(data.new_prospect_events))throw Error('顧客未定の設定履歴を含むバックアップを取得できませんでした')
     return data as ExportData
   }
   if (!hasSupabaseEnv) {

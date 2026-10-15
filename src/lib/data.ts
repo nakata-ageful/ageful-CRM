@@ -188,7 +188,7 @@ export async function getProjects(): Promise<ProjectRow[]> {
         maintenance_start_date: contract?.maintenance_start_date ?? null,
         created_at: p.created_at,
         updated_at: (p as { updated_at?: string | null }).updated_at ?? p.created_at,
-        customer_name: c?.company_name ?? c?.name ?? '所有者未確認',
+        customer_name: c?.company_name ?? c?.name ?? (p.customer_pending?'顧客未定（新規案件）':'所有者未確認'),
         company_name: c?.company_name ?? null,
         search_text: buildProjectSearchText(
           p as unknown as Record<string, unknown>,
@@ -211,7 +211,7 @@ export async function getProjects(): Promise<ProjectRow[]> {
   return (data ?? []).map((row: Record<string, unknown>) => {
     const cust = row.customers as Record<string, unknown> | null
     const con = (Array.isArray(row.contracts) ? row.contracts[0] : row.contracts) as Record<string, unknown> | null
-    const customerName = (cust?.company_name as string) ?? (cust?.name as string) ?? '所有者未確認'
+    const customerName = (cust?.company_name as string) ?? (cust?.name as string) ?? (row.customer_pending?'顧客未定（新規案件）':'所有者未確認')
     const companyName = (cust?.company_name as string) ?? null
     // ネストした customers / contracts は検索テキストから除外して project 本体のみ渡す
     const { customers: _c, contracts: _ct, ...projOnly } = row

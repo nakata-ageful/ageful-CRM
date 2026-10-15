@@ -4,11 +4,12 @@ import {customerChoiceLabel} from '../lib/customer-search'
 import {CustomerFields} from './CustomerFields'
 import {definiteCustomerRejection,emptyCustomerInput,registrationMatches,validateCustomerRegistration,type RegistrationCustomer} from '../lib/customer-registration'
 
-export function CustomerRegistration({customers,currentOwnerId,onCreate,onReload,onSelect,onCancel,onBusyChange,pendingInput,onPendingChange}:{
+export function CustomerRegistration({customers,currentOwnerId,onCreate,onReload,onSelect,onCancel,onBusyChange,pendingInput,onPendingChange,initialCustomer=false}:{
   customers:readonly RegistrationCustomer[];currentOwnerId:number;onCreate:(input:CustomerInput)=>Promise<RegistrationCustomer>
   onReload:()=>Promise<readonly RegistrationCustomer[]>;onSelect:(customer:RegistrationCustomer,created:boolean)=>void
   onCancel:()=>void;onBusyChange:(busy:boolean)=>void
   pendingInput?:CustomerInput|null;onPendingChange?:(input:CustomerInput|null)=>void
+  initialCustomer?:boolean
 }){
   const [form,setForm]=useState<CustomerInput>(()=>({...pendingInput??emptyCustomerInput})),[busy,setBusy]=useState(false),[error,setError]=useState('')
   const [separate,setSeparate]=useState(false),[uncertain,setUncertain]=useState(!!pendingInput),[checked,setChecked]=useState<readonly RegistrationCustomer[]|null>(null)
@@ -40,7 +41,7 @@ export function CustomerRegistration({customers,currentOwnerId,onCreate,onReload
     finally{finish()}
   }
   return <section className="ownership-new-customer" aria-label="新規顧客登録">
-    <h4>新規顧客登録</h4><p>ここでは顧客だけ登録します。所有者変更は最後の確認で保存するまで行いません。変更を中止しても顧客は残ります。</p>
+    <h4>新規顧客登録</h4><p>{initialCustomer?'顧客を登録した後、「顧客を設定」でこの案件に紐づけます。設定を中止しても顧客は残ります。':'ここでは顧客だけ登録します。所有者変更は最後の確認で保存するまで行いません。変更を中止しても顧客は残ります。'}</p>
     {error&&<p className="form-error" role="alert">{error}</p>}
     {uncertain&&<div className="ownership-customer-recovery"><p role="alert">登録結果が未確認です。再登録せず、まず最新の顧客一覧を確認してください。該当する人がいれば、その顧客を選択します。ページを再読み込みする前に「登録結果を確認」を押してください。</p>
       <button type="button" className="btn btn-sub" disabled={busy} onClick={()=>void check()}>登録結果を確認</button>

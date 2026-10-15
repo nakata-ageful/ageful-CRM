@@ -138,12 +138,12 @@ function AddModal({ onSave, onClose, existingCustomers, newProspectReady }: {
 
   return (
     <div className="modal-overlay" onClick={close}>
-      <div className="modal-box" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
+      <div className="modal-box" role="dialog" aria-modal="true" aria-label="案件を追加" style={{ maxWidth: 560, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+        <div className="modal-header" style={{ flexShrink: 0 }}>
           <h2 className="modal-title">案件を追加</h2>
           <button className="modal-close" disabled={saving || uncertain} onClick={close}>✕</button>
         </div>
-        <div className="modal-body">
+        <div className="modal-body" style={{ minHeight: 0 }}>
           {error && <p className="form-error" role="alert">{error}</p>}
           {uncertain && <p role="alert">保存結果が未確認です。再読み込みや別の登録をせず、同じ内容で保存結果を確認してください。</p>}
           {checkList && <p role="alert">保存結果が未確認です。再保存せず、この画面を閉じて見込み・顧客の一覧を確認してください。</p>}
@@ -351,7 +351,8 @@ function AddModal({ onSave, onClose, existingCustomers, newProspectReady }: {
             </label>
           </div>
           </fieldset>
-          <div className="modal-footer">
+        </div>
+          <div className="modal-footer" style={{ position: 'static', flexShrink: 0, margin: 0, padding: '16px 24px 20px', flexWrap: 'wrap' }}>
             <button className="btn btn-sub" disabled={saving || uncertain} onClick={close}>{checkList ? '閉じて一覧を確認' : 'キャンセル'}</button>
             <button className="btn btn-main" onClick={handleSave} disabled={saving || checkList || !form.project_name.trim()
               || (mode === 'undecided' && !newProspectReady)
@@ -361,7 +362,6 @@ function AddModal({ onSave, onClose, existingCustomers, newProspectReady }: {
               {saving ? '保存中...' : uncertain ? '同じ内容で保存結果を確認' : '保存する'}
             </button>
           </div>
-        </div>
       </div>
     </div>
   )

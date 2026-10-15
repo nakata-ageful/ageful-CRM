@@ -14,6 +14,7 @@ trigger.props.onMouseEnter();assert(pos,'Hover opens without a click');assert.eq
 tree.props.onMouseLeave();assert.equal(pos,null);trigger.props.onFocus();assert(pos,'Keyboard focus also opens')
 tree=hm.exports.HelpNote({title:'説明',children:'本文'});assert.equal(tree.props.children[0].props['aria-describedby'],'test-note')
 const css=fs.readFileSync('src/components/HelpNote.css','utf8');assert(css.includes('position:fixed')&&css.includes(':focus-visible'));assert(source.includes('onMouseEnter={show}')&&source.includes('onFocus={show}')&&source.includes("e.key==='Escape'"))
+assert(css.includes('width:16px; height:16px')&&css.includes('inset:-8px'),'Small visible icon with a separate invisible touch target')
 assert(fs.readFileSync('src/styles.css','utf8').includes('button:not(.btn):not(.help-note-mark)'),'Generic editor buttons must not enlarge the help icon')
 const review=fs.readFileSync('src/components/BillingScheduleChangeReview.tsx','utf8');assert(!review.includes('個別確認'));assert(review.includes('請求詳細の予定日も変更しますか？'))
 console.log('PASS: compact hover help, focus/touch support, dismissible fixed note, non-submit trigger and unchanged schedule wording')

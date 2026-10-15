@@ -125,6 +125,7 @@ type Props = {
   onAddSchedule?:AddBillingOccurrence
   onAddRoutine?:AddRoutineInvoice
   onOwnershipTransfer?:()=>void
+  ownershipStatus?:ReactNode
   billingUnits?:readonly TransferBillingUnit[]
   onAddDebit?:(input:NewDebitPlan)=>Promise<void>
   onSaveBillingPlan?:(choices:TransferBillingChoice[],reason:string)=>Promise<void>
@@ -158,7 +159,7 @@ function writeTabToHash(t: Tab) {
   }
 }
 
-export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, onViewMaintenance,billingHistory,onSaveInvoice,onCheckBillingPending,onSavePeriod,onAddSchedule,onAddRoutine,onOwnershipTransfer,billingUnits,onAddDebit,onSaveBillingPlan,managementTools,changeHistory,billingCycleSettings,onRecordRemoval }: Props) {
+export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, onViewMaintenance,billingHistory,onSaveInvoice,onCheckBillingPending,onSavePeriod,onAddSchedule,onAddRoutine,onOwnershipTransfer,billingUnits,onAddDebit,onSaveBillingPlan,managementTools,changeHistory,billingCycleSettings,onRecordRemoval,ownershipStatus }: Props) {
   const toast = useToast()
   const [scheduleReview,setScheduleReview]=useState<ScheduleDateReview|null>(null)
   const [scheduleFailure,setScheduleFailure]=useState('')
@@ -185,7 +186,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       .then(d => { if (!cancelled) setBillingDetail(d) })
       .finally(() => { if (!cancelled) setBillingDetailLoading(false) })
     return () => { cancelled = true }
-  }, [tab, project.id])
+  }, [tab, project.id, project.customer_id, project.owner_unconfirmed_on])
   async function reloadBillingDetail() {
     const d = await getBillingDetail(project.id)
     setBillingDetail(d)
@@ -780,12 +781,12 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
     <>
       <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 13, color: '#64748b' }}>顧客：</span>
-        <button
+        {customer&&project.customer_id!=null?<button
           className="link-btn"
-          onClick={() => onViewCustomer(project.customer_id)}
+          onClick={() => onViewCustomer(customer.id)}
         >
           {customer.company_name ?? customer.name}
-        </button>
+        </button>:<span>現在の所有者：未確認{project.old_owner?` ／ 前の所有者：${project.old_owner}`:''}</span>}
         <span style={{ fontSize: 13, color: '#64748b' }}>発電所：</span>
         <b style={{ fontSize: 'inherit' }}>{project.plant_name || project.project_name}</b>
         {onOwnershipTransfer&&contract&&<button className="btn btn-main" onClick={onOwnershipTransfer}>所有者を変更</button>}
@@ -793,6 +794,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       </div>
 
       {/* タブ */}
+      {ownershipStatus}
       <div className="tab-bar">
         {TABS.filter(t=>t==='管理設定'?!!managementTools:t==='変更履歴'?!!changeHistory:true).map(t => (
           <button
@@ -1085,7 +1087,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       {tab==='請求情報'&&billingCycleSettings}
       {/* ── 請求詳細タブ（旧・独立の請求詳細画面を埋め込み） ── */}
       {tab === '請求詳細' && (
-        billingDetailLoading && !billingDetail ? (
+        (billingDetailLoading && !billingDetail || billingDetail&&billingDetail.project.customer_id!==project.customer_id) ? (
           <div className="card loading-card">読み込み中...</div>
         ) : billingDetail ? (
           <BillingDetailView
@@ -1108,7 +1110,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
 
       {/* ── その他タブ ── */}
       {tab==='管理設定'&&<div className="project-management-tab">{managementTools}
-      {billingHistory&&(onAddDebit||(billingUnits&&onSaveBillingPlan))&&<BillingExceptionActions key={project.id} projectId={project.id} owner={customer}
+      {billingHistory&&(onAddDebit||(billingUnits&&onSaveBillingPlan))&&<BillingExceptionActions key={project.id} projectId={project.id} owner={customer??{id:0,name:'所有者未確認'}}
         recipients={billingHistory.recipients} units={billingUnits} onAddDebit={onAddDebit} onSavePlan={onSaveBillingPlan}/>}
       </div>}
       {tab==='変更履歴'&&<div className="project-history-tab">{changeHistory}</div>}

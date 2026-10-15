@@ -315,13 +315,13 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject, emb
     toast('保守情報を保存しました')
   }
 
-  const custName = customer.company_name ?? customer.name
+  const custName = customer?.company_name ?? customer?.name ?? '現在の所有者：未確認'
 
   // Explicit read-only new-ledger input: never show legacy write controls alongside it.
   if (billingHistory) return <div>
     {!embedded && <button className="btn" onClick={onBack}>戻る</button>}
     {!onSaveInvoice&&<p role="status">新しい請求記録の表示確認中です。この画面ではまだ編集できません。</p>}
-    <InvoiceLedgerDetail data={billingHistory} projectId={project.id} onSave={onSaveInvoice} onRecordRemoval={onRecordRemoval} contract={contract} currentRecipientId={customer.id} onAddSchedule={onAddSchedule} onAddRoutine={onAddRoutine} maintenanceStartDate={contract.maintenance_start_date} onSavePeriod={onSavePeriod}/>
+    <InvoiceLedgerDetail data={billingHistory} projectId={project.id} onSave={onSaveInvoice} onRecordRemoval={onRecordRemoval} contract={contract} currentRecipientId={customer?.id??0} onAddSchedule={onAddSchedule} onAddRoutine={onAddRoutine} maintenanceStartDate={contract.maintenance_start_date} onSavePeriod={onSavePeriod}/>
   </div>
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

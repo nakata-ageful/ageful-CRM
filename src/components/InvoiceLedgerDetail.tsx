@@ -93,7 +93,8 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
   const first = initialUnit(units)
   const [focusedId, setFocusedId] = useState<string | null>(null)
   const [editor, setEditor] = useState<{ unitId: string; mode: EditorMode } | null>(null)
-  const candidate=contract&&currentRecipientId?detailPlanCandidate(contract,currentRecipientId,allUnits,today??new Date().toLocaleDateString('sv-SE'),data.managementEvents,data.cycleRules):null
+  const rawCandidate=contract?detailPlanCandidate(contract,currentRecipientId??0,allUnits,today??new Date().toLocaleDateString('sv-SE'),data.managementEvents,data.cycleRules):null
+  const candidate=rawCandidate&&!currentRecipientId?{...rawCandidate,reviewReason:['請求先を選んでください',rawCandidate.reviewReason].filter(Boolean).join('。')}:rawCandidate
   const canCreate=!!onAddSchedule&&!!data.recipients&&isBillingDate(contract?.maintenance_start_date??'')
   const active=first&&!['received','cancelled'].includes(first.lifecycle)
   const focused = units.find(unit => unit.id === focusedId) ?? (active||!candidate?first:undefined)
@@ -133,14 +134,14 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
         <div className="invoice-current-amount">{candidate.amount==null?'金額要確認':fmtYen(candidate.amount)}</div>
         <p className="invoice-current-basis">契約からの参考額 ／ {candidate.method==='direct_debit'?'口座振替':'請求書'}</p>
         <dl className="invoice-current-facts">
-          <div><dt>{canRecord?'請求先（発行時に確認）':'請求先の候補'}</dt><dd>{data.recipientName(candidate.recipientId)}</dd></div>
+          <div><dt>{canRecord?'請求先（発行時に確認）':'請求先の候補'}</dt><dd>{candidate.recipientId>0?data.recipientName(candidate.recipientId):'請求先を選んでください'}</dd></div>
           <div><dt>対象の回</dt><dd>第{candidate.round}回（参考）</dd></div>
           <div className="invoice-period-fact"><dt>保守期間</dt><dd>{candidate.periodStart&&candidate.periodEnd?`${candidate.periodStart} ～ ${candidate.periodEnd}（参考）`:'保守開始日未設定'}</dd></div>
         </dl>
         <BillingDates method={candidate.method==='direct_debit'?'口座振替':'請求書'} scheduledDate={candidate.date} reference/>
         {contract&&<p className="invoice-current-basis">年間総額（税込・請求対象のみ）：{fmtYen(annualBillableTotalInc(contract))}</p>}
         <p className="invoice-reference-help">{canRecord?'請求書を送ったら「発行内容を記録」で請求日を入力してください。':'まだ登録していない予定です。内容を確認して登録してください。'}</p>
-        {candidate.reviewReason&&<p className="billing-overview-notice" role="alert">保守期間要確認：{candidate.reviewReason}</p>}
+        {candidate.reviewReason&&<p className="billing-overview-notice" role="alert">{candidate.recipientId>0?'保守期間要確認：':''}{candidate.reviewReason}</p>}
         {!candidate.periodStart&&<p className="invoice-reference-help">「保守情報」で保守開始日を確認してください。委託契約の開始日とは別の項目です。</p>}
         {canCreate&&<div className="invoice-current-actions">{canRecord&&<button type="button" className="btn btn-main" onClick={()=>setRecording(routine)}>発行内容を記録</button>}<button type="button" className={canRecord?'btn':'btn btn-main'} onClick={()=>setAdding({after:null})}>{candidate.reviewReason?'予定を確認・調整':'予定を登録'}</button>{!canRecord&&!candidate.reviewReason&&<button type="button" className="btn" onClick={()=>setAdding({after:candidate.method==='direct_debit'?'debit':'invoice'})}>{candidate.method==='direct_debit'?'振替結果を記録':'請求内容を入力して発行'}</button>}</div>}
       </>:<p className="invoice-reference-help">{units.length?'追加できる予定候補がありません。「請求情報」の設定と保存済み記録を確認してください。':'この発電所の請求記録はまだありません。「請求情報」で請求方法・予定日を確認してください。'}</p>}

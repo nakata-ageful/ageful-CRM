@@ -1013,7 +1013,7 @@ export function CsvImport({ onReload }: Props) {
         {billingRuntimeEnabled&&<div style={{marginBottom:16}}>
           <button className="btn btn-main" disabled={exporting} onClick={handleFullRuntimeBackup}>全アプリデータを保存（新しい請求・所有者変更履歴を含むJSON）</button>
           <button className="btn" disabled={exporting} onClick={handleUnitCsv}>各回の請求CSVをダウンロード</button>
-          <p>下の項目選択に関係なく、管理終了・再開履歴を含む全19テーブルを同じ時点で取得します。顧客情報を含むため、安全な場所に保管してください。ログイン設定・添付ファイル本体・DB構造は含まれず、Supabase全体の復元用バックアップとは別です。</p>
+          <p>下の項目選択に関係なく、請求・所有者変更・引継ぎ手続き・管理終了など、アプリの対象データをまとめて取得します。顧客情報を含むため、安全な場所に保管してください。ログイン設定・添付ファイル本体・DB構造は含まれず、Supabase全体の復元用バックアップとは別です。</p>
           <p>下の金額確認CSVは現在の契約条件です。過去の請求実額ではありません。旧形式の請求記録CSVは、切替後の記録が抜けるため使用できません。</p>
         </div>}
 

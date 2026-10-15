@@ -20,7 +20,9 @@ export type Customer = {
 export type Project = {
   updated_at?: string | null
   id: number
-  customer_id: number
+  customer_id: number | null
+  previous_owner_customer_id?: number | null
+  owner_unconfirmed_on?: string | null
   summary_notes?: string | null
   meti_notes?: string | null
   power_company_notes?: string | null
@@ -248,7 +250,7 @@ export type DashboardStats = {
 
 export type ProjectRow = {
   id: number
-  customer_id: number
+  customer_id: number | null
   project_no: string | null
   project_name: string
   plant_name: string | null
@@ -268,7 +270,7 @@ export type ProjectRow = {
 
 export type ProjectDetail = {
   project: Project
-  customer: Customer
+  customer: Customer | null
   contract: Contract | null
   annualRecords: AnnualRecord[]
   maintenanceResponses: MaintenanceResponse[]
@@ -297,7 +299,7 @@ export type BillingRow = {
 
 export type BillingDetail = {
   project: Project
-  customer: Customer
+  customer: Customer | null
   contract: Contract
   annualRecords: AnnualRecord[]
   maintenanceResponses: MaintenanceResponse[]
@@ -358,6 +360,9 @@ export type ProspectContractStatus = '未' | '完了' | '不可'
 
 export type Prospect = {
   id: number
+  ownership_project_id?: number | null
+  candidate_customer_id?: number | null
+  ownership_state?: 'open' | 'completed' | 'cancelled' | null
   customer_name: string
   customer_name_kana: string | null
   project_name: string

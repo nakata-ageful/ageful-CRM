@@ -22,6 +22,7 @@ export const contractFieldKinds = {
   billing_amount_overrides:'amounts', billing_item_flags:'flags',
 } as const satisfies Record<keyof Contract, Kind>
 export const projectFieldKinds = {
+  previous_owner_customer_id:'protected',owner_unconfirmed_on:'protected',
   id:'protected', customer_id:'protected', old_owner:'protected', created_at:'protected',updated_at:'protected',
   summary_notes:'text', meti_notes:'text', power_company_notes:'text', project_no:'text', project_name:'text',
   plant_name:'text', site_postal_code:'text', site_prefecture:'text', site_address:'text', latitude:'number',

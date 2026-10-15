@@ -12,6 +12,7 @@ import type {
   AnnualRecordInput, AnnualRecordStatus, CsvImportRow, BillingImportRow, Prospect, ProspectInput,
 } from '../types'
 import { buildTaskMap, buildSubTaskMap } from './prospect-tasks'
+import {assertOwnershipProspectEdit,isOwnershipProspect} from './ownership-workflow'
 import { annualRecordFromStorage, annualRecordPayloadForStorage, singleAnnualRecordId, toStoredAnnualRecordStatus } from './annual-record-status-storage'
 import { ensureLegacyRestoreAllowed } from './restore-safety'
 import { statusFromBillingDates } from './annual-record-status'
@@ -896,6 +897,15 @@ export async function createProspect(input: ProspectInput): Promise<Prospect> {
 }
 
 export async function updateProspect(id: number, data: Partial<Omit<Prospect, 'id' | 'created_at'>>, customerId?: number | null): Promise<void> {
+  const current=hasSupabaseEnv?(await db().from('prospects').select('*').eq('id',id).single()).data as Prospect|null:prospectStore.getAll().find(p=>p.id===id)
+  if(!current)throw Error('見込みを取得できません')
+  if(isOwnershipProspect(current)){
+    assertOwnershipProspectEdit(current,data)
+    if(!hasSupabaseEnv){prospectStore.update(id,data);return}
+    const {error}=await db().from('prospects').update(data).eq('id',id).eq('ownership_state','open').select('id').single()
+    if(error)throw error
+    return
+  }
   if (!hasSupabaseEnv) {
     prospectStore.update(id, data)
     // モック: 顧客・案件への同期
@@ -960,7 +970,7 @@ async function syncProspectToCustomerProject(
   let projectId: number | null = null
   if (Object.keys(projectUpdate).length > 0) {
     if (!hasSupabaseEnv) {
-      const proj = projectStore.getAll().find((p: { customer_id: number }) => p.customer_id === customerId)
+      const proj = projectStore.getAll().find(p => p.customer_id === customerId)
       if (proj) {
         projectStore.update(proj.id, projectUpdate)
         projectId = proj.id
@@ -979,7 +989,7 @@ async function syncProspectToCustomerProject(
     if (!hasSupabaseEnv) {
       // mockではprojectId経由でcontract取得→更新
       if (projectId == null) {
-        const proj = projectStore.getAll().find((p: { customer_id: number }) => p.customer_id === customerId)
+        const proj = projectStore.getAll().find(p => p.customer_id === customerId)
         projectId = proj?.id ?? null
       }
       if (projectId != null) {
@@ -1013,6 +1023,7 @@ async function maySyncLegacyProspect(customerId:number):Promise<boolean>{
 }
 
 export async function convertProspectToCustomer(prospect: Prospect): Promise<number> {
+  if(isOwnershipProspect(prospect))throw Error('既存発電所の引継ぎは「所有者を確定する」から行ってください')
   // 顧客作成
   const customer = await createCustomer({
     name: prospect.customer_name,
@@ -1160,6 +1171,7 @@ export async function exportAllData(): Promise<ExportData> {
     const {data,error}=await db().rpc('billing_runtime_backup')
     if(error)throw error
     if(data?.version!==2||!Array.isArray(data.billing_units)||!Array.isArray(data.ownership_transfers))throw Error('新しい請求記録を含むバックアップを取得できませんでした')
+    if(data.ownership_workflow_ready===true&&!Array.isArray(data.ownership_workflow_events))throw Error('引継ぎ履歴を含むバックアップを取得できませんでした')
     return data as ExportData
   }
   if (!hasSupabaseEnv) {

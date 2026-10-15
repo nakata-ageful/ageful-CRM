@@ -122,6 +122,6 @@ const submit=tree=>nodes(tree,e=>e.type==='form')[0].props.onSubmit({preventDefa
  const app=fs.readFileSync(path.join(root,'src/App.tsx'),'utf8')
  assert.ok(app.includes('closeDisabled={transferBusy}')&&app.includes('onBusyChange={setTransferBusy}'))
  assert.ok(app.includes('pendingCustomerInput={pendingCustomerInput} onPendingCustomerChange={setPendingCustomerInput}'))
- assert.ok(app.includes('const customer=await createCustomer(input);setCustomers('),'Successful creation goes directly into the customer list, without a fallible reload')
+ assert.ok(/const customer=await createCustomer\(input\)\s*setCustomers\(/.test(app),'Successful creation goes directly into the shared customer list, without a fallible reload')
  console.log('PASS: customer registration/recovery, preserved transfer drafts, contract typed callbacks, responsive layout guards and saved plan payload/revision preservation without premature saves')
 })().catch(e=>{console.error(e);process.exitCode=1})

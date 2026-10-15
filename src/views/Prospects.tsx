@@ -3,6 +3,7 @@ import type { Prospect, ProspectApplyStatus, ProspectContractStatus, ProspectInp
 import { createProspect, deleteProspect } from '../lib/actions'
 import { fmtNum, dateInputRange } from '../lib/utils'
 import { useToast } from '../components/Toast'
+import {prospectCustomerId,ownershipProspectLabel} from '../lib/ownership-workflow'
 
 const APPLY_STATUSES: ProspectApplyStatus[] = ['未', '提出済', '通過', '不通', '不可']
 const CONTRACT_STATUSES: ProspectContractStatus[] = ['未', '完了', '不可']
@@ -318,6 +319,7 @@ export function Prospects({
   onViewDetail,
   onViewProject,
   onViewCustomer,
+  onViewExistingProject,
 }: {
   prospects: Prospect[]
   customers: Customer[]
@@ -325,6 +327,7 @@ export function Prospects({
   onViewDetail: (id: number) => void
   onViewProject: (customerId: number) => void
   onViewCustomer: (customerId: number) => void
+  onViewExistingProject?: (projectId:number)=>void
 }) {
   const toast = useToast()
   // 複数選択フィルター: 空配列 = 全件、非空 = OR 条件で絞り込み
@@ -512,26 +515,28 @@ export function Prospects({
                     >詳細</button>
                   </td>
                   <td style={{ ...tdStyle, fontWeight: 600 }} onClick={e => {
-                    if (p.converted_customer_id) {
+                    if (prospectCustomerId(p)) {
                       e.stopPropagation()
-                      onViewCustomer(p.converted_customer_id)
+                      onViewCustomer(prospectCustomerId(p)!)
                     }
                   }}>
-                    {p.converted_customer_id ? (
+                    {prospectCustomerId(p) ? (
                       <span style={{ color: '#2563eb', cursor: 'pointer', textDecoration: 'underline' }}>{p.customer_name}</span>
                     ) : p.customer_name}
                   </td>
                   <td style={tdStyle} onClick={e => {
-                    if (p.converted_customer_id) {
+                    if(p.ownership_project_id&&onViewExistingProject){e.stopPropagation();onViewExistingProject(p.ownership_project_id)}
+                    else if (p.converted_customer_id) {
                       e.stopPropagation()
                       onViewProject(p.converted_customer_id)
                     }
                   }}>
-                    {p.converted_customer_id ? (
+                    {p.converted_customer_id||p.ownership_project_id ? (
                       <span style={{ color: '#2563eb', cursor: 'pointer', textDecoration: 'underline' }}>{p.project_name}</span>
                     ) : p.project_name}
                   </td>
                   <td style={tdStyle}>
+                    {p.ownership_project_id&&<span className="prospect-badge">{ownershipProspectLabel(p)}</span>}
                     {p.loan_company && (
                       <span style={{ background: '#e0f2fe', color: '#0369a1', fontSize: 11.5, fontWeight: 600, borderRadius: 99, padding: '2px 8px' }}>
                         {p.loan_company}
@@ -544,7 +549,7 @@ export function Prospects({
                   <td style={tdStyle}><ContractBadge status={p.contract_status} /></td>
                   <td style={tdStyle} onClick={e => e.stopPropagation()}>
                     <div className="row-actions">
-                      <button className="btn-icon btn-icon--danger" onClick={e => handleDelete(e, p)}>✕</button>
+                      {p.ownership_project_id?<button className="btn btn-sub btn-sm" onClick={e=>{e.stopPropagation();onViewDetail(p.id)}}>手続き</button>:<button className="btn-icon btn-icon--danger" onClick={e => handleDelete(e, p)}>✕</button>}
                     </div>
                   </td>
                 </tr>

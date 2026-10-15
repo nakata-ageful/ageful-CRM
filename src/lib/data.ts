@@ -171,7 +171,7 @@ export async function getCustomerDetail(customerId: number): Promise<CustomerDet
 export async function getProjects(): Promise<ProjectRow[]> {
   if (!hasSupabaseEnv) {
     return projectStore.getAll().map(p => {
-      const c = customerStore.getById(p.customer_id)
+      const c = (p.customer_id==null?null:customerStore.getById(p.customer_id))
       const contract = contractStore.getByProjectId(p.id)
       return {
         id: p.id,
@@ -188,7 +188,7 @@ export async function getProjects(): Promise<ProjectRow[]> {
         maintenance_start_date: contract?.maintenance_start_date ?? null,
         created_at: p.created_at,
         updated_at: (p as { updated_at?: string | null }).updated_at ?? p.created_at,
-        customer_name: c?.company_name ?? c?.name ?? '-',
+        customer_name: c?.company_name ?? c?.name ?? '所有者未確認',
         company_name: c?.company_name ?? null,
         search_text: buildProjectSearchText(
           p as unknown as Record<string, unknown>,
@@ -203,7 +203,7 @@ export async function getProjects(): Promise<ProjectRow[]> {
   const client = db()
   const { data, error } = await client
     .from('projects')
-    .select('*, customers(name, company_name), contracts(subcontractor, maintenance_start_date, sale_contract_date, equipment_contract_date, land_contract_date, ownership_transfer_date, sales_to_neosys, neosys_to_referrer, equipment_contract_notes, land_contract_notes)')
+    .select('*, customers:customers!projects_customer_id_fkey(name, company_name), contracts(subcontractor, maintenance_start_date, sale_contract_date, equipment_contract_date, land_contract_date, ownership_transfer_date, sales_to_neosys, neosys_to_referrer, equipment_contract_notes, land_contract_notes)')
     .order('created_at', { ascending: false })
     // TODO: 大規模データセットに対しては適切なページネーションを実装すべき
     .limit(1000)
@@ -211,7 +211,7 @@ export async function getProjects(): Promise<ProjectRow[]> {
   return (data ?? []).map((row: Record<string, unknown>) => {
     const cust = row.customers as Record<string, unknown> | null
     const con = (Array.isArray(row.contracts) ? row.contracts[0] : row.contracts) as Record<string, unknown> | null
-    const customerName = (cust?.company_name as string) ?? (cust?.name as string) ?? '-'
+    const customerName = (cust?.company_name as string) ?? (cust?.name as string) ?? '所有者未確認'
     const companyName = (cust?.company_name as string) ?? null
     // ネストした customers / contracts は検索テキストから除外して project 本体のみ渡す
     const { customers: _c, contracts: _ct, ...projOnly } = row
@@ -252,8 +252,8 @@ export async function getProjectDetail(projectId: number): Promise<ProjectDetail
   if (!hasSupabaseEnv) {
     const project = projectStore.getById(projectId)
     if (!project) return null
-    const customer = customerStore.getById(project.customer_id)
-    if (!customer) return null
+    const customer = (project.customer_id==null?null:customerStore.getById(project.customer_id))
+    if (project.customer_id!=null&&!customer) throw Error('所有者の情報を取得できません')
     const contract = contractStore.getByProjectId(projectId)
     const annualRecords = contract ? annualRecordStore.getByContractId(contract.id) : []
     const maintenanceResponses = maintenanceResponseStore.getByProjectId(projectId)
@@ -263,8 +263,9 @@ export async function getProjectDetail(projectId: number): Promise<ProjectDetail
   const client = db()
   const { data: project } = await client.from('projects').select('*').eq('id', projectId).single()
   if (!project) return null
-  const { data: customer } = await client.from('customers').select('*').eq('id', project.customer_id).single()
-  if (!customer) return null
+  const { data: customer, error: customerError } = project.customer_id==null?{data:null,error:null}:await client.from('customers').select('*').eq('id', project.customer_id).single()
+  if(customerError)throw customerError
+  if(project.customer_id!=null&&!customer)throw Error('所有者の情報を取得できません')
   const { data: conArr } = await client.from('contracts').select('*').eq('project_id', projectId).limit(1)
   const contract = conArr?.[0] ?? null
   const annualRecords = contract
@@ -289,7 +290,7 @@ export async function getMaintenanceResponses(): Promise<MaintenanceResponse[]> 
   const client = db()
   const { data, error } = await client
     .from('maintenance_responses')
-    .select('*, projects(project_name, plant_name, customers(name, company_name))')
+    .select('*, projects(project_name, plant_name, customers:customers!projects_customer_id_fkey(name, company_name))')
     .order('response_no', { ascending: false, nullsFirst: false })
     // TODO: 大規模データセットに対しては適切なページネーションを実装すべき
     .limit(1000)
@@ -311,7 +312,7 @@ export async function getMaintenanceResponseById(id: number): Promise<Maintenanc
   const client = db()
   const { data } = await client
     .from('maintenance_responses')
-    .select('*, projects(project_name, plant_name, customer_id, panel_maker, panel_model, pcs_maker, pcs_model, monitoring_system, monitoring_model, customers(name, company_name))')
+    .select('*, projects(project_name, plant_name, customer_id, panel_maker, panel_model, pcs_maker, pcs_model, monitoring_system, monitoring_model, customers:customers!projects_customer_id_fkey(name, company_name))')
     .eq('id', id)
     .single()
   if (!data) return null
@@ -339,7 +340,7 @@ export async function getPeriodicMaintenance(): Promise<PeriodicMaintenance[]> {
   if (!hasSupabaseEnv) {
     return periodicMaintenanceStore.getAll().map(m => {
       const proj = projectStore.getById(m.project_id)
-      const cust = proj ? customerStore.getById(proj.customer_id) : null
+      const cust = proj ? (proj.customer_id==null?null:customerStore.getById(proj.customer_id)) : null
       return {
         ...m,
         project_name: proj?.project_name ?? '不明',
@@ -351,7 +352,7 @@ export async function getPeriodicMaintenance(): Promise<PeriodicMaintenance[]> {
   const client = db()
   const { data, error } = await client
     .from('periodic_maintenance')
-    .select('*, projects(project_name, plant_name, customers(name, company_name))')
+    .select('*, projects(project_name, plant_name, customers:customers!projects_customer_id_fkey(name, company_name))')
     .order('record_date', { ascending: false, nullsFirst: false })
     // TODO: 大規模データセットに対しては適切なページネーションを実装すべき
     .limit(1000)
@@ -374,7 +375,7 @@ export async function getBillingRows(): Promise<BillingRow[]> {
   if (!hasSupabaseEnv) {
     const currentYear = new Date().getFullYear()
     return projectStore.getAll().map(p => {
-      const c = customerStore.getById(p.customer_id)
+      const c = (p.customer_id==null?null:customerStore.getById(p.customer_id))
       const storedContract = contractStore.getByProjectId(p.id)
       // The legacy mock data predates per-round schedule days. Keep production
       // behavior strict, but give the isolated UI preview one representative
@@ -388,7 +389,7 @@ export async function getBillingRows(): Promise<BillingRow[]> {
       return {
         project_id: p.id,
         project_name: p.project_name,
-        customer_name: c?.company_name ?? c?.name ?? '-',
+        customer_name: c?.company_name ?? c?.name ?? '所有者未確認',
         company_name: c?.company_name ?? null,
         contract: contract ?? null,
         contract_count: contract ? 1 : 0,
@@ -403,7 +404,7 @@ export async function getBillingRows(): Promise<BillingRow[]> {
   const currentYear = new Date().getFullYear()
   const { data: projData, error } = await client
     .from('projects')
-    .select('id, project_name, customer_id, customers(name, company_name), contracts(*, annual_records(*))')
+    .select('id, project_name, customer_id, customers:customers!projects_customer_id_fkey(name, company_name), contracts(*, annual_records(*))')
     .order('created_at', { ascending: false })
     // TODO: 大規模データセットに対しては適切なページネーションを実装すべき
     .limit(1000)
@@ -418,7 +419,7 @@ export async function getBillingRows(): Promise<BillingRow[]> {
     return {
       project_id: row.id as number,
       project_name: row.project_name as string,
-      customer_name: (cust?.company_name as string) ?? (cust?.name as string) ?? '-',
+      customer_name: (cust?.company_name as string) ?? (cust?.name as string) ?? '所有者未確認',
       company_name: (cust?.company_name as string) ?? null,
       contract: con as import('../types').Contract | null,
       contract_count: conArr?.length ?? 0,
@@ -456,8 +457,8 @@ export async function getBillingDetail(projectId: number): Promise<BillingDetail
   if (!hasSupabaseEnv) {
     const project = projectStore.getById(projectId)
     if (!project) return null
-    const customer = customerStore.getById(project.customer_id)
-    if (!customer) return null
+    const customer = (project.customer_id==null?null:customerStore.getById(project.customer_id))
+    if (project.customer_id!=null&&!customer) throw Error('所有者の情報を取得できません')
     const contract = contractStore.getByProjectId(projectId)
     if (!contract) return null
     const annualRecords = annualRecordStore.getByContractId(contract.id)
@@ -469,8 +470,9 @@ export async function getBillingDetail(projectId: number): Promise<BillingDetail
   const client = db()
   const { data: project } = await client.from('projects').select('*').eq('id', projectId).single()
   if (!project) return null
-  const { data: customer } = await client.from('customers').select('*').eq('id', project.customer_id).single()
-  if (!customer) return null
+  const { data: customer, error: customerError } = project.customer_id==null?{data:null,error:null}:await client.from('customers').select('*').eq('id', project.customer_id).single()
+  if(customerError)throw customerError
+  if(project.customer_id!=null&&!customer)throw Error('所有者の情報を取得できません')
   const { data: conArr } = await client.from('contracts').select('*').eq('project_id', projectId).limit(1)
   const contract = conArr?.[0]
   if (!contract) return null

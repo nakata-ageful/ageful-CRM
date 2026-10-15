@@ -33,9 +33,10 @@ export async function readBackupTables(fetchPage: (table: BackupTable, from: num
 export function checkBackupRelations(data: Record<BackupTable, Row[]>): void {
   const ids = Object.fromEntries(BACKUP_TABLES.map(table => [table, new Set(data[table].map(r => r.id))])) as Record<BackupTable, Set<unknown>>
   const relations: [BackupTable, string, BackupTable, boolean][] = [
-    ['projects', 'customer_id', 'customers', false], ['contracts', 'project_id', 'projects', false],
+    ['projects', 'customer_id', 'customers', true], ['projects','previous_owner_customer_id','customers',true], ['contracts', 'project_id', 'projects', false],
     ['annual_records', 'contract_id', 'contracts', false], ['maintenance_responses', 'project_id', 'projects', false],
     ['periodic_maintenance', 'project_id', 'projects', false], ['prospects', 'converted_customer_id', 'customers', true],
+    ['prospects','ownership_project_id','projects',true],['prospects','candidate_customer_id','customers',true],
   ]
   for (const [table, column, target, optional] of relations) {
     for (const row of data[table]) {
@@ -43,4 +44,5 @@ export function checkBackupRelations(data: Record<BackupTable, Row[]>): void {
       if (!ids[target].has(row[column])) throw new Error(`${table}の${column}に対応する${target}が不足しています。復元用としては要確認です`)
     }
   }
+  for(const p of data.projects)if(p.customer_id==null&&(!p.owner_unconfirmed_on||p.previous_owner_customer_id==null))throw Error('所有者未確認の履歴が不足しています')
 }

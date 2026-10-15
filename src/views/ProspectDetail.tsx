@@ -1,5 +1,9 @@
 import { useState } from 'react'
-import type { Prospect, ProspectApplyStatus, ProspectContractStatus } from '../types'
+import type { Prospect, ProspectApplyStatus, ProspectContractStatus,Customer,CustomerInput,Project } from '../types'
+import {Modal} from '../components/Modal'
+import {OwnershipWorkflowPanel} from '../components/OwnershipWorkflowPanel'
+import {isOwnershipProspect,ownershipProspectLabel} from '../lib/ownership-workflow'
+import type {RegistrationCustomer} from '../lib/customer-registration'
 import { updateProspect } from '../lib/actions'
 import { fmtNum, dateInputRange } from '../lib/utils'
 import { buildTaskMap, buildSubTaskMap, tasksForCompany } from '../lib/prospect-tasks'
@@ -276,21 +280,34 @@ export function ProspectDetailView({
   onBack,
   onViewCustomer,
   onViewProject,
+  onViewExistingProject,customers=[],onOwnershipAction,onOwnershipComplete,onCreateCustomer,onReloadCustomers,
+  pendingCustomerInput,onPendingCustomerChange,onLoadOwnershipProject,
 }: {
   prospect: Prospect
   onBack: () => void
   onViewCustomer: (customerId: number) => void
   onViewProject: (customerId: number) => void
+  onViewExistingProject?:(projectId:number)=>void
+  customers?:readonly Customer[]
+  onOwnershipAction?:(p:Prospect,action:'candidate'|'cancel',customerId:number|null)=>Promise<Prospect>
+  onOwnershipComplete?:(p:Prospect)=>Promise<void>
+  onCreateCustomer?:(input:CustomerInput)=>Promise<RegistrationCustomer>
+  onReloadCustomers?:()=>Promise<readonly RegistrationCustomer[]>
+  pendingCustomerInput?:CustomerInput|null;onPendingCustomerChange?:(input:CustomerInput|null)=>void
+  onLoadOwnershipProject?:(id:number)=>Promise<Project>
 }) {
   const [p, setP] = useState<Prospect>(initial)
   const [saving, setSaving] = useState(false)
+  const [error,setError]=useState(''),[candidateOpen,setCandidateOpen]=useState(false),[candidateBusy,setCandidateBusy]=useState(false)
+  const [candidateProject,setCandidateProject]=useState<Project|null>(null)
 
   async function save(updated: Partial<Omit<Prospect, 'id' | 'created_at'>>) {
+    setError('')
+    if(isOwnershipProspect(p)&&p.ownership_state!=='open'){setError('完了・取下げ済みの手続きは変更できません');return}
     const next = { ...p, ...updated }
     setP(next)
     setSaving(true)
-    await updateProspect(p.id, updated, p.converted_customer_id)
-    setSaving(false)
+    try{await updateProspect(p.id, updated, p.converted_customer_id)}catch(e){setP(p);setError(e instanceof Error?e.message:String(e))}finally{setSaving(false)}
   }
 
   async function handleLoanCompanyChange(company: string | null) {
@@ -319,6 +336,31 @@ export function ProspectDetailView({
           <button className="btn btn-sub btn-sm" onClick={() => onViewProject(p.converted_customer_id!)}>案件詳細 →</button>
         </>)}
       </div>
+
+      {error&&<p role="alert" className="form-error">{error}</p>}
+      {isOwnershipProspect(p)&&<section className="card">
+        <h3>既存発電所の引継ぎ：{ownershipProspectLabel(p)}</h3>
+        <p>引継ぎ先：{p.candidate_customer_id?p.customer_name:'未定'}</p>
+        <div className="management-action-grid">
+          {onViewExistingProject&&<button type="button" className="btn btn-sub" onClick={()=>onViewExistingProject(p.ownership_project_id!)}>発電所を開く</button>}
+          {p.ownership_state==='open'&&onOwnershipAction&&<>
+            {!p.candidate_customer_id&&onLoadOwnershipProject&&<button type="button" className="btn btn-main" disabled={saving||candidateBusy} onClick={async()=>{
+              setCandidateBusy(true);setError('');try{setCandidateProject(await onLoadOwnershipProject(p.ownership_project_id!));setCandidateOpen(true)}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setCandidateBusy(false)}
+            }}>引継ぎ先を設定</button>}
+            {p.candidate_customer_id&&onOwnershipComplete&&<button type="button" className="btn btn-main" disabled={saving} onClick={()=>void onOwnershipComplete(p).catch(e=>setError(e instanceof Error?e.message:String(e)))}>所有者を確定する</button>}
+            <button type="button" className="btn btn-sub" disabled={saving} onClick={async()=>{
+              if(!confirm('この候補の引継ぎを取りやめますか？ 現在の所有者・保守・請求は変えず、記録を残します。'))return
+              setSaving(true);setError('');try{setP(await onOwnershipAction(p,'cancel',null))}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setSaving(false)}
+            }}>この候補を取り下げる</button>
+          </>}
+        </div>
+        {candidateOpen&&candidateProject&&onOwnershipAction&&onCreateCustomer&&onReloadCustomers&&<Modal title="引継ぎ先を設定" width={760} closeDisabled={candidateBusy} onClose={()=>setCandidateOpen(false)}>
+          <OwnershipWorkflowPanel candidateOnly project={candidateProject} customers={customers}
+            onBusyChange={setCandidateBusy} onCreateCustomer={onCreateCustomer} onReloadCustomers={onReloadCustomers}
+            pendingCustomerInput={pendingCustomerInput} onPendingCustomerChange={onPendingCustomerChange}
+            onSave={async(_action,id)=>{setP(await onOwnershipAction(p,'candidate',id));setCandidateOpen(false)}}/>
+        </Modal>}
+      </section>}
 
       {/* 金額カード */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
@@ -367,6 +409,7 @@ export function ProspectDetailView({
             <input
               type="text" className="form-input" style={{ marginTop: 4 }}
               value={p.customer_name}
+              readOnly={isOwnershipProspect(p)}
               onChange={e => save({ customer_name: e.target.value })}
             />
           </div>
@@ -375,6 +418,7 @@ export function ProspectDetailView({
             <input
               type="text" className="form-input" style={{ marginTop: 4 }}
               value={p.customer_name_kana ?? ''}
+              readOnly={isOwnershipProspect(p)}
               onChange={e => save({ customer_name_kana: e.target.value || null })}
               placeholder="やまだ たろう"
             />
@@ -384,6 +428,7 @@ export function ProspectDetailView({
             <input
               type="text" className="form-input" style={{ marginTop: 4 }}
               value={p.project_name}
+              readOnly={isOwnershipProspect(p)}
               onChange={e => save({ project_name: e.target.value })}
             />
           </div>

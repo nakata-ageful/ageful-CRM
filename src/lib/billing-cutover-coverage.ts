@@ -22,9 +22,9 @@ export function inspectFutureBillingCoverage(rows:readonly BillingRow[],recipien
   if(!/^\d{4}-\d{2}$/.test(startMonth)||!isBillingDate(`${startMonth}-01`)||!Number.isInteger(months)||months<1||months>24)throw Error('比較対象の年月と期間を確認してください')
   const [year,month]=startMonth.split('-').map(Number),candidates:CoverageCandidate[]=[],issues:{projectId:number;reason:string}[]=[]
   for(const row of rows){
-    const recipientId=recipients.get(row.project_id),c=row.contract
+    const recipientId=recipients.get(row.project_id)??0,c=row.contract
     if(!c)continue
-    if(!recipientId){issues.push({projectId:row.project_id,reason:'請求先が不明'});continue}
+    if(!recipientId)issues.push({projectId:row.project_id,reason:'所有者が未確認です。請求先を選んでください'})
     if(!['請求書','口座振替'].includes(c.billing_method??'')){issues.push({projectId:row.project_id,reason:'請求方法が未設定'});continue}
     const days=c.billing_schedule_days??[]
     const own=units.filter(u=>u.project_id===row.project_id)
@@ -112,6 +112,7 @@ export function inspectFutureBillingCoverage(rows:readonly BillingRow[],recipien
           status='review';reason='旧形式の請求記録があります。対象の保守期間・回と保存済み請求の対応を確認してください'
         }
         if(maintenanceEnded&&status!=='handled'){status='review';reason='保守終了後の対象費目・前払い期間・個別金額を確認してください（自動日割りなし）'}
+        if(!recipientId&&status!=='handled'&&status!=='matches'){status='review';reason=['請求先を選んでください',reason].filter(Boolean).join('。')}
         candidates.push({projectId:row.project_id,recipientId,method,date:item.date,round:item.round,amount,status,reason,
           ...(serviceYear==null?{}:{serviceYear}),...(periodStart&&periodEnd?{periodStart,periodEnd}:{})})
       }

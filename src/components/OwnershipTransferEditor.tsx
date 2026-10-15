@@ -1,4 +1,5 @@
 import {useState} from 'react'
+import {HelpNote} from './HelpNote'
 import {CustomerPicker} from './CustomerPicker'
 import type {CustomerChoice} from '../lib/customer-search'
 import type {Contract,Project,CustomerInput} from '../types'
@@ -47,11 +48,11 @@ export function OwnershipTransferEditor({project:initialProject,contract:initial
     let nextOccurrence:MaintenanceScheduleItem|undefined
     if(addNext){
       if(!newOwner||!oldOwner)throw Error('変更前後の所有者を選択してください')
-      if(!isBillingDate(nextDate)||!/^\d+$/.test(nextAmount)||!Number.isSafeInteger(Number(nextAmount)))throw Error('未保存回の予定日・予定額を確認してください')
+      if(!isBillingDate(nextDate)||!/^\d+$/.test(nextAmount)||!Number.isSafeInteger(Number(nextAmount)))throw Error('追加する請求予定の日付・金額を確認してください')
       const recipientId=nextRecipient==='old'?oldOwner.id:newOwner.id
       const candidate=maintenanceSchedule(prepared.after.contract as Contract,nextYear,recipientId,units,managementEvents,
         individualPeriod?{periodStart,periodEnd}:undefined).find(item=>item.round===nextRound)
-      if(!candidate||candidate.exclusion)throw Error(candidate?.exclusion??'未保存回の保守期間・回数を確認してください')
+      if(!candidate||candidate.exclusion)throw Error(candidate?.exclusion??'追加する請求予定の保守期間・回数を確認してください')
       nextOccurrence={...candidate,method:nextMethod,date:nextDate,amount:Number(nextAmount)}
     }
     return {prepared,nextOccurrence}
@@ -60,7 +61,7 @@ export function OwnershipTransferEditor({project:initialProject,contract:initial
   return <section className="ownership-transfer-shell">
     <header className="ownership-transfer-heading"><div><span className="ownership-transfer-kicker">発電所の所有者変更</span><h2>{project.plant_name||project.project_name}</h2><p>所有者・契約・今後の請求を一度に確認して保存します。</p></div><span className="ownership-transfer-safe">変更前の情報は履歴に保存</span></header>
     <ol className="ownership-transfer-steps" aria-label="所有者変更の手順"><li className="active"><b>1</b>変更内容を入力</li><li><b>2</b>請求予定を確認</li><li><b>3</b>最終確認・保存</li></ol>
-    <div className="ownership-transfer-notice">旧所有者の見込み情報を守るため、変更前後の顧客に紐づく見込みとの自動同期は停止します。見込み情報の変更は「見込み管理」で行ってください。</div>
+    <HelpNote title="見込み管理の情報も変わる？"><p>所有者変更をしても、見込み管理の情報は書き換えません。必要な修正は「見込み管理」で行ってください。</p></HelpNote>
     <fieldset disabled={busy} className="ownership-transfer-fieldset">
       <section className="ownership-transfer-card"><h3>所有者と変更日</h3><div className="ownership-transfer-grid">
         <div className="ownership-transfer-current"><span>現在の所有者</span><strong>{oldOwner.name}</strong><small>顧客ID {oldOwner.id}</small></div>
@@ -73,10 +74,10 @@ export function OwnershipTransferEditor({project:initialProject,contract:initial
         {customerNotice&&<p role="status">{customerNotice}</p>}
         {onCreateCustomer&&onReloadCustomers&&<div hidden={!creating}><CustomerRegistration key={registrationSession} customers={allCustomers} currentOwnerId={project.customer_id} onCreate={onCreateCustomer} onReload={onReloadCustomers} pendingInput={pendingCustomerInput} onPendingChange={onPendingCustomerChange} onSelect={selectCustomer} onCancel={()=>setCreating(false)} onBusyChange={value=>{setCustomerBusy(value);onBusyChange?.(value)}}/></div>}
       </section>
-      {newOwner&&<section className="ownership-transfer-card"><h3>変更後に追加する請求</h3><label>基本の請求先<select className="form-input" value={future} onChange={e=>setFuture(e.target.value as 'old'|'new')}><option value="new">{newOwner.name}</option><option value="old">{oldOwner.name}</option></select></label><p>下の各回の指定を優先します。請求の自動追加や銀行への振替手配は行いません。</p></section>}
-      {newOwner&&<section className="ownership-transfer-card"><h3>まだ保存していない1回を指定</h3>
-        <label className="ownership-transfer-check"><input type="checkbox" checked={addNext} aria-expanded={addNext} aria-controls="ownership-next-occurrence" onChange={e=>setAddNext(e.target.checked)}/><span>今回の所有者変更と同時に、確認した1回を保存する</span></label>
-        <p id="ownership-next-help">選ばなければ予定を追加しません。選ぶ場合も発行・入金・銀行への振替手配は行いません。既に保存済みの回は下の一覧で変更してください。</p>
+      {newOwner&&<section className="ownership-transfer-card"><h3>今後の請求先</h3><label>これから追加する予定の請求先<select className="form-input" value={future} onChange={e=>setFuture(e.target.value as 'old'|'new')}><option value="new">{newOwner.name}</option><option value="old">{oldOwner.name}</option></select></label><HelpNote title="登録済みの予定も請求先が変わる？"><p>登録済みの予定は、下の一覧で1回ずつ選びます。ここで選んだだけでは変更しません。請求の自動追加や銀行への振替手配はしません。</p></HelpNote></section>}
+      {newOwner&&<section className="ownership-transfer-card"><h3>請求予定を1件追加</h3>
+        <label className="ownership-transfer-check"><input type="checkbox" checked={addNext} aria-expanded={addNext} aria-controls="ownership-next-occurrence" onChange={e=>setAddNext(e.target.checked)}/><span>所有者変更と一緒に、新しい予定を追加する</span></label>
+        <p id="ownership-next-help">登録済みの予定は、下の一覧で変更してください。</p><HelpNote title="予定を追加するとどうなる？"><p>チェックした場合だけ、予定を1件追加します。請求済み・入金済みにはなりません。銀行への振替手配もしません。</p></HelpNote>
         {addNext&&<div id="ownership-next-occurrence" className="ownership-next-occurrence" aria-describedby="ownership-next-help">
           <div className="ownership-occurrence-grid">
           <label>保守期間の開始年<input className="form-input" type="number" min="2000" max="2199" value={nextYear} onChange={e=>setNextYear(Number(e.target.value))}/></label>

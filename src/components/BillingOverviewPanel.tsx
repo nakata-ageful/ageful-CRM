@@ -11,6 +11,7 @@ import { InvoicePlanEditor } from './InvoicePlanEditor'
 import { ManualDebitEditor } from './ManualDebitEditor'
 import { Modal } from './Modal'
 import {RoutineInvoiceEditor} from './RoutineInvoiceEditor'
+import {HelpNote} from './HelpNote'
 import {routineInvoiceKey,type AddRoutineInvoice,type RoutineInvoiceContext} from '../lib/routine-invoice'
 
 export type DebitOverviewProject = { projectId: number; projectName: string; customerName: string; days: string; amount: number }
@@ -65,10 +66,10 @@ export function BillingOverviewPanel({ data, today, onViewDetail, setupItems = [
     <OverviewSection title="未入金" count={overview.unpaid.length} color="red"><BillingOverviewTable {...tableProps} units={overview.unpaid} mode="unpaid" /></OverviewSection>
     <OverviewSection title="今月・来月・再来月の請求予定" count={overview.upcoming.length + nearTermCandidates.length} color="blue">
       <BillingOverviewTable {...tableProps} units={overview.upcoming} candidates={nearTermCandidates} mode="upcoming" />
-      {!!nearTermCandidates.length && <p className="billing-overview-help">まだ保存していない予定候補です。通常の請求は「発行内容を記録」から、請求先と実際の請求日・明細をまとめて保存できます。「予定を確認」の行は、先に保守期間や保存済み記録との対応を確認してください。請求書の作成・送信は行いません。</p>}
+      {!!nearTermCandidates.length && <HelpNote title="請求した日を記録するには？"><p>請求書を送ったら「発行内容を記録」で請求日・明細を入力します。このアプリから請求書の作成・送信はしません。</p><p>「予定を確認」と表示される回は、同じ請求が既に登録されていないか「請求詳細」で確認してください。</p></HelpNote>}
     </OverviewSection>
     <OverviewSection title="口座振替" count={new Set([...debitProjects.map(p => p.projectId), ...debitChecks.map(p => p.projectId), ...overview.debitPlans.map(p => p.projectId)]).size} color="purple" collapsed>
-      <p className="billing-overview-help">銀行が振替を実行します。ここでは結果を確認するだけで、未保存は未払い・振替失敗を意味しません。</p>
+      <p className="billing-overview-help">銀行の振替結果を確認して記録します。</p><HelpNote title="ここから振替の手配はできる？"><p>このアプリから銀行への振替手配は行いません。記録がなくても、未払いや振替失敗とは限りません。</p></HelpNote>
       {!!debitChecks.length && <><h4 className="billing-overview-subtitle">口座振替の結果を確認（{debitChecks.length}件）</h4><BillingOverviewTable {...tableProps} candidates={debitChecks} mode="review" /></>}
       {!!overview.debitPlans.length && <><h4 className="billing-overview-subtitle">保存済みの振替予定（{overview.debitPlans.length}件）</h4><BillingOverviewTable {...tableProps} units={overview.debitPlans} mode="review" /></>}
       {!!debitProjects.length && <><h4 className="billing-overview-subtitle">口座振替の発電所（常時）</h4><div className="billing-overview-scroll"><table className="billing-overview-table"><thead><tr><th>発電所</th><th>現在の顧客</th><th>振替日</th><th className="billing-overview-money">今月の参考額（税込）</th><th className="billing-overview-operation">操作</th></tr></thead>
@@ -79,16 +80,16 @@ export function BillingOverviewPanel({ data, today, onViewDetail, setupItems = [
     {([['表示期間より前の予定', overview.overduePlans], ['日付要確認', overview.undatedPlans], ['それ以降の予定', overview.laterPlans], ['記録要確認', overview.review]] as const)
       .filter(([, units]) => units.length).map(([label, units]) => <OverviewSection key={label} title={label} count={units.length} color="amber" collapsed={label==='それ以降の予定'}><BillingOverviewTable {...tableProps} units={units} mode="review" /></OverviewSection>)}
     {!!remainingItems.length && <OverviewSection title="未保存・要確認の請求予定" count={remainingItems.length} color="amber">
-      <p className="billing-overview-help">予定日を過ぎた候補・保存記録と一致しない候補です。発行済みか、別日に変更した同じ回がないか確認してください。自動発行しません。</p>
+      <p className="billing-overview-help">「予定を確認」から、請求済みか・予定日の変更が必要か確認してください。</p><HelpNote title="なぜここに表示される？"><p>予定日を過ぎているか、登録済みの請求と日付などが違う予定です。同じ請求を二重に登録しないよう、過去の記録を確認してください。</p></HelpNote>
       <BillingOverviewTable {...tableProps} candidates={remainingItems} mode="review" />
-      {remainingItems.filter(item => item.reason).map(item => <p className="billing-overview-help" key={`${item.projectId}:${item.date}:${item.round}:${item.method}`}>{item.projectName}（{item.date}）：{item.reason}</p>)}
+      {!!remainingItems.some(item=>item.reason)&&<HelpNote title="発電所ごとの確認理由">{remainingItems.filter(item => item.reason).map(item => <p key={`${item.projectId}:${item.date}:${item.round}:${item.method}`}>{item.projectName}（{item.date}）：{item.reason}</p>)}</HelpNote>}
     </OverviewSection>}
     {!!setupIssues.length && <OverviewSection title="請求設定要確認" count={setupIssues.length} color="amber" collapsed>
-      <p className="billing-overview-help">請求方法・日付・金額を未設定のまま表示しています。自動で「請求なし」と確定しません。</p>
+      <p className="billing-overview-help">「詳細で確認」から、不足している請求設定を入力してください。</p><HelpNote title="請求しない発電所も表示される？"><p>請求方法・日付・金額が不足している発電所を表示します。他社保守などで請求しない場合も、自動で対象外にはしません。</p></HelpNote>
       {!!actionRequired.length && <><h4 className="billing-overview-subtitle">請求設定が必要（{actionRequired.length}件）</h4>{issueList(actionRequired)}</>}
       {!!noBillingCandidates.length && <details className="billing-overview-secondary"><summary>自社請求なし候補（{noBillingCandidates.length}件・未確定）</summary><p className="billing-overview-help">他社保守などの可能性があります。発電所ごとに確認します。</p>{issueList(noBillingCandidates)}</details>}
     </OverviewSection>}
-    <p className="billing-overview-footer">金額・スケジュール・請求方法は「発電所 ＞ 請求情報」、各回の明細・保守期間・訂正は「請求詳細」で確認できます。請求CSVは全期間の各回を出力します。</p>
+    <HelpNote title="請求の設定・記録はどこで変更する？"><p>毎年の予定日・金額・請求方法は、発電所の「請求情報」で設定します。各回の明細・保守期間・日付の訂正は「請求詳細」で行います。</p><p>「請求CSV」には全期間の請求記録を出力します。</p></HelpNote>
     {routine&&onAddRoutine&&onSave&&data.recipients&&<Modal title={`${data.projectName(routine.contract.project_id)}：発行内容を記録`} width={720} closeDisabled={routineBusy} onClose={()=>setRoutine(null)}><div className="standard-editor">
       <RoutineInvoiceEditor context={routine} recipients={data.recipients} onAdd={onAddRoutine} onSave={onSave} onBusyChange={setRoutineBusy} onClose={()=>setRoutine(null)}/>
     </div></Modal>}

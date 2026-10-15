@@ -54,6 +54,7 @@ function fmtFormNum(v: string | number | null | undefined): string {
   return n.toLocaleString('ja-JP')
 }
 import { useToast } from '../components/Toast'
+import {HelpNote} from '../components/HelpNote'
 
 /** カーソルを合わせる（スマホはタップ）と説明の吹き出しが出る「?」インフォマーク */
 function InfoTip({ text }: { text: string }) {
@@ -1027,7 +1028,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               <h3 className="section-title" style={{ margin: 0 }}>請求情報</h3>
               {contract && <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('billing')}>編集</button>}
             </div>
-            {billingHistory&&<p className="invoice-reference-help">今後の基本設定です。「編集」→「保存する」で、保存済みの未発行予定も確認できます。基本設定と日付が違う回・日付未登録の回は、その確認画面で日付を入力して修正できます。</p>}
+            {billingHistory&&<HelpNote title="請求予定日を変更するには？"><p>「編集」で毎年の予定日を変更し、「保存する」を押してください。「請求詳細」に登録済みの未発行予定も変更するか確認できます。</p><p>既に毎年の予定日を変更した場合も、「編集」→「保存する」から各回の日付を修正できます。過去の請求・入金記録は変わりません。</p></HelpNote>}
             {(() => {
               const annualInc = annualBillableTotalInc(contract)
               const excludedItems = contract ? BILLING_ITEMS.filter(it => contract.billing_item_flags?.[it.key] === false && (contract[it.field] ?? 0) > 0) : []
@@ -2419,7 +2420,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                   </div>
                   <p style={{ fontSize: 11, color: '#94a3b8', margin: '6px 0 0' }}>※ チェックを外した項目は保守内容に記載のみで、請求金額の計算に入りません</p>
                   {!billingHistory&&<p role="status">過去額を保護するため、請求対象の変更は新しい回別請求への移行後に利用できます。</p>}
-                  {billingHistory&&<p>保存済みの予定・発行済み・入金済みの金額は変わりません。各回の個別金額と手数料は別に確認してください。</p>}
+                  {billingHistory&&<HelpNote title="登録済みの請求金額も変わる？"><p>この画面で金額を変えても、登録済みの予定・発行済み・入金済みの金額は変わりません。各回の金額は「請求詳細」で変更してください。</p></HelpNote>}
                 </div>
 
                 {isInvoice && (

@@ -48,7 +48,7 @@ export function InvoiceUnitEditor({unit:initialUnit,recipientName,onSave,onClose
           <label>金額（税込）<input required inputMode="numeric" value={item.amount} onChange={e=>setItems(items.map((v,i)=>i===index?{...v,amount:e.target.value}:v))}/></label>
           {items.length>1&&<button type="button" onClick={()=>setItems(items.filter((_,i)=>i!==index))}>削除</button>}
         </div>)}<button type="button" onClick={()=>setItems([...items,{name:'',amount:''}])}>明細を追加</button></>}
-      <p>入力内容を確認して保存してください。保存後に最新の請求履歴を読み込みます。</p>
+      <p>{issuing?'請求書の作成・送信は行いません。別途発行した内容を記録します。':'通帳などに記載された入金日を入力してください。'}</p>
       <div className="editor-footer"><button type="button" className="btn btn-sub" onClick={onClose}>キャンセル</button><button type="submit" className="btn btn-main">{busy?'保存中…':issuing?'発行して保存':'入金確認を保存'}</button></div>
     </fieldset></form>
   </section>

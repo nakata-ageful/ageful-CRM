@@ -34,7 +34,7 @@ assert.doesNotThrow(()=>cycle.validateCycleOccurrence(c,2026,'2026-12-31',rules)
 assert.equal(JSON.stringify({c,units,rules}),original)
 const {BillingCycleSettings}=load('src/components/BillingCycleSettings.tsx')
 const html=renderToStaticMarkup(React.createElement(BillingCycleSettings,{contract:c,units,rules,onSave:()=>{throw Error('Render must not save')}}))
-assert.ok(html.includes('前年12月1日に翌年分を請求'));assert.ok(html.includes('繰り返し設定を変更'));assert.ok(!html.includes('<details'))
+assert.ok(html.includes('前年12月1日に翌年分を請求'));assert.ok(html.includes('繰り返し設定を変更'));assert.ok(html.includes('<section class="card billing-cycle-settings">'),'Current setting and edit action stay visible; only supplementary help collapses')
 const nodes=(e,p)=>Array.isArray(e)?e.flatMap(v=>nodes(v,p)):!e?.props?[]:[...(p(e)?[e]:[]),...nodes(e.props.children,p)]
 const state=[];let cursor=0;const hooks={useState(initial){const i=cursor++;if(!(i in state))state[i]=typeof initial==='function'?initial():initial;return[state[i],v=>state[i]=typeof v==='function'?v(state[i]):v]},useRef(initial){const i=cursor++;return state[i]??(state[i]={current:initial})}}
 const C=load('src/components/BillingCycleSettings.tsx',hooks).BillingCycleSettings

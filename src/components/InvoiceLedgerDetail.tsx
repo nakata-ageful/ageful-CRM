@@ -21,7 +21,7 @@ import {RoutineInvoiceEditor} from './RoutineInvoiceEditor'
 import {isActiveBillingUnit} from '../lib/billing-unit'
 import {canRemoveBillingRecord,type BillingRecordRemovalRequest} from '../lib/billing-record-removal'
 import {BillingRecordRemovalEditor} from './BillingRecordRemovalEditor'
-import {HelpNote} from './HelpNote'
+
 
 type EditorMode = 'invoice' | 'plan' | 'debit' | 'correction'
 
@@ -139,7 +139,7 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
         </dl>
         <BillingDates method={candidate.method==='direct_debit'?'口座振替':'請求書'} scheduledDate={candidate.date} reference/>
         {contract&&<p className="invoice-current-basis">年間総額（税込・請求対象のみ）：{fmtYen(annualBillableTotalInc(contract))}</p>}
-        <p className="invoice-reference-help">{canRecord?'請求書を送ったら「発行内容を記録」で請求日を入力してください。':'まだ登録していない予定です。内容を確認して登録してください。'}</p><HelpNote title="請求予定と請求済みの違いは？"><p>予定の登録だけでは、請求済み・入金済みにはなりません。このアプリから請求書の作成・送信はしません。</p><p>「発行内容を記録」では、請求先・実際の請求日・明細をまとめて保存できます。事前の予定登録は不要です。</p></HelpNote>
+        <p className="invoice-reference-help">{canRecord?'請求書を送ったら「発行内容を記録」で請求日を入力してください。':'まだ登録していない予定です。内容を確認して登録してください。'}</p>
         {candidate.reviewReason&&<p className="billing-overview-notice" role="alert">保守期間要確認：{candidate.reviewReason}</p>}
         {!candidate.periodStart&&<p className="invoice-reference-help">「保守情報」で保守開始日を確認してください。委託契約の開始日とは別の項目です。</p>}
         {canCreate&&<div className="invoice-current-actions">{canRecord&&<button type="button" className="btn btn-main" onClick={()=>setRecording(routine)}>発行内容を記録</button>}<button type="button" className={canRecord?'btn':'btn btn-main'} onClick={()=>setAdding({after:null})}>{candidate.reviewReason?'予定を確認・調整':'予定を登録'}</button>{!canRecord&&!candidate.reviewReason&&<button type="button" className="btn" onClick={()=>setAdding({after:candidate.method==='direct_debit'?'debit':'invoice'})}>{candidate.method==='direct_debit'?'振替結果を記録':'請求内容を入力して発行'}</button>}</div>}
@@ -209,7 +209,7 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
       <div className="invoice-history-list">
         {history.map(group=><section className="invoice-period-group" key={group.key} aria-label={`保守期間：${group.label}`}>
           <div className="invoice-period-heading"><strong>{group.label}</strong><span>{group.units.length}件</span></div>
-          {group.inferred&&<div className="invoice-period-unconfirmed"><span>保守期間が未登録の記録があります</span><HelpNote title="表示中の保守期間について"><p>保守開始日から計算した期間を表示しています。正しい期間は「保守期間の確認・修正」で登録してください。請求日が期間外でも、自動で変更しません。</p></HelpNote></div>}
+          {group.inferred&&<div className="invoice-period-unconfirmed"><span>保守期間が未登録の記録があります</span></div>}
           {group.units.map(unit=>{
             const amount=resolveUnitAmount(unit)
             return <button type="button" key={unit.id} className={`invoice-history-item ${focused?.id===unit.id?'is-selected':''}`} onClick={()=>{setFocusedId(unit.id);setEditor(null)}}>
@@ -219,7 +219,7 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
             </button>
           })}
         </section>)}
-      </div><p className="invoice-history-help">各回を押すと、明細の確認・日付の訂正ができます。</p><HelpNote title="記録はどの順番で表示される？"><p>対象の保守期間ごとにまとめています。前払いなどで請求日が期間外でも、その保守期間に表示します。</p></HelpNote>
+      </div><p className="invoice-history-help">各回を押すと、明細の確認・日付の訂正ができます。</p>
       {!!removed.length&&<details className="invoice-removed-records"><summary>削除済みの記録（{removed.length}件）</summary><p className="invoice-history-help">通常の一覧・集計・請求CSVには含みません。</p>
         {removed.map(unit=><section className="invoice-removed-item" key={unit.id}>
           <strong>{periodLabel(unit,maintenanceStartDate)}</strong><p>{roundLabel(unit)} ／ ID {unit.id} ／ {resolveUnitAmount(unit).amount==null?'金額要確認':fmtYen(resolveUnitAmount(unit).amount!)}<br/>請求先：{unit.recipientId==null?'要確認':data.recipientName(unit.recipientId)}<br/>請求日：{unit.issuedOn??'未登録'} ／ 入金日：{unit.receivedOn??'未登録'}</p>

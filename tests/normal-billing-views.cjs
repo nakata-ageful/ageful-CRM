@@ -63,7 +63,7 @@ const emptyHistory={units:[],recipientName:()=>'',projectName:()=>'',plannedAmou
 for(const html of [
  render(Billing,{rows:[setupRow],onReload:noAction,onViewDetail:noAction,billingHistory:emptyHistory,billingToday:'2026-11-15',projectRecipients:new Map([[1,2]])}),
  render(Dashboard,{stats:{totalCustomers:1,totalProjects:1,activeMaintenanceCount:0},maintenanceList:[],billingRows:[setupRow],onNavigate:noAction,onViewMaintenance:noAction,onViewBilling:noAction,billingHistory:emptyHistory,billingToday:'2026-11-15',projectRecipients:new Map([[1,2]])}),
-]){assert.ok(html.includes('今月・来月・再来月の請求予定（1件）'));assert.ok(html.includes('2026-12-01'));assert.ok(html.includes('請求した日を記録するには？'));assert.ok(!html.includes('未保存・要確認の請求予定（1件）'),'near-term candidate must not be repeated in a second list');}
+]){assert.ok(html.includes('今月・来月・再来月の請求予定（1件）'));assert.ok(html.includes('2026-12-01'));assert.ok(!html.includes('請求した日を記録するには？'));assert.ok(!html.includes('未保存・要確認の請求予定（1件）'),'near-term candidate must not be repeated in a second list');}
 const passedDateHtml=render(Billing,{rows:[setupRow],onReload:noAction,onViewDetail:noAction,billingHistory:emptyHistory,billingToday:'2026-12-15',projectRecipients:new Map([[1,2]])});
 assert.ok(passedDateHtml.includes('予定日経過・要確認'),'a past candidate must not look like an ordinary future plan');
 const savedMatch={...base,id:'saved-match',recipientId:2,lifecycle:'planned',plannedAmount:165000};
@@ -90,7 +90,7 @@ const debitRow={...setupRow,contract:{...setupRow.contract,billing_method:'口�
 for(const [today,hasCheck] of [['2026-11-14',false],['2026-11-20',true]]){
  const html=render(Billing,{rows:[debitRow],onReload:noAction,onViewDetail:noAction,billingHistory:emptyHistory,billingToday:today,projectRecipients:new Map([[1,2]])});
  assert.equal(html.includes('口座振替の結果を確認（1件）'),hasCheck,'the bank check appears only after the due date');
- if(hasCheck){assert.ok(html.includes('記録がなくても、未払いや振替失敗とは限りません'));assert.ok(!html.includes('未保存・要確認の請求予定（1件）'));}
+ if(hasCheck){assert.ok(html.includes('銀行の振替結果を確認して記録します'));assert.ok(!html.includes('未保存・要確認の請求予定（1件）'));}
 }
 for(const html of [
  render(Billing,{rows:[setupRow],onReload:noAction,onViewDetail:noAction,billingHistory:{...emptyHistory,cutoverOn:'2026-09-23'},billingToday:'2027-01-15',projectRecipients:new Map([[1,2]])}),

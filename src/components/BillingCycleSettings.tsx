@@ -4,7 +4,7 @@ import type {BillingUnit} from '../lib/billing-unit'
 import {cycleCompatibility,validateCycleRule,type BillingCycleRule} from '../lib/billing-cycle'
 import {maintenancePeriod} from '../lib/maintenance-period-label'
 import {Modal} from './Modal'
-import {HelpNote} from './HelpNote'
+
 
 export type CycleSettingInput={year:number;mode:BillingCycleRule['mode'];reason:string}
 export function BillingCycleSettings({contract,units,rules,onSave}:{contract:Contract;units:readonly BillingUnit[];rules:readonly BillingCycleRule[];onSave?:(value:CycleSettingInput)=>Promise<unknown>}){
@@ -24,7 +24,7 @@ export function BillingCycleSettings({contract,units,rules,onSave}:{contract:Con
   return <section className="card billing-cycle-settings">
     <div className="card-header-row"><h3 className="section-title">今後の保守期間・請求の繰り返し</h3>{onSave&&<button type="button" className="btn btn-sub btn-sm" onClick={()=>{setOpen(true);change();setReason('');setYear(Math.max(new Date().getFullYear()+1,latest?.effective_year??0));setMode(latest?.mode??'calendar_prepaid')}}>繰り返し設定を変更</button>}</div>
     <p>{latest?`${latest.effective_year}年の保守期間から：${latest.mode==='calendar_prepaid'?'毎年1月1日〜12月31日／前年12月1日に翌年分を請求':'当初の保守開始日を基準に1年間'}`:'未設定：保守開始日を基準に1年間の候補を表示します。'}</p>
-    <HelpNote title="この設定で何が変わる？"><p>これから追加する保守期間・請求予定に使います。「前年12月1日請求」を選ぶと、「請求情報」の予定日よりこちらを優先します。</p><p>過去の記録・保守開始日・登録済みの予定は変わりません。請求書の自動作成・送信はしません。</p>{!!own.length&&<p>以前の設定は「変更履歴」→「請求の変更」で確認できます。</p>}</HelpNote>
+
     {!compatible&&latest?.mode==='calendar_prepaid'&&<p role="alert" className="notice notice-error">繰り返し設定と請求方法・回数が一致していません。「請求書・年1回」にするか、繰り返し設定を変更してください。</p>}
     {!onSave&&<p role="status">繰り返し設定の保存機能は、この環境ではまだ利用できません。</p>}
     {!open&&notice&&<p role="status" className="notice">{notice}</p>}
@@ -34,9 +34,9 @@ export function BillingCycleSettings({contract,units,rules,onSave}:{contract:Con
       </select></label>
       {!compatible&&<p>1月〜12月・前年12月1日請求は「請求情報」が「請求書・年1回」の発電所で利用できます。</p>}
       <label>何年分の保守期間から適用するか<input className="form-input" type="number" min={2001} max={2199} value={year} onChange={e=>{setYear(Number(e.target.value));change()}}/></label>
-      <HelpNote title="適用する年の選び方"><p>例：「前年12月1日請求」で2027年を選ぶと、2027年1月〜12月分を2026年12月1日に請求する予定になります。下の表で確認してください。</p></HelpNote>
+
       <div className="billing-overview-scroll"><table className="billing-overview-table"><thead><tr><th>対象の保守期間</th><th>請求予定日</th></tr></thead><tbody>{examples.map(e=><tr key={e.year}><td>{e.periodStart} ～ {e.periodEnd}</td><td>{e.date}</td></tr>)}</tbody></table></div>
-      <p>年の途中で切り替える場合は、先に「請求詳細」で年末までの保守期間を登録してください。</p><HelpNote title="年の途中で切り替えるときは？"><p>例：8月開始から1月開始に変える場合は、8月〜12月分を「請求詳細」→「保守期間の確認・修正」で登録します。この短い期間の金額は自分で入力してください。</p><p>保守期間が重なる場合や登録済みの請求と合わない場合は、保存前にお知らせします。</p></HelpNote>
+      <p>年の途中で切り替える場合は、先に「請求詳細」で年末までの保守期間を登録してください。</p>
       <label>確認内容・備考<textarea className="form-input" value={reason} onChange={e=>{setReason(e.target.value);change()}} placeholder="例：8月〜年末の移行期間を確認済み。2027年分から1月〜12月、前年12月1日請求に統一"/></label>
       {notice&&<p role="alert" className="notice notice-error">{notice}</p>}
       {review&&<p role="status" className="notice">上の繰り返し設定だけを保存します。保存済みの請求・入金・金額・期間・請求先は変更しません。今後も請求先と金額を確認して「予定を登録」し、発行日・入金日を記録してください。</p>}

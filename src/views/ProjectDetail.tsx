@@ -1027,7 +1027,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               <h3 className="section-title" style={{ margin: 0 }}>請求情報</h3>
               {contract && <button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('billing')}>編集</button>}
             </div>
-            {billingHistory&&<p className="invoice-reference-help">今後の基本設定です。請求予定日を変更して保存すると、保存済みの未発行予定も変更するか確認できます。すでに設定だけ変更した回や個別の予定は「請求詳細」の「予定を変更」から修正してください。</p>}
+            {billingHistory&&<p className="invoice-reference-help">今後の基本設定です。「編集」→「保存する」で、保存済みの未発行予定も確認できます。基本設定と日付が違う回・日付未登録の回は、その確認画面で日付を入力して修正できます。</p>}
             {(() => {
               const annualInc = annualBillableTotalInc(contract)
               const excludedItems = contract ? BILLING_ITEMS.filter(it => contract.billing_item_flags?.[it.key] === false && (contract[it.field] ?? 0) > 0) : []
@@ -1837,7 +1837,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       {editSection && (
         <Modal title={SECTION_TITLES[editSection]} closeDisabled={saving} onClose={() => {setEditSection(null);setScheduleReview(null);setScheduleOutcome(null);if(scheduleFailure){setScheduleFailure('');onReload()}}}>
           {err && <div className="form-error">{err}</div>}
-          {scheduleFailure?<section className="schedule-change-review">{scheduleOutcome?.requests.map((q,i)=>{const c=scheduleReview?.changes.find(c=>Number(c.unit.id)===q.unitId);return <p key={q.unitId}><strong>{scheduleOutcome.settingsSaved?(i<scheduleOutcome.completed?'保存確認済み':i===scheduleOutcome.completed?'保存結果要確認':'未着手'):'未着手'}</strong>：{c?`${c.unit.serviceYear}年・${c.unit.roundLabel} ／ ${c.unit.scheduledDate} → ${c.date}`:`請求記録ID ${q.unitId}`}</p>})}<button type="button" className="btn btn-sub" onClick={()=>{setEditSection(null);setScheduleReview(null);setScheduleFailure('');setScheduleOutcome(null);onReload()}}>閉じて最新の情報を確認</button></section>:scheduleReview?<BillingScheduleChangeReview review={scheduleReview} name={project.plant_name||project.project_name} recipientName={id=>billingHistory?.recipientName(id)??`顧客ID ${id}`} busy={saving} onBack={()=>{setScheduleReview(null);setErr('')}} onSave={requests=>void handleSaveSection(requests)}/>:<>
+          {scheduleFailure?<section className="schedule-change-review">{scheduleOutcome?.requests.map((q,i)=>{const c=[...(scheduleReview?.changes??[]),...(scheduleReview?.editable??[])].find(c=>Number(c.unit.id)===q.unitId),nextDate=(q.value as {scheduled_date?:string}).scheduled_date;return <p key={q.unitId}><strong>{scheduleOutcome.settingsSaved?(i<scheduleOutcome.completed?'保存確認済み':i===scheduleOutcome.completed?'保存結果要確認':'未着手'):'未着手'}</strong>：{c?`${c.unit.serviceYear}年・${c.unit.roundLabel} ／ ${c.unit.scheduledDate||'未登録'} → ${nextDate??c.date}`:`請求記録ID ${q.unitId}`}</p>})}<button type="button" className="btn btn-sub" onClick={()=>{setEditSection(null);setScheduleReview(null);setScheduleFailure('');setScheduleOutcome(null);onReload()}}>閉じて最新の情報を確認</button></section>:scheduleReview?<BillingScheduleChangeReview review={scheduleReview} name={project.plant_name||project.project_name} recipientName={id=>billingHistory?.recipientName(id)??`顧客ID ${id}`} busy={saving} onBack={()=>{setScheduleReview(null);setErr('')}} onSave={requests=>void handleSaveSection(requests)}/>:<>
           <div className="form-grid">
 
             {/* 概要 */}

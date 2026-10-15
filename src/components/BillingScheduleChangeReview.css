@@ -9,6 +9,10 @@
 .schedule-change-dates { color:#0f172a; }
 .schedule-change-dates b { color:#0369a1; }
 .schedule-change-manual { padding:12px; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; }
+.schedule-change-editable { min-width:0; margin:14px 0; padding:12px; border:1px solid #e2e8f0; border-radius:8px; background:#fff; }
+.schedule-change-editable .schedule-change-row { border:0; padding:0; margin:0 0 14px; }
+.schedule-change-date-label { display:flex; flex-direction:column; gap:6px; font-size:13px; font-weight:600; }
+.schedule-change-date-label .form-input { box-sizing:border-box; width:100%; min-width:0; min-height:42px; }
 .schedule-change-buttons { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; margin-top:20px; }
 .schedule-change-buttons .btn { white-space:normal; min-height:40px; }
 @media(max-width:620px) { .schedule-change-buttons { flex-direction:column; align-items:stretch; } .schedule-change-row { padding:12px; } }

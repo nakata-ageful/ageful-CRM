@@ -1,20 +1,20 @@
 import type {Contract} from '../types'
 import {parseScheduleDay} from './billing'
 import {isActiveBillingUnit,isBillingDate,isEditableInvoicePlan,type BillingUnit} from './billing-unit'
-import {futureMaintenancePeriod,cycleRuleForYear,type BillingCycleRule} from './billing-cycle'
+import {futureMaintenancePeriod,cycleInvoiceDate,cycleRuleForYear,type BillingCycleRule} from './billing-cycle'
 import type {InvoiceWriteRequest} from './invoice-write-session'
 
-export type ScheduleDateChange={unit:BillingUnit;date:string;period:string}
-export type ScheduleDateReview={changes:ScheduleDateChange[];manual:BillingUnit[];preserved:number;notice:string}
-/** Only propose correspondences that can be explained by the OLD schedule.
- * The caller/operator selects the exact saved unit; never choose by earliest date.
+export type ScheduleDateChange={unit:BillingUnit;date:string;period:string;reason?:string}
+export type ScheduleDateReview={changes:ScheduleDateChange[];editable?:ScheduleDateChange[];manual:BillingUnit[];preserved:number;notice:string}
+/** Calculated suggestions require the old schedule to match; exceptions get an
+ * empty editable date. The operator always selects the exact saved unit.
  */
 export function reviewScheduleDateChanges(before:Contract,after:Contract,units:readonly BillingUnit[],today:string,rules:readonly BillingCycleRule[]=[]):ScheduleDateReview|null {
   const oldDays=before.billing_schedule_days??[],newDays=after.billing_schedule_days??[]
   const sameDay=(a:string,b:string)=>JSON.stringify(parseScheduleDay(a))===JSON.stringify(parseScheduleDay(b))
-  if(oldDays.length===newDays.length&&oldDays.every((d,i)=>sameDay(d,newDays[i])))return null
+  const scheduleChanged=!(oldDays.length===newDays.length&&oldDays.every((d,i)=>sameDay(d,newDays[i])))
   const own=units.filter(u=>u.projectId===before.project_id&&isActiveBillingUnit(u))
-  const changes:ScheduleDateChange[]=[],manual:BillingUnit[]=[]
+  const changes:ScheduleDateChange[]=[],editable:ScheduleDateChange[]=[],manual:BillingUnit[]=[]
   const count=before.billing_count??oldDays.length
   const compatible=before.billing_method==='請求書'&&after.billing_method==='請求書'&&count===(after.billing_count??newDays.length)&&count>0&&oldDays.length===count&&newDays.length===count&&before.maintenance_start_date===after.maintenance_start_date
   const dateFor=(day:string,year:number,start:string)=>{const {month,day:d}=parseScheduleDay(day);if(!month||!d)return null
@@ -23,23 +23,39 @@ export function reviewScheduleDateChanges(before:Contract,after:Contract,units:r
     return isBillingDate(value)?value:null}
   for(const u of own.filter(u=>u.lifecycle==='planned')){
     const round=/^第(\d+)回$/.exec(u.roundLabel),i=round?Number(round[1])-1:-1
-    if(compatible&&i>=0&&i<count&&sameDay(oldDays[i],newDays[i]))continue
+    let periodLabel=u.periodStart&&u.periodEnd?`${u.periodStart} ～ ${u.periodEnd}`:'保守期間未確認'
+    let expectedNew:string|null=null
     try{
-      if(!compatible||!isEditableInvoicePlan(u)||!isBillingDate(today)||!u.scheduledDate||u.scheduledDate<today||i<0||i>=count||!Number.isSafeInteger(Number(u.id))||Number(u.id)<=0||cycleRuleForYear(rules,before.project_id,u.serviceYear)?.mode==='calendar_prepaid')throw Error('manual')
+      const period=futureMaintenancePeriod(after,u.serviceYear,rules)
+      if(!u.periodStart&&!u.periodEnd)periodLabel=`${period.periodStart} ～ ${period.periodEnd}（参考・期間未保存）`
+      if(after.billing_method==='請求書')expectedNew=cycleInvoiceDate(after,u.serviceYear,rules)??(i>=0&&i<newDays.length?dateFor(newDays[i],u.serviceYear,period.periodStart):null)
+    }catch{/* Manual input never requires inventing a service period. */}
+    if(expectedNew&&expectedNew===u.scheduledDate&&(!scheduleChanged||cycleRuleForYear(rules,after.project_id,u.serviceYear)?.mode==='calendar_prepaid'))continue
+    if(scheduleChanged&&compatible&&i>=0&&i<count&&sameDay(oldDays[i],newDays[i])&&expectedNew===u.scheduledDate)continue
+    try{
+      if(!scheduleChanged||!compatible||!isEditableInvoicePlan(u)||u.frozenLineItems!==null||!isBillingDate(today)||!u.scheduledDate||u.scheduledDate<today||i<0||i>=count||!Number.isSafeInteger(Number(u.id))||Number(u.id)<=0||cycleRuleForYear(rules,before.project_id,u.serviceYear)?.mode==='calendar_prepaid')throw Error('manual')
       const period=futureMaintenancePeriod(before,u.serviceYear,rules)
       if((u.periodStart||u.periodEnd)&&(u.periodStart!==period.periodStart||u.periodEnd!==period.periodEnd))throw Error('manual')
       const oldDate=dateFor(oldDays[i],u.serviceYear,period.periodStart),newDate=dateFor(newDays[i],u.serviceYear,period.periodStart)
       if(!oldDate||oldDate!==u.scheduledDate||!newDate||newDate<today||newDate===oldDate)throw Error('manual')
       if(u.paymentDueOn&&u.paymentDueOn<newDate)throw Error('manual')
       changes.push({unit:structuredClone(u),date:newDate,period:`${period.periodStart} ～ ${period.periodEnd}${!u.periodStart?'（参考・期間未保存）':''}`})
-    }catch{manual.push(structuredClone(u))}
+    }catch{
+      if(isEditableInvoicePlan(u)&&u.frozenLineItems===null&&Number.isSafeInteger(Number(u.id))&&Number(u.id)>0){
+        const reason=!u.scheduledDate?'請求予定日が未登録です。':u.scheduledDate<today?'期限を過ぎた未発行予定です。':cycleRuleForYear(rules,before.project_id,u.serviceYear)?.mode==='calendar_prepaid'?'前年12月請求の繰り返し設定があります。この回だけを変更します。':!compatible?'基本設定から日付を決められないため、変更日を入力してください。':'基本設定と日付・期間が異なる予定です。'
+        editable.push({unit:structuredClone(u),date:'',period:periodLabel,reason})
+      }else if(scheduleChanged)manual.push(structuredClone(u))
+    }
   }
   changes.sort((a,b)=>a.unit.scheduledDate!.localeCompare(b.unit.scheduledDate!)||a.unit.id.localeCompare(b.unit.id))
-  return {changes,manual,preserved:own.length-changes.length-manual.length,notice:compatible?'':'請求方法・回数も変更される場合や口座振替は、各回の予定を「請求詳細」で個別に確認してください。'}
+  if(!scheduleChanged&&!editable.length)return null
+  return {changes,editable,manual,preserved:own.length-changes.length-editable.length-manual.length,notice:compatible?'':'基本設定をそのまま当てはめず、この回の請求予定日を確認して入力してください。口座振替は「請求詳細」で確認してください。'}
 }
 export function scheduleDateRequest(change:ScheduleDateChange):InvoiceWriteRequest {
   const u=change.unit
-  if(!isEditableInvoicePlan(u)||!isBillingDate(change.date)||!Number.isSafeInteger(Number(u.id))||Number(u.id)<=0)throw Error('変更対象の予定を確認してください')
+  if(!isEditableInvoicePlan(u)||u.frozenLineItems!==null||!isBillingDate(change.date)||!Number.isSafeInteger(Number(u.id))||Number(u.id)<=0)throw Error('変更対象の予定と請求予定日を確認してください')
+  if(change.date===u.scheduledDate)throw Error('変更後の請求予定日が現在と同じです。変更しない回はチェックを外してください。')
+  if(u.paymentDueOn&&u.paymentDueOn<change.date)throw Error('請求予定日が保存済みの入金予定日より後になります。「請求詳細」で入金予定日もあわせて確認してください。')
   return {unitId:Number(u.id),revision:u.revision,mode:'plan',value:{recipient_customer_id:u.recipientId,scheduled_date:change.date,planned_amount:u.plannedAmount??null},reason:null}
 }
 export class ScheduleChangeSaveError extends Error {

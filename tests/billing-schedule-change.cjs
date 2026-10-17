@@ -10,7 +10,7 @@ const original=plain([unit,paid]);let r=review(before,after,[unit,paid],'2026-10
 assert.deepEqual(plain(request(r.changes[0])),{unitId:123,revision:9,mode:'plan',value:{recipient_customer_id:10,scheduled_date:'2026-11-01',planned_amount:165000},reason:null});
 assert.equal(review(before,{...before,billing_schedule_days:['7月01日','12月1日']},[unit],'2026-10-14'),null);
 const yearLater={...unit,id:'125',serviceYear:2027,scheduledDate:'2027-12-01'};assert.equal(review(before,after,[unit,yearLater],'2026-10-14').changes.length,2);
-const first={...unit,roundLabel:'第1回',scheduledDate:'2026-07-01'};assert.equal(review(before,after,[first],'2026-01-01').changes[0].date,'2027-05-01','Anchor to maintenance period, not calendar year');
+const first={...unit,roundLabel:'第1回',scheduledDate:'2026-07-01'};assert.equal(review(before,after,[first],'2026-01-01').changes[0].date,'2026-05-01','A prepayment remains in the service start year');
 for(const patch of [{scheduledDate:'2026-12-15'},{periodStart:'2026-08-01',periodEnd:'2026-12-31'},{scheduledDate:'2025-12-01'},{roundLabel:'保存済み単回記録'},{method:'口座振替'},{paymentDueOn:'2026-10-31'}])assert.equal(review(before,after,[{...unit,...patch}],'2026-10-14').changes.length,0);
 assert.equal(review(before,{...after,billing_count:1},[unit],'2026-10-14').editable.length,1);
 const rule={id:1,project_id:1,effective_year:2026,mode:'calendar_prepaid'};assert.equal(review(before,after,[unit],'2026-10-14',[rule]).changes.length,0);

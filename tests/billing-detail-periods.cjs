@@ -100,6 +100,13 @@ console.log('PASS: service-period grouping, two rounds/prepayments, preserved ex
  nodes(tree,e=>e.type==='select'&&e.props.value==='10')[0].props.onChange({target:{value:'11'}});tree=render()
  assert.equal(nodes(tree,e=>e.type==='input'&&e.props.inputMode==='numeric')[0].props.value,'','Changing occurrence must not retain the old round/month amount')
  assert.ok(!button(tree,'確認した予定を保存'))
+ state.length=0;refs.length=0
+ props.contract=invoice;props.units=[];props.candidate=candidate(invoice,7,[],'2026-10-03')
+ tree=render();nodes(tree,e=>e.type==='input'&&e.props.type==='number')[0].props.onChange({target:{value:'2028'}});tree=render()
+ assert.ok(nodes(tree,e=>e.type==='input'&&e.props.type==='date').some(e=>e.props.value==='2028-07-14'),'Changing service year refreshes the invoice suggestion too')
+ nodes(tree,e=>e.type==='select')[0].props.onChange({target:{value:'2'}});tree=render()
+ assert.ok(nodes(tree,e=>e.type==='input'&&e.props.type==='date').some(e=>e.props.value==='2029-01-14'),'Changing round retains the ordered next-year rollover')
+ assert.ok(!button(tree,'確認した予定を保存'),'Changing date identity invalidates confirmation')
  assert.equal(JSON.stringify(units),before)
  console.log('PASS: real creator handlers require review/reconfirmation, preserve zero, send one occurrence and do not mutate historical financials')
 })().catch(e=>{console.error(e);process.exitCode=1})

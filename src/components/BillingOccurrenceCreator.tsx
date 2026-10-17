@@ -7,6 +7,7 @@ import {futureMaintenancePeriod,cycleInvoiceDate,type BillingCycleRule} from '..
 import {detailPlanCount,validateDetailPlan,type DetailPlanCandidate} from '../lib/billing-detail-plan'
 import type {MaintenanceScheduleItem} from '../lib/maintenance-schedule'
 import {fmtYen} from '../lib/utils'
+import {invoiceScheduleDate} from '../lib/invoice-schedule-date'
 
 export type AddBillingOccurrence=(item:MaintenanceScheduleItem,reason:string)=>Promise<unknown>
 
@@ -24,10 +25,11 @@ export function BillingOccurrenceCreator({candidate,contract,units,recipients,on
   const lock=useRef(false),debit=candidate.method==='direct_debit'
   const change=(setter:(v:string)=>void,value:string)=>{setter(value);setConfirmed(null);setError('')}
   const changeCoverage=(setter:(v:string)=>void,value:string)=>{change(setter,value);setAmount('')}
+  const invoiceDate=(y:string,r:string)=>{if(!debit)setDate(cycleInvoiceDate(contract,Number(y),cycleRules)??invoiceScheduleDate(contract,Number(y),Number(r))??'')}
   const years=(value:string)=>{
     changeCoverage(setYear,value)
     const stored=units.find(u=>u.serviceYear===Number(value)&&u.periodStart&&u.periodEnd)
-    try{const period=stored?{periodStart:stored.periodStart!,periodEnd:stored.periodEnd!}:futureMaintenancePeriod(contract,Number(value),cycleRules);setStart(period.periodStart);setEnd(period.periodEnd);const prepaid=cycleInvoiceDate(contract,Number(value),cycleRules);if(prepaid)setDate(prepaid)}catch{setStart('');setEnd('')}
+    try{const period=stored?{periodStart:stored.periodStart!,periodEnd:stored.periodEnd!}:futureMaintenancePeriod(contract,Number(value),cycleRules);setStart(period.periodStart);setEnd(period.periodEnd);invoiceDate(value,round)}catch{setStart('');setEnd('');if(!debit)setDate('')}
   }
   function review(e:React.FormEvent){e.preventDefault();setError('');setConfirmed(null)
     try{
@@ -48,7 +50,7 @@ export function BillingOccurrenceCreator({candidate,contract,units,recipients,on
     {error&&<p role="alert">{error}</p>}
     <form onSubmit={review}><fieldset disabled={busy} style={{border:0,padding:0}}>
       <label>保守期間の開始年<input type="number" min={2000} max={2199} required value={year} onChange={e=>years(e.target.value)}/></label>
-      <label>対象の回<select value={round} onChange={e=>changeCoverage(setRound,e.target.value)}>{Array.from({length:detailPlanCount(contract)},(_,i)=><option key={i} value={i+1}>第{i+1}回</option>)}</select></label>
+      <label>対象の回<select value={round} onChange={e=>{changeCoverage(setRound,e.target.value);invoiceDate(year,e.target.value)}}>{Array.from({length:detailPlanCount(contract)},(_,i)=><option key={i} value={i+1}>第{i+1}回</option>)}</select></label>
       <label>保守期間の開始日<input type="date" required value={start} onChange={e=>{changeCoverage(setStart,e.target.value);setYear(e.target.value.slice(0,4))}}/></label>
       <label>保守期間の終了日<input type="date" required value={end} onChange={e=>changeCoverage(setEnd,e.target.value)}/></label>
       <CustomerPicker label="請求先" value={recipient} onChange={value=>change(setRecipient,value)} customers={recipients}/>

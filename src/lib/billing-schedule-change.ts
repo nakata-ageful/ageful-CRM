@@ -5,6 +5,7 @@ import {futureMaintenancePeriod,cycleInvoiceDate,cycleRuleForYear,type BillingCy
 import type {InvoiceWriteRequest} from './invoice-write-session'
 import {detailPlanCandidate} from './billing-detail-plan'
 import {managementActiveOn,type ManagementEvent} from './management-lifecycle'
+import {invoiceScheduleDate} from './invoice-schedule-date'
 
 export type ScheduleDateChange={unit:BillingUnit;date:string;period:string;reason?:string}
 export type ScheduleDatePreview={year:number;round:number;date:string;period:string;warning?:string;method:'invoice'|'direct_debit'}
@@ -22,10 +23,6 @@ export function reviewScheduleDateChanges(before:Contract,after:Contract,units:r
   const changes:ScheduleDateChange[]=[],editable:ScheduleDateChange[]=[],manual:BillingUnit[]=[]
   const count=before.billing_count??oldDays.length
   const compatible=before.billing_method==='請求書'&&after.billing_method==='請求書'&&count===(after.billing_count??newDays.length)&&count>0&&oldDays.length===count&&newDays.length===count&&before.maintenance_start_date===after.maintenance_start_date
-  const dateFor=(day:string,year:number,start:string)=>{const {month,day:d}=parseScheduleDay(day);if(!month||!d)return null
-    const y= `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`<start?year+1:year
-    const value=`${y}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`
-    return isBillingDate(value)?value:null}
   for(const u of own.filter(u=>u.lifecycle==='planned')){
     const round=/^第(\d+)回$/.exec(u.roundLabel),i=round?Number(round[1])-1:-1
     let periodLabel=u.periodStart&&u.periodEnd?`${u.periodStart} ～ ${u.periodEnd}`:'保守期間未確認'
@@ -33,7 +30,7 @@ export function reviewScheduleDateChanges(before:Contract,after:Contract,units:r
     try{
       const period=futureMaintenancePeriod(after,u.serviceYear,rules)
       if(!u.periodStart&&!u.periodEnd)periodLabel=`${period.periodStart} ～ ${period.periodEnd}（参考・期間未保存）`
-      if(after.billing_method==='請求書')expectedNew=cycleInvoiceDate(after,u.serviceYear,rules)??(i>=0&&i<newDays.length?dateFor(newDays[i],u.serviceYear,period.periodStart):null)
+      if(after.billing_method==='請求書')expectedNew=cycleInvoiceDate(after,u.serviceYear,rules)??invoiceScheduleDate(after,u.serviceYear,i+1)
     }catch{/* Manual input never requires inventing a service period. */}
     if(expectedNew&&expectedNew===u.scheduledDate&&u.method===after.billing_method)continue
     if(scheduleChanged&&compatible&&i>=0&&i<count&&sameDay(oldDays[i],newDays[i])&&expectedNew===u.scheduledDate)continue
@@ -41,7 +38,7 @@ export function reviewScheduleDateChanges(before:Contract,after:Contract,units:r
       if(!scheduleChanged||!compatible||!isEditableInvoicePlan(u)||u.frozenLineItems!==null||!isBillingDate(today)||!u.scheduledDate||u.scheduledDate<today||i<0||i>=count||!Number.isSafeInteger(Number(u.id))||Number(u.id)<=0||cycleRuleForYear(rules,before.project_id,u.serviceYear)?.mode==='calendar_prepaid')throw Error('manual')
       const period=futureMaintenancePeriod(before,u.serviceYear,rules)
       if((u.periodStart||u.periodEnd)&&(u.periodStart!==period.periodStart||u.periodEnd!==period.periodEnd))throw Error('manual')
-      const oldDate=dateFor(oldDays[i],u.serviceYear,period.periodStart),newDate=dateFor(newDays[i],u.serviceYear,period.periodStart)
+      const oldDate=invoiceScheduleDate(before,u.serviceYear,i+1),newDate=invoiceScheduleDate(after,u.serviceYear,i+1)
       if(!oldDate||oldDate!==u.scheduledDate||!newDate||newDate<today||newDate===oldDate)throw Error('manual')
       if(u.paymentDueOn&&u.paymentDueOn<newDate)throw Error('manual')
       changes.push({unit:structuredClone(u),date:newDate,period:`${period.periodStart} ～ ${period.periodEnd}${!u.periodStart?'（参考・期間未保存）':''}`})

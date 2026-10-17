@@ -4,6 +4,7 @@ import {validateIndividualPeriod,type IndividualPeriod} from './individual-maint
 import {invoiceAmount} from './billing'
 import {managementActiveOn,managementBillingContract,type ManagementEvent} from './management-lifecycle'
 import {futureMaintenancePeriod,cycleInvoiceDate,validateCycleOccurrence,type BillingCycleRule} from './billing-cycle'
+import {invoiceScheduleDate} from './invoice-schedule-date'
 export type MaintenanceScheduleItem={year:number;periodStart:string;periodEnd:string;round:number;method:'invoice'|'direct_debit';date:string;recipientId:number;amount:number|null;exclusion?:string}
 export function selectedMaintenanceScheduleItems(items:readonly (MaintenanceScheduleItem&{include:boolean})[]):MaintenanceScheduleItem[]{
  return items.filter(item=>item.include).map(item=>({
@@ -28,6 +29,6 @@ export function maintenanceSchedule(contract:Contract,year:number,recipientId:nu
   const round=i+1,existing=own.find(u=>u.roundLabel===`第${round}回`||u.roundLabel==='保存済み単回記録'||u.roundLabel.endsWith('月分'))
   const exclusion=!active?'対象保守期間の開始時点では全取引終了です。再開後の期間を確認してください':existing?
    existing.roundLabel===`第${round}回`?`この保守期間の第${round}回は保存済みです${existing.lifecycle==='cancelled'?'（取りやめ済み）':''}`:'この保守期間の保存記録は回の対応確認が必要です':undefined
-  return {...period,year,round,method,date:method==='invoice'?cycleInvoiceDate(contract,year,rules)??'':'',recipientId,amount:method==='invoice'&&!changes.length?invoiceAmount(effective,round,count):null,exclusion}
+  return {...period,year,round,method,date:method==='invoice'?cycleInvoiceDate(contract,year,rules)??invoiceScheduleDate(contract,year,round)??'':'',recipientId,amount:method==='invoice'&&!changes.length?invoiceAmount(effective,round,count):null,exclusion}
  })
 }

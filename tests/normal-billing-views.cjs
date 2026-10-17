@@ -29,7 +29,7 @@ for(const state of ['planned','issued','received']){
 const detailHistory={units:[old,{...base,id:'current',roundLabel:'第2回',recipientId:2,lifecycle:'issued',scheduledDate:'2026-12-01',issuedOn:'2026-12-03',paymentDueOn:'2026-12-31',frozenAmount:82500,frozenLineItems:[{name:'保守料',amount:82500}],frozenAt:'2026-12-03T00:00:00Z'}],
  recipientName:id=>id===1?'旧所有者A':'新所有者B',projectName:()=> '検証発電所',plannedAmount:()=>999999,recipients:[{id:1,name:'旧所有者A'},{id:2,name:'新所有者B'}]};
 const detailHtml=render(InvoiceLedgerDetail,{data:detailHistory,projectId:1,onSave:async()=>{}});
-for(const text of ['今回・次回の請求','82,500','新所有者B','請求予定日','2026-12-01','請求日','2026-12-03','入金予定日','2026-12-31','請求明細','保守料','過去の請求・入金記録','旧所有者A','165,000','入金日を記録'])assert.ok(detailHtml.includes(text),`billing detail missing ${text}`);
+for(const text of ['今回・次回の請求','82,500','新所有者B','請求予定日','2026-12-01','請求日','2026-12-03','入金予定日','2026-12-31','請求明細','保守料','保存済みの請求予定・入金記録','旧所有者A','165,000','入金日を記録'])assert.ok(detailHtml.includes(text),`billing detail missing ${text}`);
 assert.ok(!detailHtml.includes('この発電所の操作'),'old all-actions block must not return');
 const periodDetail=render(InvoiceLedgerDetail,{data:detailHistory,projectId:1,onSave:noAction,maintenanceStartDate:'2022-07-14',onSavePeriod:noAction});
 assert.ok(periodDetail.includes('保守期間の確認・修正'));

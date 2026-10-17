@@ -4,7 +4,7 @@ import type {TransferBillingUnit} from './ownership-billing-plan'
 /** Read-only correspondence review shared by the UI and migration rehearsal. */
 export function reviewFutureSchedule(candidates:readonly CoverageCandidate[],units:readonly TransferBillingUnit[]){
  return candidates.map(candidate=>{
-  const own=units.filter(u=>u.projectId===candidate.projectId),year=Number(candidate.date.slice(0,4)),month=Number(candidate.date.slice(5,7))
+  const own=units.filter(u=>u.projectId===candidate.projectId),year=candidate.serviceYear??Number(candidate.date.slice(0,4)),month=Number(candidate.date.slice(5,7))
   let exclusion:string|undefined
   if(own.some(u=>u.lifecycle==='planned'&&!u.scheduledDate))exclusion='日付未設定の請求予定があります'
   else if(candidates.filter(c=>c.projectId===candidate.projectId&&c.date===candidate.date).length>1)exclusion='同じ日に複数回の候補があります'

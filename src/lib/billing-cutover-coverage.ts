@@ -6,6 +6,7 @@ import type {BillingUnit} from './billing-unit'
 import {debitScheduleReminder} from './debit-schedule-reminder'
 import {cycleRuleForYear,cycleCompatibility,futureMaintenancePeriod,type BillingCycleRule} from './billing-cycle'
 import {inspectCandidatePeriod} from './billing-period-coverage'
+import {invoiceServiceYear} from './invoice-schedule-date'
 
 type StoredUnit={project_id:number;service_year?:number;recipient_customer_id:number;recipient_source?:string;collection_method:string;scheduled_date:string|null;lifecycle:string;planned_amount:number|null;round_number?:number|null;service_month?:number|null;period_start?:string|null;period_end?:string|null;removed_at?:string|null}
 export type CoverageCandidate={projectId:number;recipientId:number;method:'invoice'|'direct_debit';date:string;round:number;amount:number;status:'missing'|'matches'|'handled'|'review'|'overdue';reason?:string;serviceYear?:number;periodStart?:string;periodEnd?:string}
@@ -50,7 +51,7 @@ export function inspectFutureBillingCoverage(rows:readonly BillingRow[],recipien
         let serviceYear=item.serviceYear,periodStart:string|undefined,periodEnd:string|undefined,periodReason:string|undefined
         if(method==='invoice'){
           try{
-            if(serviceYear==null){serviceYear=y;if(item.date<futureMaintenancePeriod(c,y,rules).periodStart)serviceYear--}
+            if(serviceYear==null)serviceYear=invoiceServiceYear(c,item.date,item.round)??y
             const period=futureMaintenancePeriod(c,serviceYear,rules)
             periodStart=period.periodStart;periodEnd=period.periodEnd
             const assessment=inspectCandidatePeriod(c,serviceYear,period,periodEvidence,rules)

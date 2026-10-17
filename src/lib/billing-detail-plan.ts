@@ -7,6 +7,7 @@ import {managementActiveOn,managementBillingContract,type ManagementEvent} from 
 import {validateIndividualPeriod} from './individual-maintenance-period'
 import {futureMaintenancePeriod,cycleInvoiceDate,cycleRuleForYear,validateCycleOccurrence,type BillingCycleRule} from './billing-cycle'
 import {inspectCandidatePeriod} from './billing-period-coverage'
+import {invoiceScheduleDate} from './invoice-schedule-date'
 
 export type DetailPlanCandidate = Omit<MaintenanceScheduleItem,'periodStart'|'periodEnd'> & {periodStart:string|null;periodEnd:string|null;reviewReason?:string}
 
@@ -44,13 +45,8 @@ export function detailPlanCandidate(contract:Contract,recipientId:number,units:r
       const prepaidDate=cycleInvoiceDate(contract,serviceYear,rules)
       if(prepaidDate){options.push({year:serviceYear,round:1,date:prepaidDate,month:12});continue}
       for(let round=1;round<=count;round++){
-        const {month,day}=parseScheduleDay(contract.billing_schedule_days?.[round-1]??'')
-        let cy=serviceYear
-        try{const period=futureMaintenancePeriod(contract,serviceYear,rules)
-          if(month&&day&&`${cy}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`<period.periodStart)cy++
-        }catch{/* Year is only a reference until the operator chooses coverage. */}
-        const date=month&&day?`${cy}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`:''
-        options.push({year:serviceYear,round,date:isBillingDate(date)?date:'',month:month??1})
+        const {month}=parseScheduleDay(contract.billing_schedule_days?.[round-1]??'')
+        options.push({year:serviceYear,round,date:invoiceScheduleDate(contract,serviceYear,round)??'',month:month??1})
       }
     }
   }

@@ -13,11 +13,14 @@ const bank:Contract={...blank,id:1,project_id:1,billing_method:'口座振替',bi
 const paper={...bank,billing_method:'請求書',billing_count:2,billing_schedule_days:['7月14日','1月14日'],maintenance_start_date:'2022-07-14'}
 const first:BillingUnit={id:'1',projectId:1,serviceYear:2026,roundLabel:'第1回',method:'請求書',scheduledDate:'2025-12-01',issuedOn:'2025-12-02',receivedOn:'2025-12-20',paymentDueOn:'2025-12-31',recipientId:1,lifecycle:'received',frozenAmount:82500,frozenLineItems:[{name:'保守料',amount:82500}],frozenAt:'2025-12-02T00:00:00Z',plannedAmount:null,revision:1,periodStart:'2026-07-14',periodEnd:'2027-07-13'}
 const second:BillingUnit={...first,id:'2',roundLabel:'第2回',scheduledDate:'2027-01-14',issuedOn:null,receivedOn:null,paymentDueOn:null,lifecycle:'planned',frozenAmount:null,frozenLineItems:null,frozenAt:null,plannedAmount:82500,recipientId:2}
+const june={...paper,billing_count:1,billing_schedule_days:['6月1日'],maintenance_start_date:'2025-07-01'}
+const november={...june,billing_schedule_days:['11月1日'],maintenance_start_date:'2022-12-23'}
+const prepaidHistory={...first,roundLabel:'保存済み単回記録',serviceYear:2026,periodStart:null,periodEnd:null,scheduledDate:null}
 function Preview(){
  const [mode,setMode]=useState('bank'),[units,setUnits]=useState<BillingUnit[]>([])
- const [notice,setNotice]=useState(''),contract=mode==='bank'?bank:paper
+ const [notice,setNotice]=useState(''),contract=mode==='bank'?bank:mode==='june'?june:mode==='november'?november:paper
  return <main style={{padding:24,maxWidth:1260,margin:'auto'}}><div className="notice">隔離検証：合成データのみ。保存操作はこのページのメモリーだけに反映します。本番DBへの接続はありません。</div>
-   <div style={{display:'flex',gap:12,marginBottom:20}}><button className="btn" onClick={()=>{setMode('bank');setUnits([]);setNotice('')}}>口座振替・未登録</button><button className="btn" onClick={()=>{setMode('paper');setUnits([first,second]);setNotice('')}}>請求書・期間内2回</button></div>
+   <div style={{display:'flex',flexWrap:'wrap',gap:12,marginBottom:20}}><button className="btn" onClick={()=>{setMode('bank');setUnits([]);setNotice('')}}>口座振替・未登録</button><button className="btn" onClick={()=>{setMode('paper');setUnits([first,second]);setNotice('')}}>請求書・期間内2回</button><button className="btn" onClick={()=>{setMode('june');setUnits([prepaidHistory]);setNotice('')}}>7月開始・6月前払い</button><button className="btn" onClick={()=>{setMode('november');setUnits([{...prepaidHistory,serviceYear:2025}]);setNotice('')}}>12月開始・11月前払い</button></div>
    <h2 style={{marginBottom:20}}>検証発電所 ／ 請求詳細</h2>
    <InvoiceLedgerDetail key={mode} projectId={1} contract={contract} currentRecipientId={1} maintenanceStartDate={contract.maintenance_start_date} today="2026-10-03"
      data={{units,recipientName:id=>id===1?'検証顧客A':'検証顧客B',projectName:()=> '検証発電所',plannedAmount:()=>null,recipients:[{id:1,name:'検証顧客A'},{id:2,name:'検証顧客B'}]}}

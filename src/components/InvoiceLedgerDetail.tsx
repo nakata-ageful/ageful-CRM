@@ -205,7 +205,7 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
     })()}
     </div>
     <aside className="card invoice-history-panel">
-      <div className="invoice-history-heading"><div><span>保守期間ごとの</span><h3>過去の請求・入金記録</h3></div><b>{history.length}期間・{units.length}件</b></div>
+      <div className="invoice-history-heading"><div><span>保守期間ごとの</span><h3>保存済みの請求予定・入金記録</h3></div><b>{history.length}期間・{units.length}件</b></div>
       {!units.length&&<p className="empty-cell">保存済みの請求・入金記録はありません。</p>}
       <div className="invoice-history-list">
         {history.map(group=><section className="invoice-period-group" key={group.key} aria-label={`保守期間：${group.label}`}>

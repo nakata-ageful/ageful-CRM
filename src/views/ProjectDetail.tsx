@@ -54,6 +54,7 @@ function fmtFormNum(v: string | number | null | undefined): string {
   return n.toLocaleString('ja-JP')
 }
 import { useToast } from '../components/Toast'
+import {ProjectTodoPanel} from '../components/ProjectTodoPanel'
 
 
 /** カーソルを合わせる（スマホはタップ）と説明の吹き出しが出る「?」インフォマーク */
@@ -106,7 +107,7 @@ function InfoTip({ text }: { text: string }) {
   )
 }
 
-type Tab = '基本情報' | '設備情報' | '契約情報' | '保守情報' | '請求情報' | '請求詳細' | 'その他' | '保守対応' | '年次請求記録' | '管理設定' | '変更履歴'
+type Tab = '基本情報' | '設備情報' | '契約情報' | '保守情報' | '請求情報' | '請求詳細' | 'その他' | '保守対応' | '年次請求記録' | '管理設定' | '変更履歴' | 'Todo'
 
 type Props = {
   detail: ProjectDetail
@@ -142,7 +143,7 @@ const BILLING_METHODS = ['請求書', '口座振替'] as const
 
 // 年次請求記録タブは請求タブ／請求詳細に運用を集約したため非表示（描画コードは dormant で残置）
 // 並び順: 設定系 → 保守関連（保守情報・保守対応）→ 請求関連（請求情報・請求詳細）→ その他
-const TABS: Tab[] = ['基本情報', '設備情報', '契約情報', '保守情報', '保守対応', '請求情報', '請求詳細', '管理設定', '変更履歴', 'その他']
+const TABS: Tab[] = ['基本情報', '設備情報', '契約情報', '保守情報', '保守対応', 'Todo', '請求情報', '請求詳細', '管理設定', '変更履歴', 'その他']
 
 function readTabFromHash(): Tab {
   const h = window.location.hash
@@ -816,7 +817,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
 
       {/* タブ */}
       {ownershipStatus}
-      <div className="tab-bar">
+      <div className="tab-bar project-detail-tabs">
         {TABS.filter(t=>t==='管理設定'?!!managementTools:t==='変更履歴'?!!changeHistory:true).map(t => (
           <button
             key={t}
@@ -1130,6 +1131,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       )}
 
       {/* ── その他タブ ── */}
+      {tab==='Todo'&&<ProjectTodoPanel key={project.id} projectId={project.id} readOnly={readOnly}/>}
       {tab==='管理設定'&&!readOnly&&<div className="project-management-tab">{managementTools}
       {billingHistory&&(onAddDebit||(billingUnits&&onSaveBillingPlan))&&<BillingExceptionActions key={`billing-exceptions:${project.id}`} projectId={project.id} owner={customer??{id:0,name:'所有者未確認'}}
         recipients={billingHistory.recipients} units={billingUnits} onAddDebit={onAddDebit} onSavePlan={onSaveBillingPlan}/>}

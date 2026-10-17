@@ -12,7 +12,7 @@ import type {SavedMaintenancePeriodChange} from '../lib/saved-maintenance-period
 import {Modal} from './Modal'
 import type {Contract} from '../types'
 import {billingDetailPeriods} from '../lib/billing-detail-periods'
-import {detailPlanCandidate} from '../lib/billing-detail-plan'
+import {detailPlanCandidate,detailPlanCount} from '../lib/billing-detail-plan'
 import {BillingOccurrenceCreator,type AddBillingOccurrence} from './BillingOccurrenceCreator'
 import type {MaintenanceScheduleItem} from '../lib/maintenance-schedule'
 import {annualBillableTotalInc} from '../lib/billing'
@@ -100,6 +100,12 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
   const focused = focusedId==='auto-plan'&&candidate?undefined:units.find(unit => unit.id === focusedId) ?? (active||!candidate?first:undefined)
   const editingUnit = units.find(unit => unit.id === editor?.unitId)
   const history = billingDetailPeriods(units,maintenanceStartDate)
+  // Saved history is judged per service period, not by today's contract count.
+  // Include the automatic next round so a partially saved split invoice keeps its labels.
+  const candidatePeriod= candidate?history.find(group=>group.units[0].serviceYear===candidate.year
+    &&group.start===candidate.periodStart&&group.end===candidate.periodEnd):undefined
+  const showCandidateRound=!!candidate&&(candidate.method==='direct_debit'||candidate.round>1
+    ||!!contract&&detailPlanCount(contract)>1||!!candidatePeriod&&candidatePeriod.units.length>0)
   const [adding,setAdding]=useState<{after:EditorMode|null;adjust?:boolean}|null>(null)
   const [created,setCreated]=useState<{projectId:number;item:MaintenanceScheduleItem;after:EditorMode|null}|null>(null)
   const [recording,setRecording]=useState<ReturnType<typeof routineInvoiceContext>>(null)
@@ -209,7 +215,7 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
       {candidate&&<section className="invoice-period-group" aria-label="自動表示の次回予定">
         <div className="invoice-period-heading"><strong>次回の予定</strong><span>自動表示</span></div>
         <button type="button" className={`invoice-history-item ${!focused?'is-selected':''}`} aria-label="自動表示の次回予定を見る" onClick={()=>{setFocusedId('auto-plan');setEditor(null)}}>
-          <span className="invoice-history-row"><b>第{candidate.round}回</b><em>{candidate.reviewReason?'要確認':candidate.method==='direct_debit'?'振替予定':'未発行'}</em><strong>{candidate.amount==null?'金額要確認':fmtYen(candidate.amount)}</strong></span>
+          <span className="invoice-history-row">{showCandidateRound&&<b>第{candidate.round}回</b>}<em>{candidate.reviewReason?'要確認':candidate.method==='direct_debit'?'振替予定':'未発行'}</em><strong>{candidate.amount==null?'金額要確認':fmtYen(candidate.amount)}</strong></span>
           <span className="invoice-history-meta">{candidate.periodStart&&candidate.periodEnd?`${candidate.periodStart} ～ ${candidate.periodEnd}`:'保守期間要確認'}</span>
           <span className="invoice-history-meta">請求先：{candidate.recipientId>0?data.recipientName(candidate.recipientId):'要確認'} ／ {candidate.method==='direct_debit'?'振替予定額':'請求予定額'}</span>
           <span className="invoice-history-dates"><span>{candidate.method==='direct_debit'?'振替予定日':'請求予定日'}：{candidate.date||'日付要確認'}</span></span>
@@ -223,7 +229,7 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
           {group.units.map(unit=>{
             const amount=resolveUnitAmount(unit)
             return <button type="button" key={unit.id} className={`invoice-history-item ${focused?.id===unit.id?'is-selected':''}`} onClick={()=>{setFocusedId(unit.id);setEditor(null)}}>
-              <span className="invoice-history-row"><b>{roundLabel(unit)}</b><em>{billingUnitStatusLabel(unit)}</em><strong>{amount.amount==null?'金額要確認':fmtYen(amount.amount)}</strong></span>
+              <span className="invoice-history-row">{(unit.method!=='請求書'||unit.roundLabel!=='第1回'||group.units.length>1||candidatePeriod===group&&(candidate?.round??0)>1)&&<b>{roundLabel(unit)}</b>}<em>{billingUnitStatusLabel(unit)}</em><strong>{amount.amount==null?'金額要確認':fmtYen(amount.amount)}</strong></span>
               <span className="invoice-history-meta">請求先：{unit.recipientId==null?'要確認':data.recipientName(unit.recipientId)} ／ {unit.method} ／ {amount.basis}</span>
               <span className="invoice-history-dates"><span>{unit.method==='口座振替'?'振替予定日':'請求予定日'}：{unit.scheduledDate??'未登録'}</span>{unit.method==='請求書'&&<span>請求日：{unit.issuedOn??'未登録'}</span>}<span>入金予定日：{unit.paymentDueOn??'未登録'}</span><span>{unit.method==='口座振替'?'入金日（振替確認日）':'入金日'}：{unit.receivedOn??'未登録'}</span></span>
             </button>

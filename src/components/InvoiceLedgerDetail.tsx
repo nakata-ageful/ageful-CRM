@@ -57,13 +57,13 @@ function roundLabel(unit:BillingUnit):string {
   return unit.roundLabel
 }
 
-function BillingDates({method,scheduledDate,issuedOn,paymentDueOn,receivedOn,reference=false}:{
-  method:BillingUnit['method'];scheduledDate?:string|null;issuedOn?:string|null;paymentDueOn?:string|null;receivedOn?:string|null;reference?:boolean
+function BillingDates({method,scheduledDate,issuedOn,paymentDueOn,receivedOn}:{
+  method:BillingUnit['method'];scheduledDate?:string|null;issuedOn?:string|null;paymentDueOn?:string|null;receivedOn?:string|null
 }){
   const debit=method==='口座振替'
   return <div className="invoice-date-groups">
     <section className="invoice-date-group invoice-date-group-billing"><h4>{debit?'口座振替':'請求'}</h4><dl>
-      <div><dt>{debit?'振替予定日':'請求予定日'}</dt><dd>{scheduledDate||'未登録'}{reference&&scheduledDate?'（参考）':''}</dd></div>
+      <div><dt>{debit?'振替予定日':'請求予定日'}</dt><dd>{scheduledDate||'日付要確認'}</dd></div>
       {!debit&&<div><dt>請求日</dt><dd>{issuedOn||'未登録'}</dd></div>}
     </dl></section>
     <section className="invoice-date-group invoice-date-group-received"><h4>入金</h4><dl>
@@ -97,10 +97,10 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
   const candidate=rawCandidate&&!currentRecipientId?{...rawCandidate,reviewReason:['請求先を選んでください',rawCandidate.reviewReason].filter(Boolean).join('。')}:rawCandidate
   const canCreate=!!onAddSchedule&&!!data.recipients&&isBillingDate(contract?.maintenance_start_date??'')
   const active=first&&!['received','cancelled'].includes(first.lifecycle)
-  const focused = units.find(unit => unit.id === focusedId) ?? (active||!candidate?first:undefined)
+  const focused = focusedId==='auto-plan'&&candidate?undefined:units.find(unit => unit.id === focusedId) ?? (active||!candidate?first:undefined)
   const editingUnit = units.find(unit => unit.id === editor?.unitId)
   const history = billingDetailPeriods(units,maintenanceStartDate)
-  const [adding,setAdding]=useState<{after:EditorMode|null}|null>(null)
+  const [adding,setAdding]=useState<{after:EditorMode|null;adjust?:boolean}|null>(null)
   const [created,setCreated]=useState<{projectId:number;item:MaintenanceScheduleItem;after:EditorMode|null}|null>(null)
   const [recording,setRecording]=useState<ReturnType<typeof routineInvoiceContext>>(null)
   const [recordingBusy,setRecordingBusy]=useState(false)
@@ -129,21 +129,21 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
     <div className="invoice-detail-columns">
     <div className="invoice-detail-main">
     {!focused ? <div className="card invoice-current-card">
-      <div className="invoice-current-heading"><div><span>今回・次回の請求</span><h2>{candidate?.method==='direct_debit'?`${candidate.date?Number(candidate.date.slice(5,7))+'月の':'今回の'}口座振替`:'請求予定'}</h2></div><span className="billing-unit-status billing-unit-status-planned">未登録</span></div>
+      <div className="invoice-current-heading"><div><span>今回・次回の請求</span><h2>{candidate?.method==='direct_debit'?`${candidate.date?Number(candidate.date.slice(5,7))+'月の':'今回の'}口座振替`:'請求予定'}</h2></div><span className="billing-unit-status billing-unit-status-planned">{candidate?candidate.reviewReason?'要確認':candidate.method==='direct_debit'?'振替予定':'未発行':'予定なし'}</span></div>
       {candidate?<>
         <div className="invoice-current-amount">{candidate.amount==null?'金額要確認':fmtYen(candidate.amount)}</div>
-        <p className="invoice-current-basis">契約からの参考額 ／ {candidate.method==='direct_debit'?'口座振替':'請求書'}</p>
+        <p className="invoice-current-basis">{candidate.method==='direct_debit'?'振替予定額 ／ 口座振替':'請求予定額 ／ 請求書'}</p>
         <dl className="invoice-current-facts">
           <div><dt>{canRecord?'請求先（発行時に確認）':'請求先の候補'}</dt><dd>{candidate.recipientId>0?data.recipientName(candidate.recipientId):'請求先を選んでください'}</dd></div>
-          <div><dt>対象の回</dt><dd>第{candidate.round}回（参考）</dd></div>
-          <div className="invoice-period-fact"><dt>保守期間</dt><dd>{candidate.periodStart&&candidate.periodEnd?`${candidate.periodStart} ～ ${candidate.periodEnd}（参考）`:'保守開始日未設定'}</dd></div>
+          <div><dt>対象の回</dt><dd>第{candidate.round}回</dd></div>
+          <div className="invoice-period-fact"><dt>保守期間（設定から表示）</dt><dd>{candidate.periodStart&&candidate.periodEnd?`${candidate.periodStart} ～ ${candidate.periodEnd}`:'保守開始日未設定'}</dd></div>
         </dl>
-        <BillingDates method={candidate.method==='direct_debit'?'口座振替':'請求書'} scheduledDate={candidate.date} reference/>
+        <BillingDates method={candidate.method==='direct_debit'?'口座振替':'請求書'} scheduledDate={candidate.date}/>
         {contract&&<p className="invoice-current-basis">年間総額（税込・請求対象のみ）：{fmtYen(annualBillableTotalInc(contract))}</p>}
-        <p className="invoice-reference-help">{canRecord?'請求書を送ったら「発行内容を記録」で請求日を入力してください。':'まだ登録していない予定です。内容を確認して登録してください。'}</p>
+        <p className="invoice-reference-help">請求情報から自動表示しています。毎年の予定登録は不要です。</p>
         {candidate.reviewReason&&<p className="billing-overview-notice" role="alert">{candidate.recipientId>0?'保守期間要確認：':''}{candidate.reviewReason}</p>}
         {!candidate.periodStart&&<p className="invoice-reference-help">「保守情報」で保守開始日を確認してください。委託契約の開始日とは別の項目です。</p>}
-        {canCreate&&<div className="invoice-current-actions">{canRecord&&<button type="button" className="btn btn-main" onClick={()=>setRecording(routine)}>発行内容を記録</button>}<button type="button" className={canRecord?'btn':'btn btn-main'} onClick={()=>setAdding({after:null})}>{candidate.reviewReason?'予定を確認・調整':'予定を登録'}</button>{!canRecord&&!candidate.reviewReason&&<button type="button" className="btn" onClick={()=>setAdding({after:candidate.method==='direct_debit'?'debit':'invoice'})}>{candidate.method==='direct_debit'?'振替結果を記録':'請求内容を入力して発行'}</button>}</div>}
+        {canCreate&&<div className="invoice-current-actions">{canRecord&&<button type="button" className="btn btn-main" onClick={()=>setRecording(routine)}>発行内容を記録</button>}{!canRecord&&!candidate.reviewReason&&<button type="button" className="btn btn-main" onClick={()=>setAdding({after:candidate.method==='direct_debit'?'debit':'invoice'})}>{candidate.method==='direct_debit'?'振替結果を記録':'請求内容を入力して発行'}</button>}<button type="button" className={candidate.reviewReason?'btn btn-main':'btn'} onClick={()=>setAdding({after:null,adjust:true})}>{candidate.reviewReason?'予定を確認・調整':'今回の予定を変更'}</button></div>}
       </>:<p className="invoice-reference-help">{units.length?'追加できる予定候補がありません。「請求情報」の設定と保存済み記録を確認してください。':'この発電所の請求記録はまだありません。「請求情報」で請求方法・予定日を確認してください。'}</p>}
       {!!contract?.notes&&<div className="invoice-current-lines"><h3>備考</h3><p style={{whiteSpace:'pre-wrap'}}>{contract.notes}</p></div>}
     </div> : (() => {
@@ -205,7 +205,16 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
     })()}
     </div>
     <aside className="card invoice-history-panel">
-      <div className="invoice-history-heading"><div><span>保守期間ごとの</span><h3>保存済みの請求予定・入金記録</h3></div><b>{history.length}期間・{units.length}件</b></div>
+      <div className="invoice-history-heading"><div><span>保守期間ごとの</span><h3>請求予定・入金記録</h3></div><b>保存済み{history.length}期間・{units.length}件</b></div>
+      {candidate&&<section className="invoice-period-group" aria-label="自動表示の次回予定">
+        <div className="invoice-period-heading"><strong>次回の予定</strong><span>自動表示</span></div>
+        <button type="button" className={`invoice-history-item ${!focused?'is-selected':''}`} aria-label="自動表示の次回予定を見る" onClick={()=>{setFocusedId('auto-plan');setEditor(null)}}>
+          <span className="invoice-history-row"><b>第{candidate.round}回</b><em>{candidate.reviewReason?'要確認':candidate.method==='direct_debit'?'振替予定':'未発行'}</em><strong>{candidate.amount==null?'金額要確認':fmtYen(candidate.amount)}</strong></span>
+          <span className="invoice-history-meta">{candidate.periodStart&&candidate.periodEnd?`${candidate.periodStart} ～ ${candidate.periodEnd}`:'保守期間要確認'}</span>
+          <span className="invoice-history-meta">請求先：{candidate.recipientId>0?data.recipientName(candidate.recipientId):'要確認'} ／ {candidate.method==='direct_debit'?'振替予定額':'請求予定額'}</span>
+          <span className="invoice-history-dates"><span>{candidate.method==='direct_debit'?'振替予定日':'請求予定日'}：{candidate.date||'日付要確認'}</span></span>
+        </button>
+      </section>}
       {!units.length&&<p className="empty-cell">保存済みの請求・入金記録はありません。</p>}
       <div className="invoice-history-list">
         {history.map(group=><section className="invoice-period-group" key={group.key} aria-label={`保守期間：${group.label}`}>
@@ -234,7 +243,7 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
       await onRecordRemoval(request);setEditor(null);setFocusedId(request.mode==='restore'?String(request.unitId):null);setNotice(request.mode==='restore'?'記録を削除前の内容で復元しました。':'記録を削除しました。「削除済みの記録」から復元できます。')
     }}/></div></Modal>}
     {recording&&onAddRoutine&&onSave&&data.recipients&&<Modal title="発行内容を記録" width={720} closeDisabled={recordingBusy} onClose={()=>setRecording(null)}><div className="standard-editor"><RoutineInvoiceEditor context={recording} recipients={data.recipients} onAdd={onAddRoutine} onSave={onSave} onBusyChange={setRecordingBusy} onClose={()=>setRecording(null)}/></div></Modal>}
-    {adding&&candidate&&contract&&onAddSchedule&&data.recipients&&<Modal title="請求・振替予定を追加" width={720} onClose={()=>setAdding(null)}><div className="standard-editor"><BillingOccurrenceCreator key={`${projectId}:${JSON.stringify(candidate)}:${allUnits.map(u=>u.id+':'+u.revision).join(',')}`} candidate={candidate} contract={contract} units={allUnits} recipients={data.recipients} cycleRules={data.cycleRules}
+    {adding&&candidate&&contract&&onAddSchedule&&data.recipients&&<Modal title={adding.adjust?'今回の予定を変更':'請求・振替予定を追加'} width={720} onClose={()=>setAdding(null)}><div className="standard-editor"><BillingOccurrenceCreator key={`${projectId}:${JSON.stringify(candidate)}:${allUnits.map(u=>u.id+':'+u.revision).join(',')}`} purpose={adding.adjust?'adjust':'add'} candidate={candidate} contract={contract} units={allUnits} recipients={data.recipients} cycleRules={data.cycleRules}
       onSave={async(item,reason)=>{await onAddSchedule(item,reason);setCreated({projectId,item,after:adding.after})}} onClose={()=>setAdding(null)}/></div></Modal>}
     {!!units.length&&maintenanceStartDate!==undefined&&<div className="card" style={{padding:20,marginTop:16}}>
       <h3>保守期間の確認・修正</h3>

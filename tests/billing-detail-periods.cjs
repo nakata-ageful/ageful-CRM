@@ -31,7 +31,7 @@ assert.equal(reference.amount,10110);assert.equal(reference.date,'2026-10-25');a
 assert.equal(reference.periodStart,'2026-01-01');assert.equal(reference.periodEnd,'2026-12-31')
 const history={units:[],recipientName:()=> '山﨑 真佑子',projectName:()=> '西予市新城⑨',plannedAmount:()=>999999,recipients:[{id:7,name:'山﨑 真佑子'}]}
 const html=renderToStaticMarkup(React.createElement(InvoiceLedgerDetail,{data:history,projectId:56,contract,currentRecipientId:7,maintenanceStartDate:contract.maintenance_start_date,onAddSchedule:noSave,onSave:noSave,today:'2026-10-03'}))
-for(const text of ['10,110','2026-10-25','2026-01-01 ～ 2026-12-31','契約からの参考額','未登録','予定を登録','振替結果を記録','初年度現金回収','保存済みの請求・入金記録はありません'])assert.ok(html.includes(text),text)
+for(const text of ['10,110','2026-10-25','2026-01-01 ～ 2026-12-31','振替予定額','未登録','今回の予定を変更','振替結果を記録','初年度現金回収','保存済みの請求・入金記録はありません'])assert.ok(html.includes(text),text)
 assert.ok(!html.includes('999,999')&&!html.includes('357,600'),'Excluded maintenance must not become a billable reference')
 const groupedHtml=renderToStaticMarkup(React.createElement(InvoiceLedgerDetail,{data:{...history,units},projectId:56,maintenanceStartDate:'2022-07-14',onSave:noSave}))
 assert.equal((groupedHtml.match(/class="invoice-period-group"/g)||[]).length,1)
@@ -58,7 +58,7 @@ assert.doesNotThrow(()=>validate({...item,date:'2025-12-01'},[],56,'翌期分の
 assert.throws(()=>validate({...item,year:2027,periodStart:'2027-01-01',periodEnd:'2027-12-31'},[{...base,periodEnd:'2027-07-13'}],56,'確認','2022-07-14'),/重複/)
 assert.throws(()=>validate({...item,round:11,periodStart:'2026-02-01',periodEnd:'2027-01-31'},[saved],56,'確認','2025-01-01'),/保守期間/)
 const missingAnchorHtml=renderToStaticMarkup(React.createElement(InvoiceLedgerDetail,{data:history,projectId:56,contract:{...contract,maintenance_start_date:null},currentRecipientId:7,onAddSchedule:noSave,today:'2026-10-03'}))
-assert.ok(missingAnchorHtml.includes('保守開始日未設定')&&!missingAnchorHtml.includes('予定を登録'),'Do not offer a save the RPC will reject for a missing anchor')
+assert.ok(missingAnchorHtml.includes('保守開始日未設定')&&!missingAnchorHtml.includes('今回の予定を変更'),'Do not offer a save the RPC will reject for a missing anchor')
 console.log('PASS: service-period grouping, two rounds/prepayments, preserved exceptions, unconfirmed periods, contract-only reference and duplicate safety')
 
 ;(async()=>{

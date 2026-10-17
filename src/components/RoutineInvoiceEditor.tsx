@@ -45,7 +45,7 @@ export function RoutineInvoiceEditor({context,recipients,onAdd,onSave,onClose,on
     <p>別途発行した請求書の内容を記録します。このアプリから請求書の作成・送信は行いません。</p>
     <dl className="invoice-current-facts"><div><dt>保守期間</dt><dd>{item.periodStart} ～ {item.periodEnd}</dd></div>
       <div><dt>対象の回</dt><dd>第{item.round}回</dd></div><div><dt>請求予定日</dt><dd>{item.date}</dd></div></dl>
-    <p>契約からの参考額：{fmtYen(item.amount!)}。実際の請求明細を入力してください。</p>
+    <p>請求予定額：{fmtYen(item.amount!)}。実際の請求明細を入力してください。</p>
     <p>期間・予定日を変更する場合は、キャンセルして「請求詳細」で予定を調整してください。</p>
     {prepared&&<p role="status">請求予定は保存済みです。発行の記録が未完了の場合は、この画面で再試行してください。閉じても未発行の予定は残ります。</p>}
     {error&&<><p role="alert">{error}</p><p>「保存結果が未確認」と表示された場合は、入力を変えず、いったんキャンセルで閉じて画面上部の「保存結果を再確認」を押してください。確認後は一覧に戻り、その記録の状態を確認してください。</p></>}

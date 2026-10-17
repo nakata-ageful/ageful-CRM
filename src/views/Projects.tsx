@@ -7,6 +7,7 @@ import { CustomerPicker } from '../components/CustomerPicker'
 import { createCustomer, createProject, deleteProject } from '../lib/actions'
 import { useToast } from '../components/Toast'
 import { projectMatchesSearch } from '../lib/project-search'
+import { validateCustomerRegistration } from '../lib/customer-registration'
 
 type Props = {
   projects: ProjectRow[]
@@ -123,6 +124,7 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
   const [customerMode, setCustomerMode] = useState<CustomerMode>('existing')
   const [selectedCustomerId, setSelectedCustomerId] = useState<number>(customers[0]?.id ?? 0)
   const [customerForm, setCustomerForm] = useState<CustomerInput>(emptyCustomerForm)
+  const [newCustomerType, setNewCustomerType] = useState<'' | 'individual' | 'corporate'>('')
   const [projectForm, setProjectForm] = useState<Omit<ProjectInput, 'customer_id'>>(emptyProjectForm)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -159,6 +161,7 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
     setCustomerMode('existing')
     setSelectedCustomerId(customers[0]?.id ?? 0)
     setCustomerForm(emptyCustomerForm)
+    setNewCustomerType('')
     setProjectForm(emptyProjectForm)
     setModal(true)
     setError('')
@@ -173,9 +176,10 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
         if (!selectedCustomerId) { setError('顧客を選択してください'); setSaving(false); return }
         customerId = selectedCustomerId
       } else {
-        if (!customerForm.name.trim()) { setError('顧客名は必須です'); setSaving(false); return }
-        const signature=JSON.stringify(customerForm)
-        if(createdCustomer.current?.signature!==signature)createdCustomer.current={signature,id:(await createCustomer(customerForm)).id}
+        if (!newCustomerType) { setError('個人または法人を選んでください'); return }
+        const input = validateCustomerRegistration(customerForm)
+        const signature=JSON.stringify(input)
+        if(createdCustomer.current?.signature!==signature)createdCustomer.current={signature,id:(await createCustomer(input)).id}
         customerId = createdCustomer.current.id
       }
       // project_name は DB上 NOT NULL のため、発電所名と同期
@@ -288,16 +292,22 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
               <div style={{gridColumn:'1/-1'}}><CustomerPicker label="顧客を選択" value={selectedCustomerId?String(selectedCustomerId):''} onChange={value=>setSelectedCustomerId(Number(value))} customers={customers}/></div>
             </div>
           ) : (
-            <div className="form-grid">
+            <div>
+              <div className="form-section-title">新規顧客の種別</div>
+              <div className="radio-group" role="group" aria-label="新規顧客の種別">
+                <label className="radio-label"><input type="radio" name="new-project-customer-type" checked={newCustomerType==='individual'} onChange={()=>{setNewCustomerType('individual');setCustomerForm(f=>({...f,is_corporate:false,company_name:'',company_name_kana:''}));setError('')}}/>個人</label>
+                <label className="radio-label"><input type="radio" name="new-project-customer-type" checked={newCustomerType==='corporate'} onChange={()=>{setNewCustomerType('corporate');setCustomerForm(f=>({...f,is_corporate:true}));setError('')}}/>法人</label>
+              </div>
+              {!newCustomerType&&<p>個人または法人を選んでから、顧客情報を入力してください。</p>}
+              {newCustomerType&&<div className="form-grid">
+              {customerForm.is_corporate&&<>
+                <label className="form-label required">会社名<input className="form-input" required value={customerForm.company_name} onChange={e=>setCustomerForm(f=>({...f,company_name:e.target.value}))}/></label>
+                <label className="form-label">会社名フリガナ<input className="form-input" value={customerForm.company_name_kana??''} onChange={e=>setCustomerForm(f=>({...f,company_name_kana:e.target.value}))}/></label>
+              </>}
               <label className="form-label required">
-                顧客名（個人名）
-                <input className="form-input" value={customerForm.name} onChange={e => setCustomerForm(f => ({ ...f, name: e.target.value }))} />
+                {customerForm.is_corporate?'担当者名':'顧客名（個人名）'}
+                <input className="form-input" required value={customerForm.name} onChange={e => setCustomerForm(f => ({ ...f, name: e.target.value }))} />
               </label>
-              <label className="form-label">
-                会社名（法人の場合）
-                <input className="form-input" value={customerForm.company_name} onChange={e => setCustomerForm(f => ({ ...f, company_name: e.target.value, is_corporate: !!e.target.value,company_name_kana:e.target.value?f.company_name_kana:'' }))} />
-              </label>
-              {customerForm.is_corporate&&<label className="form-label">会社名フリガナ<input className="form-input" value={customerForm.company_name_kana??''} onChange={e=>setCustomerForm(f=>({...f,company_name_kana:e.target.value}))}/></label>}
               <label className="form-label">{customerForm.is_corporate?'担当者フリガナ':'フリガナ'}<input className="form-input" value={customerForm.name_kana} onChange={e=>setCustomerForm(f=>({...f,name_kana:e.target.value}))}/></label>
               <label className="form-label">
                 電話番号
@@ -307,6 +317,7 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
                 メール
                 <input className="form-input" type="email" value={customerForm.email} onChange={e => setCustomerForm(f => ({ ...f, email: e.target.value }))} />
               </label>
+              </div>}
             </div>
           )}
 

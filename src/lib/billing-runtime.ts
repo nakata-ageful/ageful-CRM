@@ -5,10 +5,11 @@ import {durableBillingOperation} from './durable-billing-operation'
 import {managementEventFromStorage,type ManagementEvent} from './management-lifecycle'
 import {isBillingDate} from './billing-unit'
 import {cycleRuleFromStorage,type BillingCycleRule} from './billing-cycle'
+import {historyNotesFromStorage,type HistoryNote} from './history-notes'
 
 // Deployment opt-in AND authenticated server readiness. Never silently fall back to old writers.
 export {billingRuntimeEnabled}
-export type BillingRuntimeSnapshot={units:TransferBillingUnit[];transfers:Record<string,unknown>[];events:Record<string,unknown>[];managementEvents:ManagementEvent[];cutoverOn:string;cycleRules?:BillingCycleRule[];cycleRulesReady?:boolean;recordRemovalReady?:boolean;ownershipWorkflowReady?:boolean;ownershipWorkflowEvents?:Record<string,unknown>[];newProspectReady?:boolean}
+export type BillingRuntimeSnapshot={units:TransferBillingUnit[];transfers:Record<string,unknown>[];events:Record<string,unknown>[];managementEvents:ManagementEvent[];cutoverOn:string;cycleRules?:BillingCycleRule[];cycleRulesReady?:boolean;recordRemovalReady?:boolean;ownershipWorkflowReady?:boolean;ownershipWorkflowEvents?:Record<string,unknown>[];newProspectReady?:boolean;historyNotes?:HistoryNote[];historyNotesReady?:boolean}
 export async function loadBillingRuntime():Promise<BillingRuntimeSnapshot>{
   if(billingRuntimePreview)return previewSnapshot()
   if(!supabase||!billingRuntimeEnabled)throw Error('新しい請求機能はまだ有効化されていません')
@@ -28,6 +29,7 @@ export async function loadBillingRuntime():Promise<BillingRuntimeSnapshot>{
   if(data.cycle_rules_ready===true&&!Array.isArray(data.cycle_rules))throw Error('請求の繰り返し設定を取得できません')
   if(data.ownership_workflow_ready===true&&!Array.isArray(data.ownership_workflow_events))throw Error('所有者の手続き履歴を取得できません')
   return {units,transfers:data.transfers,events:data.events,managementEvents:data.management_events.map(managementEventFromStorage),cutoverOn:data.cutover_on,
+    historyNotes:data.history_notes_ready===true?historyNotesFromStorage(data.history_notes):[],historyNotesReady:data.history_notes_ready===true,
     ownershipWorkflowReady:data.ownership_workflow_ready===true,ownershipWorkflowEvents:data.ownership_workflow_events??[],newProspectReady:data.new_prospect_ready===true,
     cycleRules:Array.isArray(data.cycle_rules)?data.cycle_rules.map(cycleRuleFromStorage):[],cycleRulesReady:data.cycle_rules_ready===true,recordRemovalReady:data.version>=3&&data.record_removal_ready===true}
 }

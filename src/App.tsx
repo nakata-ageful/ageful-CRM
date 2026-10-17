@@ -411,7 +411,9 @@ function MainApp() {
                   onManagementSave={async request=>{await saveRuntime({action:'management',value:request})}}
                   cycleRules={runtime.cycleRules} onPeriodSave={value=>saveRuntime({action:'service_period',value})} onScheduleSave={value=>saveRuntime({action:'future_schedule',value:{...value,
                     ...(runtime.cycleRulesReady?{cycleRevision:Math.max(0,...(runtime.cycleRules??[]).filter(r=>r.project_id===projectDetail.project.id).map(r=>r.id))}:{})}})}/>:undefined}
-                changeHistory={runtime&&billingHistory?<><OwnershipWorkflowHistory events={(runtime.ownershipWorkflowEvents??[]).filter(e=>e.project_id===projectDetail.project.id)} recipientName={billingHistory.recipientName} onViewProspect={navToProspectDetail}/><OwnershipTransferHistory expanded
+                changeHistory={runtime&&billingHistory?<><OwnershipWorkflowHistory events={(runtime.ownershipWorkflowEvents??[]).filter(e=>e.project_id===projectDetail.project.id)} recipientName={billingHistory.recipientName} onViewProspect={navToProspectDetail}
+                  historyNotes={runtime.historyNotes} onSaveHistoryNote={runtime.historyNotesReady&&!projectReadOnly?value=>saveRuntime({action:'history_note',value}):undefined}/><OwnershipTransferHistory expanded
+                  historyNotes={runtime.historyNotes} onSaveHistoryNote={runtime.historyNotesReady&&!projectReadOnly?value=>saveRuntime({action:'history_note',value}):undefined}
                   key={projectDetail.project.id} managementEvents={runtime.managementEvents.filter(e=>e.project_id===projectDetail.project.id)} transfers={runtime.transfers.filter(t=>t.project_id===projectDetail.project.id)} events={runtime.events.filter(e=>e.project_id===projectDetail.project.id)} recipientName={billingHistory.recipientName}/></>:undefined}
                 billingHistory={billingHistory}
                 onSaveInvoice={billingHistory&&!projectReadOnly?request=>saveRuntime({action:'invoice',value:request}):undefined}

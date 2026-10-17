@@ -196,8 +196,73 @@ try{
  assert.equal((await one('projects',124)).customer_id,2,'Real workflow/transfer RPC succeeds with one active and one archived contract')
  assert.deepEqual(await one('contracts',99),archived99);assert.deepEqual(await one('contracts',100),archived100);assert.deepEqual(await one('contracts',101),archived101)
  assert.deepEqual(await rows('billing_units'),afterRelink.billing_units,'Real transfer still preserves previous customer invoice exactly')
+ // Ownership/workflow explanations are amended in a separate append-only log.
+ // Original transfer and workflow rows, including their reason/snapshots, never change.
+ const historyProtectedTables=(await db.query("select tablename from pg_tables where schemaname='public' order by tablename")).rows.map(r=>r.tablename)
+ const historyProtected=async()=>Object.fromEntries(await Promise.all(historyProtectedTables.map(async t=>[t,await rows(t)])))
+ const originalHistoryProtected=await historyProtected(),historySql=read('migrations/20261017012032_ownership_history_notes.sql')
+ await db.exec("update ageful_migration_target set project_ref='wrong'");await assert.rejects(db.exec(historySql),/Wrong project/);await db.exec('rollback')
+ await db.exec("update ageful_migration_target set project_ref='ufawaiddntqqbjhycbxn'")
+ await db.exec(historySql);assert.deepEqual(await historyProtected(),originalHistoryProtected,'History-note schema changes no existing business/audit row')
+ const historyWrite=(operationKey,value)=>db.transaction(async tx=>{await tx.exec('set local role authenticated');return (await tx.query('select billing_runtime_write($1,$2::jsonb) value',[operationKey,JSON.stringify({action:'history_note',value})])).rows[0].value})
+ const transferHistory=(await rows('ownership_transfers')).find(t=>t.project_id===124)
+ const workflowHistory=(await rows('ownership_workflow_events')).find(t=>t.project_id===124&&t.action==='complete')
+ const ownershipNote={projectId:124,kind:'ownership',targetId:String(transferHistory.id),expectedRevision:0,text:'  正しい引継ぎの説明\n補足  '}
+ const historyKey=key(),historyResult=await historyWrite(historyKey,ownershipNote)
+ assert.equal(historyResult.revision,1)
+ let historyNotes=await rows('ownership_history_notes'),note=historyNotes.find(n=>n.operation_key===historyKey)
+ assert.equal(note.text,'正しい引継ぎの説明\n補足');assert.equal(note.original_text,transferHistory.field_decisions.reason)
+ assert.equal(note.previous_text,transferHistory.field_decisions.reason);assert.equal(note.actor_user_id,actor)
+ await historyWrite(historyKey,ownershipNote);assert.deepEqual(await rows('ownership_history_notes'),historyNotes,'Exact note retry creates no extra revision')
+ await assert.rejects(historyWrite(historyKey,{...ownershipNote,text:'同じキーで別の文'}),/別の内容/)
+ await assert.rejects(historyWrite(transferHistory.operation_key,ownershipNote),/別の処理/)
+ await assert.rejects(historyWrite(workflowHistory.operation_key,ownershipNote),/別の処理/)
+ await assert.rejects(db.query('select billing_runtime_write($1,$2::jsonb)',[historyKey,JSON.stringify({action:'invoice',value:{}})]),/メモに使われています/)
+ await assert.rejects(historyWrite(key(),{...ownershipNote,text:'古い画面の文'}),/更新されています/)
+ const secondNote={...ownershipNote,expectedRevision:1,text:'二回目の訂正文'}
+ await historyWrite(key(),secondNote);historyNotes=await rows('ownership_history_notes')
+ note=historyNotes.find(n=>n.kind==='ownership'&&n.revision===2)
+ assert.equal(note.previous_text,'正しい引継ぎの説明\n補足');assert.equal(note.original_text,transferHistory.field_decisions.reason)
+ const workflowNote={projectId:124,kind:'workflow',targetId:workflowHistory.operation_key,expectedRevision:0,text:'手続き完了の補足を訂正'}
+ await historyWrite(key(),workflowNote)
+ note=(await rows('ownership_history_notes')).find(n=>n.kind==='workflow')
+ assert.equal(note.original_text,workflowHistory.reason);assert.equal(note.previous_text,workflowHistory.reason);assert.equal(note.revision,1)
+ const savedNotes=await rows('ownership_history_notes')
+ for(const value of [
+  {...ownershipNote,expectedRevision:2,text:''},{...ownershipNote,expectedRevision:2,text:'\n\t　 '},
+  {...ownershipNote,expectedRevision:2,text:'a'.repeat(4001)},
+  {...ownershipNote,expectedRevision:2,text:'二回目の訂正文'},
+  {...ownershipNote,projectId:1,expectedRevision:0,text:'別案件の履歴'},
+  {...ownershipNote,projectId:125,expectedRevision:0,text:'保管済み案件'},
+  {...ownershipNote,projectId:999999,expectedRevision:0,text:'存在しない発電所'},
+  {...ownershipNote,extra:'不正な追加キー'}, {...ownershipNote,kind:'invoice'},
+  {...ownershipNote,targetId:transferHistory.id}, {...ownershipNote,expectedRevision:-1},
+  {...workflowNote,targetId:'not-a-uuid'}, {...workflowNote,targetId:'11111111-1111-4111-8111-111111111111'},
+ ])await assert.rejects(historyWrite(key(),value),/メモ|履歴|発電所|変更されていません/)
+ assert.deepEqual(await rows('ownership_history_notes'),savedNotes,'Rejected notes leave the whole note log unchanged')
+ await db.exec('create trigger fail_history_note before insert on ownership_history_notes for each row execute function fail_new_audit()')
+ await assert.rejects(historyWrite(key(),{...ownershipNote,expectedRevision:2,text:'失敗する更新'}),/synthetic audit failure/)
+ assert.deepEqual(await rows('ownership_history_notes'),savedNotes,'Failed note save consumes neither revision nor receipt')
+ await db.exec('drop trigger fail_history_note on ownership_history_notes')
+ await assert.rejects(db.exec("update ownership_history_notes set text='原本を上書き'"),/audit|immutable|変更|追記/i)
+ await assert.rejects(db.exec('delete from ownership_history_notes'),/audit|immutable|削除|追記/i)
+ await assert.rejects(db.exec('truncate ownership_history_notes'),/audit|immutable|削除|追記/i)
+ await assert.rejects(db.transaction(async tx=>{await tx.exec('set local role authenticated');await tx.exec('select * from ownership_history_notes')}),/permission denied/)
+ await assert.rejects(db.transaction(async tx=>{await tx.exec('set local role authenticated');await tx.query("insert into ownership_history_notes(operation_key,project_id,kind,target_id,revision,original_text,previous_text,text,request_hash,actor_user_id) values($1,124,'ownership',$2,3,'','','不正直接書込','x',$3)",[key(),String(transferHistory.id),actor])}),/permission denied/)
+ await assert.rejects(db.transaction(async tx=>{await tx.exec('set local role authenticated');await tx.query('select write_ownership_history_note($1,$2)',[key(),JSON.stringify({...ownershipNote,expectedRevision:2,text:'private helper'})])}),/permission denied/)
+ const historySnapshot=(await db.query('select billing_runtime_snapshot() value')).rows[0].value
+ const historyBackup=(await db.query('select billing_runtime_backup() value')).rows[0].value
+ assert.equal(historySnapshot.history_notes_ready,true);assert.equal(historyBackup.history_notes_ready,true)
+ assert.deepEqual(historySnapshot.history_notes,historyBackup.history_notes);assert.equal(historySnapshot.history_notes.length,3)
+ assert.deepEqual(await historyProtected(),originalHistoryProtected,'All original parents, transfers, workflow events, bills and audit logs remain exactly unchanged')
+ const beforeHostedNotes=await rows('ownership_history_notes')
+ await db.exec(read('drafts/20261017_verify_ownership_history_notes_rollback.sql'))
+ assert.deepEqual(await rows('ownership_history_notes'),beforeHostedNotes,'The exact hosted smoke script rolls back every test note')
+ assert.deepEqual(await historyProtected(),originalHistoryProtected,'Rollback smoke preserves every original table')
  await db.exec("set test.actor='22222222-2222-4222-8222-222222222222'");await assert.rejects(write(key(),request),/権限|利用/)
+ await assert.rejects(historyWrite(historyKey,ownershipNote),/権限|利用/)
  await db.exec("set test.actor='';set role anon");await assert.rejects(db.query('select new_prospect_write($1,$2)',[key(),JSON.stringify(request)]),/permission denied/)
+ await assert.rejects(db.query('select billing_runtime_write($1,$2)',[key(),JSON.stringify({action:'history_note',value:ownershipNote})]),/permission denied/)
  await db.exec('reset role')
- console.log('PASS: pending prospect, assignment, Izumi classification/relink/replay/rollback, archived duplicates kept physically, active-contract RPC selection, archived writes/new work/duplicate contract rejected, real invoice untouched.')
+ console.log('PASS: pending prospect/archive flows plus append-only ownership/workflow note revisions, same-key retry, stale/schema/text/target/archive rejection, owner/RLS/private-helper protection, rollback, snapshot/backup, every original business/audit row unchanged.')
 }finally{await db.close()}

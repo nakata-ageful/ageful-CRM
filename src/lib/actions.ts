@@ -1260,6 +1260,7 @@ export async function exportAllData(): Promise<ExportData> {
     if(data.ownership_workflow_ready===true&&!Array.isArray(data.ownership_workflow_events))throw Error('引継ぎ履歴を含むバックアップを取得できませんでした')
     if(data.new_prospect_ready===true&&!Array.isArray(data.new_prospect_events))throw Error('顧客未定の設定履歴を含むバックアップを取得できませんでした')
     if(data.duplicate_archive_ready===true&&(!Array.isArray(data.duplicate_archive_events)||!Array.isArray(data.archive_function_patches)))throw Error('保管記録と変更履歴を含むバックアップを取得できませんでした')
+    if(data.history_notes_ready===true&&!Array.isArray(data.history_notes))throw Error('確認内容の訂正履歴を含むバックアップを取得できませんでした')
     return data as ExportData
   }
   if (!hasSupabaseEnv) {

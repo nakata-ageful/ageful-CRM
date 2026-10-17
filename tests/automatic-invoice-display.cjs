@@ -42,4 +42,8 @@ assert.ok(persistedHtml.includes('保存済み2期間・2件'))
 const automaticSection=persistedHtml.match(/aria-label="自動表示の次回予定">([\s\S]*?)<\/section>/)[1]
 assert.ok(automaticSection.includes('2028-07-01 ～ 2029-06-30')&&!automaticSection.includes('2027-07-01 ～ 2028-06-30'),'The saved occurrence is not duplicated as an automatic one')
 assert.equal(JSON.stringify(history),original,'No amounts, history, states or storage can change during display')
+const Creator=load('src/components/BillingOccurrenceCreator.tsx').BillingOccurrenceCreator
+const suggested=load('src/lib/billing-detail-plan.ts').detailPlanCandidate(c,1,history.units,props.today)
+const adjustment=renderToStaticMarkup(React.createElement(Creator,{candidate:suggested,contract:c,units:history.units,recipients:history.recipients,onSave:noSave,onClose:noSave,purpose:'adjust'}))
+assert.ok(adjustment.includes('変更内容を確認')&&!adjustment.includes('追加内容を確認'),'One-time adjustment keeps matching button wording')
 console.log('PASS: ordinary wording, automatic right-hand preview, no fake saved count/duplicate, non-writing navigation, saved-plan editing and 3 annual reminder windows without registration')

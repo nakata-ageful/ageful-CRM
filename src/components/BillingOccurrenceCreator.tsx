@@ -59,7 +59,7 @@ export function BillingOccurrenceCreator({candidate,contract,units,recipients,on
       <label>確認内容・備考<textarea required value={reason} onChange={e=>change(setReason,e.target.value)} placeholder="対象期間・請求先・予定額を確認した内容"/></label>
       {confirmed&&<div className="billing-plan-confirmation" role="status"><strong>{purpose==='adjust'?'今回の予定：1件':'追加する予定：1件'}</strong><p>{confirmed.periodStart} ～ {confirmed.periodEnd} ／ 第{confirmed.round}回<br/>請求先：{recipients.find(r=>r.id===confirmed.recipientId)?.name}<br/>{debit?'振替':'請求'}予定日：{confirmed.date} ／ 予定額：{fmtYen(confirmed.amount!)}</p><p>この予定を保存した後、この画面から{debit?'振替結果':'請求日・入金日'}を記録できます。</p></div>}
       <div className="editor-footer"><button type="button" className="btn btn-sub" onClick={onClose}>キャンセル</button>
-        {confirmed?<button type="button" className="btn btn-main" onClick={()=>void save()}>{busy?'保存中…':'確認した予定を保存'}</button>:<button type="submit" className="btn btn-main">追加内容を確認</button>}
+        {confirmed?<button type="button" className="btn btn-main" onClick={()=>void save()}>{busy?'保存中…':'確認した予定を保存'}</button>:<button type="submit" className="btn btn-main">{purpose==='adjust'?'変更内容を確認':'追加内容を確認'}</button>}
       </div>
     </fieldset></form>
   </section>

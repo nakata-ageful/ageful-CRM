@@ -46,13 +46,15 @@ const debit={...annual,billing_method:'口座振替',billing_count:12,billing_sc
 const debitReview=review(debit,{...debit,billing_schedule_days:['20日']},[{...unit,method:'口座振替'}],'2026-10-15');assert.equal(debitReview.manual.length,1);
 const ReviewComponent=load('src/components/BillingScheduleChangeReview.tsx').BillingScheduleChangeReview;
 const renderReview=review=>require('react-dom/server').renderToStaticMarkup(React.createElement(ReviewComponent,{review,name:'合成発電所',recipientName:()=> '合成顧客',busy:false,onSave(){throw Error('Rendering may not save')},onBack(){}}));
-const emptyHtml=renderReview(emptyReview);assert(emptyHtml.includes('2026-12-01')&&emptyHtml.includes('2026-11-01')&&emptyHtml.includes('請求情報を保存'));assert(!emptyHtml.includes('選択した0件'));
+const emptyHtml=renderReview(emptyReview);assert(emptyHtml.includes('2026-12-01')&&emptyHtml.includes('2026-11-01')&&emptyHtml.includes('今後の設定を保存'));assert(!emptyHtml.includes('選択した0件'));
 // Saved dates to change come first; unchanged future references never distract from them.
 const unchangedPreview={year:2027,round:1,date:'2028-05-01',period:'2027-06-27 ～ 2028-06-26',method:'invoice'};
 const unchangedHtml=renderReview({...r,impact:{...r.impact,before:unchangedPreview,after:unchangedPreview,warnings:['必要な注意は残す']}});
 assert(!unchangedHtml.includes('これから登録する予定'));assert(!unchangedHtml.includes('2028-05-01'));assert(unchangedHtml.includes('必要な注意は残す'));assert(unchangedHtml.includes('2026-11-01'));
 const changedHtml=renderReview({...r,impact:{...r.impact,before:unchangedPreview,after:{...unchangedPreview,date:'2028-06-01'}}});
 assert(changedHtml.indexOf('schedule-change-row')<changedHtml.indexOf('schedule-setting-impact'));assert(changedHtml.includes('2028-06-01'));
+for(const wording of ['① 今回の保存済み予定も変更しますか？','チェックしない回は、今の日付のまま','② 今後の自動予定','毎年の予定登録は不要','今後の設定だけ保存','今回分も変更して保存'])assert(changedHtml.includes(wording),wording);
+for(const confusing of ['これから登録する予定','参考予定','選択した0件'])assert(!changedHtml.includes(confusing)&&!emptyHtml.includes(confusing),confusing);
 const methodHtml=renderReview({...r,changes:[],impact:{...r.impact,before:unchangedPreview,after:{...unchangedPreview,method:'direct_debit'}}});
 assert(methodHtml.includes('請求書 → 口座振替'));assert(!methodHtml.includes('2028-05-01 →'));
 const paidHtml=renderReview(paidReview);assert(paidHtml.includes('2027-11-01')&&paidHtml.includes('入金済みの1件は変更しません'));
@@ -70,7 +72,7 @@ assert.deepEqual(plain([unit,paid]),original,'All preview operations leave sourc
  const render=()=>{pos=0;return BillingScheduleChangeReview({review:r,name:'合成発電所',recipientName:()=> '合成顧客',busy:false,onSave:q=>requests=q,onBack:()=>back++})};
  let t=render();const primary=()=>nodes(render(),e=>e.type==='button'&&e.props.className==='btn btn-main')[0];assert.equal(primary().props.disabled,true);
  nodes(t,e=>e.type==='input')[0].props.onChange({target:{checked:true}});assert.equal(primary().props.disabled,false);primary().props.onClick();assert.deepEqual(plain(requests),[plain(request(r.changes[0]))]);
- nodes(render(),e=>e.type==='button'&&e.props.children==='請求情報だけ保存')[0].props.onClick();assert.deepEqual(plain(requests),[]);
+ nodes(render(),e=>e.type==='button'&&e.props.children==='今後の設定だけ保存')[0].props.onClick();assert.deepEqual(plain(requests),[]);
  nodes(render(),e=>e.type==='button'&&e.props.children==='編集に戻る')[0].props.onClick();assert.equal(back,1);
  // Manual selection requires explicit valid date. Invalid input never calls the API, even if invoked directly.
  const manualSlots=[];let manualPos=0,manualWrites=[];const mhooks={...React,useState(initial){const i=manualPos++;if(!(i in manualSlots))manualSlots[i]=initial;return[manualSlots[i],v=>manualSlots[i]=typeof v==='function'?v(manualSlots[i]):v]}};

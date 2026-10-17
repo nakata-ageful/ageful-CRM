@@ -15,6 +15,7 @@ const annual={...before,billing_count:1,maintenance_start_date:'2020-01-01',bill
 const paid={...unit,roundLabel:'第1回',lifecycle:'received' as const,issuedOn:'2026-01-05',receivedOn:'2026-01-15',frozenAt:'2026-01-05T00:00:00Z',frozenAmount:165000,periodStart:'2026-01-01',periodEnd:'2026-12-31'}
 type Sample={label:string;before:Contract;after:Contract;units:BillingUnit[];rules?:BillingCycleRule[]}
 const samples:Sample[]=[
+  {label:'今回分と来年の自動予定',before:{...annual,maintenance_start_date:'2020-12-23',billing_schedule_days:['11月1日']},after:{...annual,maintenance_start_date:'2020-12-23'},units:[{...unit,roundLabel:'第1回',scheduledDate:'2026-11-01',periodStart:'2026-12-23',periodEnd:'2027-12-22'},{...paid,id:'2',serviceYear:2025,periodStart:'2025-12-23',periodEnd:'2026-12-22'}]},
   {label:'保存済み記録なし',before:annual,after:november,units:[]},
   {label:'今年は入金済み',before:annual,after:november,units:[paid]},
   {label:'前年12月請求が優先',before:annual,after:november,units:[paid],rules:[{id:1,project_id:1,effective_year:2027,mode:'calendar_prepaid',recorded_at:'2026-10-15',reason:'合成設定'}]},

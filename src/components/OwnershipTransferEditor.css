@@ -1,4 +1,7 @@
 .ownership-transfer-shell { display:grid; gap:18px; color:#1e293b; }
+.ownership-workflow-options { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; align-items:stretch; }
+.ownership-workflow-options > .btn { min-width:0; width:100%; height:100%; line-height:1.5; }
+@media(max-width:760px) { .ownership-workflow-options { grid-template-columns:minmax(0,1fr); } }
 .ownership-transfer-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; padding-bottom:16px; border-bottom:1px solid #e2e8f0; }
 .ownership-transfer-heading h2 { margin:4px 0 6px; font-size:24px; color:#0f172a; }
 .ownership-transfer-heading p { color:#64748b; }

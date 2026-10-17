@@ -29,7 +29,7 @@ export function OwnershipWorkflowPanel({project,customers,onSave,onDirect,onCrea
   return <div className="standard-editor ownership-transfer-shell">
     {!initialCustomer&&<h3>{candidateOnly?'引継ぎ先を設定':project.plant_name||project.project_name}</h3>}
     {!initialCustomer&&<p>現在の所有者：{customers.find(c=>c.id===project.customer_id)?.name??'未確認'}</p>}
-    {!candidateOnly&&<div className="management-action-grid">
+    {!candidateOnly&&<div className="ownership-workflow-options">
       <button type="button" className={`btn ${mode==='start'?'btn-main':'btn-sub'}`} disabled={busy||customerBusy} onClick={()=>{setMode('start');setError('')}}>見込み管理へ戻す</button>
       {onDirect&&<button type="button" className="btn btn-sub" disabled={busy||customerBusy} onClick={onDirect}>決まった所有者へ直接変更</button>}
       {project.customer_id!=null&&<button type="button" className={`btn ${mode==='unknown'?'btn-main':'btn-sub'}`} disabled={busy||customerBusy} onClick={()=>{setMode('unknown');setCreating(false);setError('')}}>所有者が変わったが名前が分からない</button>}

@@ -1,4 +1,4 @@
-export type HistoryNoteKind = 'ownership' | 'workflow'
+export type HistoryNoteKind = 'ownership' | 'workflow' | 'billing' | 'management'
 export type HistoryNote = {
   operation_key:string; project_id:number; kind:HistoryNoteKind; target_id:string; revision:number;
   original_text:string; previous_text:string; text:string; created_at:string
@@ -11,7 +11,7 @@ export function historyNotesFromStorage(rows:unknown):HistoryNote[]{
   return rows.map((row:unknown)=>{
     if(!row||typeof row!=='object')throw Error('確認内容の訂正履歴が不正です')
     const r=row as HistoryNote
-    if(!['ownership','workflow'].includes(r.kind)||!Number.isSafeInteger(r.project_id)||r.project_id<1||typeof r.target_id!=='string'||!r.target_id
+    if(!['ownership','workflow','billing','management'].includes(r.kind)||!Number.isSafeInteger(r.project_id)||r.project_id<1||typeof r.target_id!=='string'||!r.target_id
       ||!Number.isSafeInteger(r.revision)||r.revision<1||typeof r.operation_key!=='string'||typeof r.created_at!=='string'
       ||typeof r.text!=='string'||!r.text.trim()||r.text.length>4000||typeof r.original_text!=='string'||typeof r.previous_text!=='string')throw Error('確認内容の訂正履歴が不正です')
     const key=`${r.kind}:${r.target_id}:${r.revision}`

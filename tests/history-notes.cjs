@@ -14,7 +14,13 @@ assert.equal(historyNoteState([n2,n],n.kind,n.target_id,original,1).text,n2.text
 assert.throws(()=>historyNoteState([n2],n.kind,n.target_id,original,1),/つながり/)
 assert.throws(()=>historyNoteState([{...n,previous_text:'不一致'}],n.kind,n.target_id,original,1),/つながり/)
 assert.equal(historyNotesFromStorage([n]).length,1)
-for(const invalid of [null,{},[null],[{...n,text:''}],[{...n,revision:0}],[n,n],[{...n,kind:'billing'}]])assert.throws(()=>historyNotesFromStorage(invalid),/訂正履歴/)
+for(const invalid of [null,{},[null],[{...n,text:''}],[{...n,revision:0}],[n,n],[{...n,kind:'invoice'}]])assert.throws(()=>historyNotesFromStorage(invalid),/訂正履歴/)
+for(const kind of ['billing','management']){
+ const note={...n,kind,text:`${kind}の訂正文`}
+ assert.equal(historyNotesFromStorage([note])[0].kind,kind)
+ assert.equal(historyNoteState([note],kind,'1',original,1).text,note.text)
+ assert.equal(historyNoteState([note],'ownership','1',original,1).text,original,'Same numeric ID across kinds stays isolated')
+}
 const nodes=(e,p)=>Array.isArray(e)?e.flatMap(v=>nodes(v,p)):!e?.props?[]:[...(p(e)?[e]:[]),...nodes(e.props.children,p)]
 const text=e=>Array.isArray(e)?e.map(text).join(''):e?.props?text(e.props.children):typeof e==='string'?e:''
 let props={projectId:1,kind:'ownership',targetId:'1',original,notes:[n]},tree

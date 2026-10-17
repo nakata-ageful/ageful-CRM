@@ -21,7 +21,7 @@ export function HistoryNoteEditor({projectId,kind,targetId,original,notes=[],onS
     {!editing&&onSave&&<button type="button" className="btn btn-sub btn-sm" onClick={()=>{setDraft(current.text);setEditRevision(current.revision);setError('');setEditing(true)}}>確認内容を編集</button>}
     {editing&&<fieldset disabled={busy} style={{border:0,padding:0,minWidth:0}}>
       <label className="form-label">確認内容<textarea className="form-input" rows={4} maxLength={4000} value={draft} onChange={e=>setDraft(e.target.value)} style={{width:'100%',boxSizing:'border-box'}}/></label>
-      <p>文章だけを修正します。所有者・変更日・請求は変わりません。訂正前の文章も残ります。</p>
+      <p>文章だけを修正します。金額・日付・状態・所有者は変わりません。訂正前の文章も残ります。</p>
       {editRevision!==current.revision&&<p role="alert">確認内容が更新されています。キャンセルして、最新の文章から編集し直してください。</p>}
       <div style={{display:'flex',flexWrap:'wrap',gap:8}}><button type="button" className="btn btn-sub" onClick={()=>{setEditing(false);setError('')}}>キャンセル</button>
         <button type="button" className="btn btn-main" disabled={editRevision!==current.revision||!draft.trim()||draft.trim()===current.text||draft.trim().length>4000} onClick={()=>void save()}>{busy?'保存中…':'確認内容を保存'}</button></div>

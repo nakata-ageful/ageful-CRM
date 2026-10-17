@@ -54,5 +54,15 @@ function harness(file,name,props){const state=[];let cursor=0;const hooks={useSt
  nodes(tree,e=>e.type==='button'&&e.props.children==='保存された全項目を表示')[0].props.onClick();tree=history()
  assert.ok(nodes(tree,e=>e.type==='td').some(e=>e.props.children==='当時の備考'),'Unchanged full snapshot is still available')
  assert.equal(JSON.stringify(props),original)
+ for(const kind of ['billing','management']){
+   const source=kind==='billing'?props.events[0]:props.managementEvents[0]
+   const fixture={...props,transfers:[],events:kind==='billing'?[{...source,project_id:1,reason:null}]:[],managementEvents:kind==='management'?[{...source,reason:null}]:[],onSaveHistoryNote:noSave}
+   const renderHistory=harness('src/components/OwnershipTransferHistory.tsx','OwnershipTransferHistory',fixture)
+   tree=renderHistory();nodes(tree,e=>e.type==='button'&&e.props.children==='詳細を見る')[0].props.onClick();tree=renderHistory()
+   const editor=nodes(tree,e=>typeof e.type==='function'&&e.type.name==='HistoryNoteEditor'&&e.props.onSave)[0]
+   assert.ok(editor,`${kind} detail must expose text editing`)
+   assert.equal(editor.props.kind,kind);assert.equal(editor.props.projectId,1);assert.equal(editor.props.targetId,'1')
+   assert.equal(editor.props.original,'','Nullable source reasons must use the raw empty value, not a display fallback')
+ }
  console.log('PASS: action-only management landing, modal routing/safe save closure, visible dated/filterable audit rows, zero/unknown amounts, immutable complete snapshots and read-only diff')
 })().catch(e=>{console.error(e);process.exitCode=1})

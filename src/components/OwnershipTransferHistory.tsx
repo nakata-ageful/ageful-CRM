@@ -30,19 +30,19 @@ export function OwnershipTransferHistory({transfers,events,recipientName,managem
   }
   const detail=selected&&(selected.kind==='ownership'?{before:selected.record.contract_before,after:selected.record.contract_after,kind:'contract' as const}:selected.kind==='billing'?{...values(selected),kind:'billing' as const}:null)
   const fields=detail?historyFields(detail.before,detail.after,detail.kind,allFields):[]
-  const note=(e:HistoryEntry,editable=false)=><HistoryNoteEditor key={`ownership:${e.record.id}`} projectId={Number(e.record.project_id)} kind="ownership" targetId={String(e.record.id)}
-    original={String((e.record.field_decisions as Record<string,unknown>|null)?.reason??'')} notes={historyNotes} onSave={editable?onSaveHistoryNote:undefined}/>
+  const note=(e:HistoryEntry,editable=false)=><HistoryNoteEditor key={`${e.kind}:${e.record.id}`} projectId={Number(e.record.project_id)} kind={e.kind} targetId={String(e.record.id)}
+    original={String(e.kind==='ownership'?(e.record.field_decisions as Record<string,unknown>|null)?.reason??'':e.record.reason??'')} notes={historyNotes} onSave={editable?onSaveHistoryNote:undefined}/>
   return <section className="card change-history">
     <header className="change-history-heading"><div><h3 className="section-title">変更履歴</h3><p>いつ、何を変更したかを一覧で確認できます。変更前後の詳しい内容は「詳細を見る」から開きます。</p></div><span>{entries.length}件</span></header>
     <div className="history-filters" role="group" aria-label="履歴の種類">{(['all','ownership','billing','management'] as const).map(kind=><button type="button" key={kind} aria-pressed={filter===kind} onClick={()=>setFilter(kind)}>{kind==='all'?'すべて':historyKindLabels[kind]} <span>{entries.filter(e=>kind==='all'||e.kind===kind).length}</span></button>)}</div>
     {!visible.length&&<p className="history-empty">{filter==='all'?'まだ変更履歴はありません。':`${historyKindLabels[filter]}の履歴はありません。`}</p>}
     <ol className="history-list">{visible.map(e=><li key={e.key} className="history-entry">
       <div className="history-entry-meta"><span className={`history-kind ${e.kind}`}>{historyKindLabels[e.kind]}</span><time>{e.record.recorded_at||e.kind==='billing'?'記録日':'適用日'}：{historyDate(e.date)}</time></div>
-      <div className="history-entry-body"><h4>{e.title}</h4><p className="history-entry-summary">{summary(e)}</p>{target(e)&&<p>{target(e)}</p>}{e.kind==='ownership'?note(e):<p>確認内容：{e.reason}</p>}</div>
+      <div className="history-entry-body"><h4>{e.title}</h4><p className="history-entry-summary">{summary(e)}</p>{target(e)&&<p>{target(e)}</p>}{note(e)}</div>
       <button type="button" className="btn btn-sub" aria-label={`${e.title}（${historyDate(e.date)}・履歴ID ${e.record.id}）の詳細を見る`} onClick={()=>{setSelected(e);setAllFields(false)}}>詳細を見る</button>
     </li>)}</ol>
     {selected&&<Modal title={`${selected.title}の詳細`} width={960} onClose={()=>setSelected(null)}><div className="history-detail">
-      <p>{selected.record.recorded_at||selected.kind==='billing'?'記録日':'適用日'}：{historyDate(selected.date)}</p><h3>{summary(selected)}</h3>{target(selected)&&<p>{target(selected)}</p>}{selected.kind==='ownership'?note(selected,true):<p>確認内容：{selected.reason}</p>}
+      <p>{selected.record.recorded_at||selected.kind==='billing'?'記録日':'適用日'}：{historyDate(selected.date)}</p><h3>{summary(selected)}</h3>{target(selected)&&<p>{target(selected)}</p>}{note(selected,true)}
       {selected.kind==='management'?<p>適用日：{String(selected.record.effective_date)}。過去の請求や未入金は削除されません。</p>:<>
         {selected.kind==='ownership'&&<p className="history-reference-note">当時の契約情報の参照専用記録です。過去の請求金額を再計算するものではありません。</p>}
         <div className="history-detail-toolbar"><h4>{allFields?'保存された全項目':'変更された項目'}</h4><button type="button" className="btn btn-sub" onClick={()=>setAllFields(v=>!v)}>{allFields?'変更された項目だけ表示':'保存された全項目を表示'}</button></div>

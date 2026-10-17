@@ -17,7 +17,7 @@ const customers=[{id:1,name:'検証顧客A',company_name:'検証エネルギー�
 const units:TransferBillingUnit[]=[{id:'1',projectId:1,serviceYear:2026,roundLabel:'第2回',method:'請求書',scheduledDate:'2027-01-14',issuedOn:null,receivedOn:null,lifecycle:'planned',recipientId:2,collectionState:'pending',recipientSource:'confirmed',plannedAmount:82500,frozenAmount:null,frozenLineItems:null,frozenAt:null,revision:4,periodStart:'2026-07-14',periodEnd:'2027-07-13'}]
 const transfer={id:1,project_id:1,recorded_at:'2026-08-15T02:00:00Z',transfer_date:'2026-08-01',from_customer_id:1,to_customer_id:2,contract_before:contract,contract_after:{...contract,annual_maintenance_inc:180000},field_decisions:{reason:'売買のため所有者を変更。保守条件を確認。'}}
 const before={id:1,service_year:2026,round_number:2,recipient_customer_id:1,collection_method:'invoice',planned_amount:82500,frozen_amount:null,scheduled_date:'2027-01-14',period_start:'2026-07-14',period_end:'2027-07-13',plan_note:'次回の請求先を確認'}
-const event={id:1,billing_unit_id:1,recorded_at:'2026-09-25T02:00:00Z',event_type:'plan_changed',reason:'次回から新所有者へ請求することを確認',before_value:before,after_value:{...before,recipient_customer_id:2,planned_amount:0}}
+const event={id:1,project_id:1,billing_unit_id:1,recorded_at:'2026-09-25T02:00:00Z',event_type:'plan_changed',reason:'次回から新所有者へ請求することを確認',before_value:before,after_value:{...before,recipient_customer_id:2,planned_amount:0}}
 function Preview(){
   const [tab,setTab]=useState('管理設定'),[notice,setNotice]=useState(''),[fail,setFail]=useState(false)
   const [historyNotes,setHistoryNotes]=useState<HistoryNote[]>([])
@@ -29,10 +29,11 @@ function Preview(){
       onManagementSave={async request=>{await saved(request);setEvents(previous=>[...previous,{id:previous.length+1,project_id:1,scope:request.scope,action:request.action,effective_date:request.date,reason:request.reason}])}}
       onScheduleSave={saved} onPeriodSave={saved}/><BillingExceptionActions projectId={1} owner={customers[1]} recipients={customers} units={units} onAddDebit={saved} onSavePlan={async(choices,reason)=>saved({choices,reason})}/></div>
       :<div className="project-history-tab"><OwnershipTransferHistory transfers={[transfer]} events={[event]} managementEvents={events} recipientName={id=>customers.find(c=>c.id===id)?.name??`顧客ID ${id}`}
-        historyNotes={historyNotes} onSaveHistoryNote={async request=>{await saved(request);const current=historyNoteState(historyNotes,request.kind,request.targetId,transfer.field_decisions.reason,1);
+        historyNotes={historyNotes} onSaveHistoryNote={async request=>{await saved(request);const original=request.kind==='ownership'?transfer.field_decisions.reason:request.kind==='billing'?event.reason:events.find(e=>String(e.id)===request.targetId)?.reason??'';
+          const current=historyNoteState(historyNotes,request.kind,request.targetId,original,1);
           if(current.revision!==request.expectedRevision)throw Error('訂正履歴が更新されました')
           setHistoryNotes(notes=>[...notes,{operation_key:crypto.randomUUID(),project_id:1,kind:request.kind,target_id:request.targetId,revision:current.revision+1,
-            original_text:transfer.field_decisions.reason,previous_text:current.text,text:request.text,created_at:new Date().toISOString()}])}}/></div>}
+            original_text:original,previous_text:current.text,text:request.text,created_at:new Date().toISOString()}])}}/></div>}
     <div className="notice" style={{marginTop:16}}>合成データのみ。本番DBに保存しません。<label><input type="checkbox" checked={fail} onChange={e=>setFail(e.target.checked)}/>保存失敗を検証</label></div>
     {notice&&<p role="status" style={{overflowWrap:'anywhere',marginTop:12}}>{notice}</p>}
   </main></div>

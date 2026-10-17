@@ -888,6 +888,7 @@ export async function createProspect(input: ProspectInput, operationKey:string=c
       name: input.customer_name,
       name_kana: input.customer_name_kana || '',
       company_name: input.company_name || '',
+      company_name_kana: input.is_corporate ? input.company_name_kana || '' : '',
       is_corporate: input.is_corporate ?? false,
       email: '',
       phone: '',

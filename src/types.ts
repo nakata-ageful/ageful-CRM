@@ -424,6 +424,7 @@ export type ProspectInput = {
   existing_customer_id?: number
   is_corporate?: boolean
   company_name?: string
+  company_name_kana?: string
 }
 
 // ──────────────────────────────────────────────────────────

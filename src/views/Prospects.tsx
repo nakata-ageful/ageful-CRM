@@ -19,6 +19,7 @@ type ExistingCustomerOption = {
   name_kana: string
   is_corporate: boolean
   company_name: string
+  company_name_kana?: string
   source: 'prospect' | 'customer'
 }
 
@@ -37,7 +38,7 @@ function AddModal({ onSave, onClose, existingCustomers, newProspectReady }: {
   newProspectReady?: boolean
 }) {
   const [mode, setMode] = useState<'new' | 'existing' | 'undecided'>('new')
-  const [customerType, setCustomerType] = useState<'individual' | 'corporate'>('individual')
+  const [customerType, setCustomerType] = useState<'' | 'individual' | 'corporate'>('')
   const [selectedCustomer, setSelectedCustomer] = useState('')
   const [customerSearch, setCustomerSearch] = useState('')
   const [comboOpen, setComboOpen] = useState(false)
@@ -45,7 +46,7 @@ function AddModal({ onSave, onClose, existingCustomers, newProspectReady }: {
     customer_name: '', customer_name_kana: '', project_name: '', loan_company: '',
     equipment: '', land_cost: '', loan_amount: '',
     site_address: '', panel_kw: '', sales_company: '', referrer: '', lead_date: '',
-    is_corporate: false, company_name: '',
+    is_corporate: false, company_name: '', company_name_kana: '',
   })
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
@@ -72,6 +73,7 @@ function AddModal({ onSave, onClose, existingCustomers, newProspectReady }: {
         customer_name: cust.name,
         customer_name_kana: cust.name_kana,
         company_name: cust.company_name,
+        company_name_kana: cust.company_name_kana ?? '',
         is_corporate: cust.is_corporate,
         existing_customer_id: cust.id,
       }))
@@ -85,19 +87,20 @@ function AddModal({ onSave, onClose, existingCustomers, newProspectReady }: {
     setCustomerSearch('')
     setComboOpen(false)
     setSelectedCustomer('')
-    setForm(f => ({ ...f, customer_name: '', customer_name_kana: '', company_name: '',
+    setForm(f => ({ ...f, customer_name: '', customer_name_kana: '', company_name: '', company_name_kana: '',
       is_corporate: newMode === 'new' && customerType === 'corporate', existing_customer_id: undefined }))
   }
 
   function handleCustomerTypeChange(t: 'individual' | 'corporate') {
-    if (savingRef.current || uncertainRef.current) return
+    if (savingRef.current || uncertainRef.current || customerType === t) return
     setCustomerType(t)
-    setForm(f => ({ ...f, is_corporate: t === 'corporate', company_name: '' }))
+    setForm(f => ({ ...f, is_corporate: t === 'corporate', company_name: '', company_name_kana: '' }))
   }
 
   async function handleSave() {
     if (savingRef.current || checkList || !form.project_name.trim()) return
     if (mode === 'undecided' && !newProspectReady) return
+    if (mode === 'new' && !customerType) return
     if (mode !== 'undecided' && !form.customer_name.trim()) return
     if (mode === 'existing' && (!selectedCustomer || !form.existing_customer_id)) return
     if (mode === 'new' && customerType === 'corporate' && !(form.company_name ?? '').trim()) return
@@ -106,8 +109,10 @@ function AddModal({ onSave, onClose, existingCustomers, newProspectReady }: {
     setError('')
     try {
       const input = { ...form, customer_undecided: mode === 'undecided',
-        ...(mode === 'undecided' ? { customer_name: '', customer_name_kana: '', company_name: '', is_corporate: false, existing_customer_id: undefined }
+        ...(mode === 'undecided' ? { customer_name: '', customer_name_kana: '', company_name: '', company_name_kana: '', is_corporate: false, existing_customer_id: undefined }
           : mode === 'new' ? { existing_customer_id: undefined } : {}) }
+      // This field belongs to customers, not the strict undecided-prospect RPC.
+      if (mode === 'undecided') delete input.company_name_kana
       const signature = JSON.stringify(input)
       if (!operationRef.current || operationRef.current.signature !== signature) {
         if (uncertainRef.current) throw Error('前回と同じ内容で保存結果を確認してください')
@@ -188,7 +193,7 @@ function AddModal({ onSave, onClose, existingCustomers, newProspectReady }: {
                       // 入力を変更したら既存の選択を解除（新しい候補を選び直す前提）
                       if (selectedCustomer) {
                         setSelectedCustomer('')
-                        setForm(f => ({ ...f, customer_name: '', customer_name_kana: '', company_name: '', existing_customer_id: undefined }))
+                        setForm(f => ({ ...f, customer_name: '', customer_name_kana: '', company_name: '', company_name_kana: '', existing_customer_id: undefined }))
                       }
                     }}
                     onBlur={() => {
@@ -202,7 +207,8 @@ function AddModal({ onSave, onClose, existingCustomers, newProspectReady }: {
                       ? existingCustomers.filter(c =>
                           c.name.toLowerCase().includes(q) ||
                           c.name_kana.toLowerCase().includes(q) ||
-                          c.company_name.toLowerCase().includes(q)
+                          c.company_name.toLowerCase().includes(q) ||
+                          (c.company_name_kana ?? '').toLowerCase().includes(q)
                         )
                       : existingCustomers
                     return (
@@ -251,9 +257,10 @@ function AddModal({ onSave, onClose, existingCustomers, newProspectReady }: {
                   })()}
                 </label>
                 {selectedCustomer && form.is_corporate && (
-                  <div className="info-field" style={{ gridColumn: '1/-1' }}>
-                    <span>会社名</span><b>{form.company_name || '-'}</b>
-                  </div>
+                  <>
+                    <div className="info-field"><span>会社名</span><b>{form.company_name || '-'}</b></div>
+                    <div className="info-field"><span>会社名フリガナ</span><b>{form.company_name_kana || '未登録'}</b></div>
+                  </>
                 )}
                 {selectedCustomer && (
                   <>
@@ -280,10 +287,11 @@ function AddModal({ onSave, onClose, existingCustomers, newProspectReady }: {
               </>
             ) : mode === 'new' ? (
               <>
-                <div style={{ display: 'flex', gap: 8, gridColumn: '1/-1' }}>
+                <div role="group" aria-label="新規顧客の種別" style={{ display: 'flex', gap: 8, gridColumn: '1/-1' }}>
                   <button
                     type="button"
                     className={`filter-tab ${customerType === 'individual' ? 'active' : ''}`}
+                    aria-pressed={customerType === 'individual'}
                     onClick={() => handleCustomerTypeChange('individual')}
                   >
                     個人
@@ -291,17 +299,20 @@ function AddModal({ onSave, onClose, existingCustomers, newProspectReady }: {
                   <button
                     type="button"
                     className={`filter-tab ${customerType === 'corporate' ? 'active' : ''}`}
+                    aria-pressed={customerType === 'corporate'}
                     onClick={() => handleCustomerTypeChange('corporate')}
                   >
                     法人
                   </button>
                 </div>
+                {!customerType && <p style={{ gridColumn: '1/-1' }}>個人または法人を選んでから、顧客情報を入力してください。</p>}
                 {customerType === 'corporate' && (
-                  <label className="form-label required" style={{ gridColumn: '1/-1' }}>
-                    会社名
-                    <input className="form-input" value={form.company_name ?? ''} onChange={e => set('company_name', e.target.value)} placeholder="株式会社〇〇" />
-                  </label>
+                  <>
+                    <label className="form-label required">会社名<input className="form-input" value={form.company_name ?? ''} onChange={e => set('company_name', e.target.value)} placeholder="株式会社〇〇" /></label>
+                    <label className="form-label">会社名フリガナ<input className="form-input" value={form.company_name_kana ?? ''} onChange={e => set('company_name_kana', e.target.value)} placeholder="カブシキガイシャ〇〇" /></label>
+                  </>
                 )}
+                {customerType && <>
                 <label className="form-label required">
                   {customerType === 'corporate' ? '担当者名' : '顧客名'}
                   <input className="form-input" value={form.customer_name} onChange={e => set('customer_name', e.target.value)} placeholder="山田 太郎" />
@@ -310,6 +321,7 @@ function AddModal({ onSave, onClose, existingCustomers, newProspectReady }: {
                   {customerType === 'corporate' ? '担当者フリガナ' : 'フリガナ'}
                   <input className="form-input" value={form.customer_name_kana} onChange={e => set('customer_name_kana', e.target.value)} placeholder="やまだ たろう" />
                 </label>
+                </>}
               </>
             ) : <p style={{ gridColumn: '1/-1' }}>顧客を作らずに新規案件を登録します。顧客が決まったら、この見込みの詳細から設定できます。既存発電所の引継ぎは、発電所詳細の「所有者を変更」から進めてください。</p>}
             <label className="form-label required">
@@ -356,6 +368,7 @@ function AddModal({ onSave, onClose, existingCustomers, newProspectReady }: {
             <button className="btn btn-sub" disabled={saving || uncertain} onClick={close}>{checkList ? '閉じて一覧を確認' : 'キャンセル'}</button>
             <button className="btn btn-main" onClick={handleSave} disabled={saving || checkList || !form.project_name.trim()
               || (mode === 'undecided' && !newProspectReady)
+              || (mode === 'new' && !customerType)
               || (mode !== 'undecided' && !form.customer_name.trim())
               || (mode === 'existing' && (!selectedCustomer || !form.existing_customer_id))
               || (mode === 'new' && customerType === 'corporate' && !(form.company_name ?? '').trim())}>
@@ -441,6 +454,7 @@ export function Prospects({
           name_kana: c.name_kana ?? '',
           is_corporate: c.is_corporate,
           company_name: c.company_name ?? '',
+          company_name_kana: c.company_name_kana ?? '',
           source: 'customer',
         })
       }

@@ -34,7 +34,7 @@ const nodes=(e,p)=>Array.isArray(e)?e.flatMap(v=>nodes(v,p)):!e?.props?[]:[...(p
 const text=e=>Array.isArray(e)?e.map(text).join(''):e?.props?text(e.props.children):typeof e==='string'?e:''
 function reset(ready=true){
  cells.length=0;submitted=[];closed=0;handler=async()=>{}
- props={newProspectReady:ready,existingCustomers:[{id:5,name:'合成A',name_kana:'エー',company_name:'合成会社A',is_corporate:true}],
+ props={newProspectReady:ready,existingCustomers:[{id:5,name:'合成A',name_kana:'エー',company_name:'合成会社A',company_name_kana:'ゴウセイカイシャエー',is_corporate:true}],
   onClose(){closed++},onSave:async(input,key)=>{submitted.push({input,key});await handler()},
  }
 }
@@ -46,7 +46,7 @@ async function test(){
  let tree=render()
  assert.equal(button(tree,'顧客未定').props.disabled,true)
  button(tree,'顧客未定').props.onClick();tree=render()
- assert.ok(nodes(tree,e=>e.type==='input'&&e.props.placeholder==='山田 太郎').length,'Readiness guard must also reject the actual handler')
+ assert.ok(text(tree).includes('個人または法人を選んでから'),'Readiness guard must reject changing to undecided and keep the new-customer type choice')
 
  reset();tree=render();button(tree,'既存顧客').props.onClick();tree=render()
  nodes(tree,e=>e.type==='input'&&e.props.placeholder==='会社名・氏名・フリガナで検索')[0].props.onFocus();tree=render()
@@ -63,6 +63,7 @@ async function test(){
  assert.equal(submitted[0].input.customer_undecided,true)
  assert.equal(submitted[0].input.customer_name,'');assert.equal(submitted[0].input.customer_name_kana,'')
  assert.equal(submitted[0].input.company_name,'');assert.equal(submitted[0].input.existing_customer_id,undefined)
+ assert.ok(!('company_name_kana' in submitted[0].input),'The strict undecided RPC must receive the unchanged field set')
  assert.equal(submitted[0].input.is_corporate,false);assert.match(submitted[0].key,/^[0-9a-f-]{36}$/)
  tree=render();tree.props.onClick();assert.equal(closed,0,'Cannot close while saving')
  fail();await pending;tree=render()
@@ -83,11 +84,36 @@ async function test(){
  assert.equal(button(tree,'保存する').props.disabled,true,'Changing mode requires explicit customer reselection')
 
  reset();plant('合成・通常新規');tree=render()
+ button(tree,'個人').props.onClick();tree=render()
  nodes(tree,e=>e.type==='input'&&e.props.placeholder==='山田 太郎')[0].props.onChange({target:{value:'合成人名'}})
  handler=async()=>{throw new TypeError('Synthetic legacy connection loss')}
  tree=render();await button(tree,'保存する').props.onClick();tree=render()
  assert.equal(button(tree,'保存する').props.disabled,true,'Legacy multi-write path must not offer unsafe replay')
  button(tree,'閉じて一覧を確認').props.onClick();assert.equal(closed,1)
+
+ reset();plant('合成・法人の新規案件');tree=render()
+ assert.equal(nodes(tree,e=>e.type==='input'&&e.props.placeholder==='山田 太郎').length,0,'Choose type before customer entry')
+ assert.equal(button(tree,'保存する').props.disabled,true)
+ await button(tree,'保存する').props.onClick();assert.equal(submitted.length,0,'Handler also rejects missing type')
+ button(tree,'法人').props.onClick();tree=render()
+ assert.ok(text(tree).includes('担当者名')&&text(tree).includes('担当者フリガナ')&&text(tree).includes('会社名フリガナ'))
+ const enter=(placeholder,value)=>{nodes(render(),e=>e.type==='input'&&e.props.placeholder===placeholder)[0].props.onChange({target:{value}})}
+ enter('山田 太郎','合成 担当');enter('やまだ たろう','ゴウセイ タントウ');tree=render()
+ assert.equal(button(tree,'保存する').props.disabled,true,'Company remains mandatory')
+ enter('株式会社〇〇','合成法人');enter('カブシキガイシャ〇〇','ゴウセイホウジン');tree=render()
+ button(tree,'法人').props.onClick();tree=render();assert.equal(nodes(tree,e=>e.type==='input'&&e.props.placeholder==='カブシキガイシャ〇〇')[0].props.value,'ゴウセイホウジン','Clicking the selected type does not clear input')
+ assert.equal(button(tree,'保存する').props.disabled,false);await button(tree,'保存する').props.onClick()
+ assert.equal(submitted[0].input.company_name_kana,'ゴウセイホウジン');assert.equal(submitted[0].input.customer_name,'合成 担当');assert.equal(submitted[0].input.customer_name_kana,'ゴウセイ タントウ');assert.equal(submitted[0].input.is_corporate,true)
+ button(tree,'個人').props.onClick();tree=render();assert.ok(!text(tree).includes('会社名フリガナ'))
+ await button(tree,'保存する').props.onClick();assert.equal(submitted.at(-1).input.company_name,'');assert.equal(submitted.at(-1).input.company_name_kana,'');assert.equal(submitted.at(-1).input.is_corporate,false)
+ button(tree,'顧客未定').props.onClick();tree=render();await button(tree,'保存する').props.onClick()
+ assert.ok(!('company_name_kana'in submitted.at(-1).input));assert.equal(submitted.at(-1).input.customer_name,'');assert.equal(submitted.at(-1).input.customer_name_kana,'')
+
+ reset();tree=render();button(tree,'既存顧客').props.onClick();tree=render()
+ nodes(tree,e=>e.type==='input'&&e.props.placeholder==='会社名・氏名・フリガナで検索')[0].props.onChange({target:{value:'ゴウセイカイシャエー'}});tree=render()
+ const match=nodes(tree,e=>e.type==='div'&&typeof e.props.onMouseDown==='function');assert.equal(match.length,1,'Existing company kana also matches the search')
+ match[0].props.onMouseDown({preventDefault(){}});tree=render();assert.ok(text(tree).includes('ゴウセイカイシャエー'),'Existing company kana is shown without editing')
+ plant('合成・既存法人の新規案件');tree=render();await button(tree,'保存する').props.onClick();assert.equal(submitted[0].input.existing_customer_id,5)
 
  cells.length=0;index=0
  const calls=[],data=[

@@ -26,7 +26,7 @@ export function ProjectManagementActions({projectId,row,customers,units,events,o
     </section>
     <div className="management-action-grid">
       <section className="card management-action"><h3>管理の終了・再開</h3><p>保守だけ、またはすべての取引を終了・再開します。過去の請求や未入金は残ります。</p><button type="button" className="btn btn-sub" onClick={()=>setEditing('management')}>終了・再開を記録する</button></section>
-      {row&&<section className="card management-action"><h3>今後の請求予定を追加</h3><p>保守期間と第何回かを確認して、まだ保存していない予定だけを追加します。</p><button type="button" className="btn btn-sub" onClick={()=>setEditing('schedule')}>請求予定を追加する</button></section>}
+      {row&&<section className="card management-action"><h3>今後の請求予定を追加</h3><p>通常の予定は自動表示されます。期間や日付を個別に決めて追加したいときに使います。</p><button type="button" className="btn btn-sub" onClick={()=>setEditing('schedule')}>請求予定を追加する</button></section>}
     </div>
     {editing&&<Modal title={editing==='management'?'管理の終了・再開':'今後の請求予定を追加'} width={820} onClose={close}><div className="standard-editor">
       {editing==='management'?<ManagementLifecycleEditor expanded key={`${projectId}:${JSON.stringify(events)}:${units.map(u=>`${u.id}:${u.revision}`).join(',')}`} projectId={projectId} events={events.filter(e=>e.project_id===projectId)} units={units}

@@ -33,7 +33,7 @@ export function BillingScheduleChangeReview({review,name,recipientName,busy,onSa
       </section>})}</div>}
       {previewChanged&&impact?.after&&<section className="schedule-setting-impact" aria-label="今後の自動予定への反映"><h4>{hasChoices?'② 今後の自動予定':'今後の自動予定'}</h4>
         <p>「請求情報」の変更に合わせて、自動表示の日付も変わります。チェックや毎年の予定登録は不要です。</p>
-        <p><strong>{impact.after.year}年・第{impact.after.round}回</strong><br/>保守期間：{impact.after.period}</p>{impact.before&&(impact.before.year!==impact.after.year||impact.before.round!==impact.after.round||impact.before.period!==impact.after.period)?<p>変更前の候補：{impact.before.year}年・第{impact.before.round}回 ／ {impact.before.period} ／ {impact.before.date||'未登録'}</p>:null}<p className="schedule-change-dates">{impact.after.method==='direct_debit'?'振替予定日':'請求予定日'}：{impact.before?.date!==impact.after.date&&<>{impact.before?.date||'未登録'} → </>}<b>{impact.after.date||'未登録'}</b></p>
+        <p><strong>{impact.after.year}年・第{impact.after.round}回</strong><br/>保守期間：{impact.after.period}</p>{impact.before&&(impact.before.year!==impact.after.year||impact.before.round!==impact.after.round||impact.before.period!==impact.after.period)?<p>変更前の自動予定：{impact.before.year}年・第{impact.before.round}回 ／ {impact.before.period} ／ {impact.before.date||'未登録'}</p>:null}<p className="schedule-change-dates">{impact.after.method==='direct_debit'?'振替予定日':'請求予定日'}：{impact.before?.date!==impact.after.date&&<>{impact.before?.date||'未登録'} → </>}<b>{impact.after.date||'未登録'}</b></p>
         {impact.before&&impact.before.method!==impact.after.method&&<p>請求方法：{impact.before.method==='direct_debit'?'口座振替':'請求書'} → {impact.after.method==='direct_debit'?'口座振替':'請求書'}</p>}
         <p>上は自動表示される予定の例です。この保存で請求書は発行されません。</p>
       </section>}

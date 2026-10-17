@@ -31,7 +31,7 @@ const stored={...paid,periodStart:'2026-10-27',periodEnd:'2027-12-31'}
 const preserved=renderToStaticMarkup(React.createElement(SavedMaintenancePeriodEditor,{startDate:'2022-07-14',year:2026,units:[stored],onSave:noAction,onClose:noAction}))
 assert.ok(preserved.includes('value="2027-12-31"'),'Do not replace explicitly saved exceptions when opening editor')
 const html=renderToStaticMarkup(React.createElement(MaintenancePeriodReview,{startDate:'2022-07-14',units,onSave:noAction}))
-assert.ok(html.includes('参考表示・保守期間はまだ保存されていません'))
+assert.ok(html.includes('対象の保守期間が記録されていません'))
 assert.equal((html.match(/この期間の保存記録を修正/g)||[]).length,2)
 assert.ok(html.includes('2025-12-02')&&html.includes('2026-12-01'),'Prepayment dates and separate next period remain visible')
 const readOnly=renderToStaticMarkup(React.createElement(MaintenancePeriodReview,{startDate:'2022-07-14',units}))

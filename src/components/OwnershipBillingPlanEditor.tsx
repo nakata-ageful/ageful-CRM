@@ -50,9 +50,9 @@ export function OwnershipBillingPlanEditor({projectId,oldOwner,newOwner,units:in
     }catch(e){setError(e instanceof Error?e.message:String(e))}
   }
   return <section className="card ownership-billing-editor">
-    <div className="ownership-billing-title"><div><span>{saveScope==='ownership'?'STEP 2':'請求予定'}</span><h2>{saveScope==='ownership'?'所有者変更後の請求予定':'今後の請求予定を確認・変更'}</h2></div><b>{drafts.length}回を確認</b></div>
+    <div className="ownership-billing-title"><div><span>{saveScope==='ownership'?'STEP 2':'請求予定'}</span><h2>{saveScope==='ownership'?'所有者変更後の請求予定':'保存済みの請求予定を変更'}</h2></div><b>{drafts.length}回を確認</b></div>
     {saveScope==='ownership'&&<div className="ownership-billing-owners"><span>現在の所有者<br/><strong>{oldOwner.name}</strong></span><span aria-hidden="true">→</span><span>変更後の所有者<br/><strong>{newOwner.name}</strong></span></div>}
-    <p>今の予定を表示しています。変更する回だけ、請求先や方法を選び直してください。</p>
+    <p>保存済みの未発行予定を表示しています。変更したい回だけ、請求先や方法を選び直してください。</p>
     <div className="ownership-billing-notice">発行済み・入金済みなど {units.filter(u=>u.lifecycle!=='planned').length} 件は変更対象外です。自動の日割り計算・請求追加・銀行への振替手配は行いません。</div>
     {error&&<p role="alert" style={{color:'#b91c1c'}}>{error}</p>}
     <form onSubmit={review}><fieldset disabled={busy} style={{border:0,padding:0,minWidth:0}}>
@@ -76,7 +76,7 @@ export function OwnershipBillingPlanEditor({projectId,oldOwner,newOwner,units:in
           <label>備考<textarea className="form-input" value={d.note} onChange={e=>patch(i,'note',e.target.value)}/></label>
           </details>
         </fieldset>})}
-      {!drafts.length&&<p>変更する予定はありません。新しい請求は自動作成しません。</p>}
+      {!drafts.length&&<p>変更できる保存済み予定はありません。自動の予定は「請求詳細」で確認してください。</p>}
       <div className="ownership-billing-footer"><span>予定額の空欄は「金額要確認」です。0円とは区別します。</span><button className="btn btn-main" type="submit">変更内容を確認（保存はしません）</button></div>
     </fieldset></form>
     {result&&<section className="ownership-billing-review" aria-label="請求予定の確認結果">

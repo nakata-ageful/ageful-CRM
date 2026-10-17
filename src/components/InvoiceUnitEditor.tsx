@@ -35,9 +35,9 @@ export function InvoiceUnitEditor({unit:initialUnit,recipientName,onSave,onClose
       onClose()
     }catch(e){setError(e instanceof Error?e.message:String(e))}finally{lock.current=false;setBusy(false)}
   }
-  return <section className="card"><h3>{unit.serviceYear}年 {unit.roundLabel}：{issuing?'発行':'入金確認'}</h3>
+  return <section className="card"><h3>{unit.serviceYear}年 {unit.roundLabel}：{issuing?'発行内容を記録':'入金日を記録'}</h3>
     <p>請求先：{unit.recipientId===null?'請求先要確認':recipientName(unit.recipientId)}</p>
-    {issuing&&<p>保存予定額：{unit.plannedAmount==null?'金額要確認':fmtYen(unit.plannedAmount)}。実際の請求明細を確認して入力してください。</p>}
+    {issuing&&<p>請求予定額：{unit.plannedAmount==null?'金額要確認':fmtYen(unit.plannedAmount)}。実際の請求明細を確認して入力してください。</p>}
     {!issuing&&<p>確定額：{unit.frozenAmount===null?'金額要確認':fmtYen(unit.frozenAmount)}</p>}
     {error&&<p role="alert">{error}</p>}
     <form onSubmit={save}><fieldset disabled={busy} style={{border:0}}>
@@ -46,10 +46,10 @@ export function InvoiceUnitEditor({unit:initialUnit,recipientName,onSave,onClose
         {items.map((item,index)=><div key={index} className="editor-line-item">
           <label>明細名<input required value={item.name} onChange={e=>setItems(items.map((v,i)=>i===index?{...v,name:e.target.value}:v))}/></label>
           <label>金額（税込）<input required inputMode="numeric" value={item.amount} onChange={e=>setItems(items.map((v,i)=>i===index?{...v,amount:e.target.value}:v))}/></label>
-          {items.length>1&&<button type="button" onClick={()=>setItems(items.filter((_,i)=>i!==index))}>削除</button>}
+          {items.length>1&&<button type="button" onClick={()=>setItems(items.filter((_,i)=>i!==index))}>明細を削除</button>}
         </div>)}<button type="button" onClick={()=>setItems([...items,{name:'',amount:''}])}>明細を追加</button></>}
       <p>{issuing?'請求書の作成・送信は行いません。別途発行した内容を記録します。':'通帳などに記載された入金日を入力してください。'}</p>
-      <div className="editor-footer"><button type="button" className="btn btn-sub" onClick={onClose}>キャンセル</button><button type="submit" className="btn btn-main">{busy?'保存中…':issuing?'発行して保存':'入金確認を保存'}</button></div>
+      <div className="editor-footer"><button type="button" className="btn btn-sub" onClick={onClose}>キャンセル</button><button type="submit" className="btn btn-main">{busy?'保存中…':issuing?'発行内容を保存':'入金日を保存'}</button></div>
     </fieldset></form>
   </section>
 }

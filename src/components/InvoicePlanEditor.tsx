@@ -24,12 +24,12 @@ export function InvoicePlanEditor({unit:initialUnit,recipients,onSave,onClose}:{
     }catch(e){setError(e instanceof Error?e.message:String(e))}finally{lock.current=false;setBusy(false)}
   }
   return <section className="card"><h3>{unit.serviceYear}年 {unit.roundLabel}：予定を編集</h3>
-    <p>選んだ1回だけを変更します。金額は確定せず、保存後も請求予定に残ります。</p>
+    <p>今回だけの請求先・日付・予定額を変更します。保存しても未発行の予定のままです。</p>
     {error&&<p role="alert">{error}</p>}<form onSubmit={save}><fieldset disabled={busy} style={{border:0}}>
       <CustomerPicker label="請求先" value={payer} onChange={setPayer} customers={recipients} emptyLabel="請求先要確認"/>
       <label>請求予定日<input type="date" value={date} onChange={e=>setDate(e.target.value)}/></label>
       <label>予定額（税込）<input inputMode="numeric" value={amount} onChange={e=>setAmount(e.target.value)}/></label>
-      <p>空欄は金額要確認です。保存額は契約変更で自動更新されず、実績の確定額とは別です。</p>
+      <p>金額の空欄は「金額要確認」です。今回の予定額は、今後の基本設定を変更しても自動では変わりません。</p>
       <div className="editor-footer"><button className="btn btn-sub" type="button" onClick={onClose}>キャンセル</button><button className="btn btn-main" type="submit">{busy?'保存中…':'予定を保存'}</button></div>
     </fieldset></form>
   </section>

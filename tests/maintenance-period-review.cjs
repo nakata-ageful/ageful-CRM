@@ -8,7 +8,7 @@ const units=[{id:'1',serviceYear:2026,roundLabel:'保存済み単回記録',life
 const before=JSON.stringify(units),html=renderToStaticMarkup(React.createElement(MaintenancePeriodReview,{startDate:'2022-01-14',units}))
 assert.ok(html.includes('2026-01-14 ～ 2027-01-13'))
 assert.ok(html.includes('2025-12-02'))
-assert.ok(html.includes('回数未登録の記録'))
+assert.ok(html.includes('回数要確認'))
 assert.ok(html.includes('第2回'))
 assert.ok(html.includes('保存済みの予定'))
 assert.equal((html.match(/<h4>/g)||[]).length,1,'Prepayment must remain in its stored service year')

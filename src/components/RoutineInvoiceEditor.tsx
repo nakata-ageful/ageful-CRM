@@ -56,7 +56,7 @@ export function RoutineInvoiceEditor({context,recipients,onAdd,onSave,onClose,on
       {items.map((line,index)=><div className="editor-line-item" key={index}>
         <label>明細名<input required value={line.name} onChange={e=>setItems(items.map((v,i)=>i===index?{...v,name:e.target.value}:v))}/></label>
         <label>金額（税込）<input required inputMode="numeric" value={line.amount} onChange={e=>setItems(items.map((v,i)=>i===index?{...v,amount:e.target.value}:v))}/></label>
-        {items.length>1&&<button type="button" onClick={()=>setItems(items.filter((_,i)=>i!==index))}>削除</button>}
+        {items.length>1&&<button type="button" onClick={()=>setItems(items.filter((_,i)=>i!==index))}>明細を削除</button>}
       </div>)}
       <button type="button" onClick={()=>setItems([...items,{name:'',amount:''}])}>明細を追加</button>
       <label>備考（任意）<textarea value={note} disabled={!!prepared} onChange={e=>setNote(e.target.value)}/></label>

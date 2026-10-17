@@ -26,7 +26,7 @@ const html=renderToStaticMarkup(React.createElement(Table,{data,candidates:[cand
 for(const text of ['顧客A','発行時に確認','発行内容を記録','請求予定'])assert.ok(html.includes(text),text)
 assert.ok(!html.includes('現在の顧客・請求先未確定')&&!html.includes('未保存・要確認'))
 const exceptional=renderToStaticMarkup(React.createElement(Table,{data,candidates:[{...candidate,status:'review',reason:'保存済み記録の対応確認'}],mode:'review',today:'2026-10-09',canRecordCandidate:()=>false,onViewDetail:()=>{}}))
-assert.ok(exceptional.includes('保存内容を確認')&&exceptional.includes('請求先・保守期間を確認')&&exceptional.includes('予定を確認'))
+assert.ok(exceptional.includes('請求記録を確認')&&exceptional.includes('請求先・保守期間を確認')&&exceptional.includes('予定を確認'))
 assert.ok(!exceptional.includes('発行内容を記録'))
 console.log('PASS: ordinary payer display, exact clicked occurrence, exception/owner/overlap gates and exact creation response checks')
 

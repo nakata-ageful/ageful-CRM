@@ -12,7 +12,7 @@ export function ManualDebitPlanCreator({onSave,recipients=[{id:1,name:'顧客A'}
    await onSave({recipient:Number(recipient),year:Number(year),month:Number(month),date,amount:amount===''?null:Number(amount),note,reason:reason.trim()});setReason('');setError('追加しました。')
   }catch(e){setError(e instanceof Error?e.message:String(e))}finally{lock.current=false;setBusy(false)}}
  const EditorBody=expanded?'section':'details'
- return <EditorBody className="card" style={{padding:20}}>{!expanded&&<summary>振替予定を1件追加</summary>}<p>対象の月と予定日を指定します。自動で毎月の請求は作りません。</p>
+ return <EditorBody className="card" style={{padding:20}}>{!expanded&&<summary>振替予定を1件追加</summary>}<p>今回追加する1か月分だけを保存します。銀行への振替手配は行いません。</p>
  <form onSubmit={save}><fieldset disabled={busy} style={{border:0,display:'grid',gap:10}}>
  <CustomerPicker label="請求先" value={recipient} onChange={setRecipient} customers={recipients}/>
  <label>対象年<input value={year} onChange={e=>setYear(e.target.value)} inputMode="numeric" required/></label>

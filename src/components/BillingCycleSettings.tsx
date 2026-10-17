@@ -23,7 +23,7 @@ export function BillingCycleSettings({contract,units,rules,onSave}:{contract:Con
   }):[]
   return <section className="card billing-cycle-settings">
     <div className="card-header-row"><h3 className="section-title">今後の保守期間・請求の繰り返し</h3>{onSave&&<button type="button" className="btn btn-sub btn-sm" onClick={()=>{setOpen(true);change();setReason('');setYear(Math.max(new Date().getFullYear()+1,latest?.effective_year??0));setMode(latest?.mode??'calendar_prepaid')}}>繰り返し設定を変更</button>}</div>
-    <p>{latest?`${latest.effective_year}年の保守期間から：${latest.mode==='calendar_prepaid'?'毎年1月1日〜12月31日／前年12月1日に翌年分を請求':'当初の保守開始日を基準に1年間'}`:'未設定：保守開始日を基準に1年間の候補を表示します。'}</p>
+    <p>{latest?`${latest.effective_year}年の保守期間から：${latest.mode==='calendar_prepaid'?'毎年1月1日〜12月31日／前年12月1日に翌年分を請求':'当初の保守開始日を基準に1年間'}`:'標準設定：保守開始日から1年間。請求日は「請求情報」の予定日を使います。'}</p>
 
     {!compatible&&latest?.mode==='calendar_prepaid'&&<p role="alert" className="notice notice-error">繰り返し設定と請求方法・回数が一致していません。「請求書・年1回」にするか、繰り返し設定を変更してください。</p>}
     {!onSave&&<p role="status">繰り返し設定の保存機能は、この環境ではまだ利用できません。</p>}
@@ -39,7 +39,7 @@ export function BillingCycleSettings({contract,units,rules,onSave}:{contract:Con
       <p>年の途中で切り替える場合は、先に「請求詳細」で年末までの保守期間を登録してください。</p>
       <label>確認内容・備考<textarea className="form-input" value={reason} onChange={e=>{setReason(e.target.value);change()}} placeholder="例：8月〜年末の移行期間を確認済み。2027年分から1月〜12月、前年12月1日請求に統一"/></label>
       {notice&&<p role="alert" className="notice notice-error">{notice}</p>}
-      {review&&<p role="status" className="notice">上の繰り返し設定だけを保存します。保存済みの請求・入金・金額・期間・請求先は変更しません。今後も請求先と金額を確認して「予定を登録」し、発行日・入金日を記録してください。</p>}
+      {review&&<p role="status" className="notice">この設定を今後の自動予定に使います。毎年の予定登録は不要です。保存済みの請求先・金額・日付・保守期間は変更しません。</p>}
       <div className="editor-footer"><button type="button" className="btn btn-sub" disabled={busy} onClick={()=>setOpen(false)}>キャンセル</button>{review?<button type="button" className="btn btn-main" onClick={()=>void save()}>{busy?'保存中…':'確認した繰り返し設定を保存'}</button>:<button type="button" className="btn btn-main" onClick={confirm}>設定内容を確認</button>}</div>
     </fieldset></div></Modal>}
   </section>

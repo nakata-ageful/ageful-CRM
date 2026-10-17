@@ -57,8 +57,8 @@ const {BillingOverviewPanel}=load('src/components/BillingOverviewPanel.tsx'),{In
 const data={units:history,recipients:[{id:1,name:'検証顧客'}],recipientName:()=> '検証顧客',projectName:()=>row.project_name,plannedAmount:()=>null}
 const review=alerts([row],recipients,[paid],'2026-11-03')
 const html=renderToStaticMarkup(React.createElement(BillingOverviewPanel,{data,today:'2026-11-03',setupItems:review.items}))
-assert.ok(html.includes('保存済みの保守期間と候補の期間が異なります'));assert.ok(html.includes('<h3><span>未保存・要確認の請求予定'))
+assert.ok(html.includes('保存済みの保守期間と候補の期間が異なります'));assert.ok(html.includes('<h3><span>請求内容の確認が必要'))
 const detail=renderToStaticMarkup(React.createElement(InvoiceLedgerDetail,{data,contract:c,projectId:1,currentRecipientId:1,maintenanceStartDate:c.maintenance_start_date,today:'2026-10-03',onAddSchedule:()=>{throw Error('Render must not write')}}))
-assert.ok(detail.includes('保守期間要確認'));assert.ok(detail.includes('予定を確認・調整'));assert.ok(!detail.includes('請求内容を入力して発行'))
+assert.ok(detail.includes('保守期間要確認'));assert.ok(detail.includes('予定を確認・調整'));assert.ok(!detail.includes('発行内容を記録'))
 assert.equal(JSON.stringify({c,paid,rule,row}),baseline)
 console.log('PASS: 36-month long/short transition coverage, no hidden ambiguous/cancelled/moved-date claims, stored-plan and prepayment unpaid continuity, visible review warnings; fixtures unchanged')

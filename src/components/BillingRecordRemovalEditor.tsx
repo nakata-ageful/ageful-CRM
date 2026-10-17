@@ -24,7 +24,7 @@ export function BillingRecordRemovalEditor({unit:initial,mode,recipientName,peri
       <div><dt>請求先</dt><dd>{unit.recipientId==null?'要確認':recipientName(unit.recipientId)}</dd></div>
       <div><dt>請求金額</dt><dd>{amount==null?'金額要確認':fmtYen(amount)}</dd></div>
       <div className="invoice-period-fact"><dt>保守期間</dt><dd>{periodLabel}</dd></div>
-      <div><dt>対象の回・記録ID</dt><dd>{unit.roundLabel} ／ ID {unit.id}</dd></div>
+      <div><dt>対象の回・記録ID</dt><dd>{unit.roundLabel==='保存済み単回記録'?'回数要確認':unit.roundLabel} ／ ID {unit.id}</dd></div>
       <div><dt>請求方法</dt><dd>{unit.method}</dd></div>
       <div><dt>請求予定日</dt><dd>{unit.scheduledDate??'未登録'}</dd></div>
       <div><dt>請求日</dt><dd>{unit.issuedOn??'未登録'}</dd></div>

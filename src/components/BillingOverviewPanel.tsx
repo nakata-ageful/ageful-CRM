@@ -54,12 +54,12 @@ export function BillingOverviewPanel({ data, today, onViewDetail, setupItems = [
   </li>)}</ul>
   return <section className="billing-overview">
     <header className="billing-overview-toolbar"><h2>請求</h2><div>
-      <span>未入金 <strong>{fmtYen(overview.totals.unpaidAmount)}</strong> ／ 入金済 <strong>{fmtYen(overview.totals.receivedAmount)}</strong><small>今年度・昨年度・前払い分</small></span>
+      <span>未入金 <strong>{fmtYen(overview.totals.unpaidAmount)}</strong> ／ 入金済 <strong>{fmtYen(overview.totals.receivedAmount)}</strong><small>昨年以降に始まる保守期間の請求分（前払いを含む）</small></span>
       <button type="button" className="btn btn-sub btn-sm" onClick={() => downloadBillingUnitCsv(buildBillingUnitCsv(data.units, data.recipientName, data.projectName))}>請求CSV</button>
     </div></header>
     {!!overview.totals.unknownActualCount && <p className="billing-overview-notice" role="status">金額要確認：{overview.totals.unknownActualCount}件。金額不明分は合計に含みません。</p>}
     {!!overview.olderUnpaid.length && <OverviewSection title="古い未入金" count={overview.olderUnpaid.length} color="amber">
-      <p className="billing-overview-notice" role="status">今年度・昨年度より前の未入金です。入金を記録するまで警告に残します。確認できている金額：{fmtYen(overview.olderUnpaidTotals.unpaidAmount)}（上の合計には含みません）。
+      <p className="billing-overview-notice" role="status">一昨年以前に始まった保守期間の未入金です。入金を記録するまで警告に残します。確認できている金額：{fmtYen(overview.olderUnpaidTotals.unpaidAmount)}（上の合計には含みません）。
         {!!overview.olderUnpaidTotals.unknownActualCount && ` 金額要確認：${overview.olderUnpaidTotals.unknownActualCount}件。金額不明分は合計に含みません。`}</p>
       <BillingOverviewTable {...tableProps} units={overview.olderUnpaid} mode="unpaid" />
     </OverviewSection>}
@@ -79,7 +79,7 @@ export function BillingOverviewPanel({ data, today, onViewDetail, setupItems = [
     <OverviewSection title="入金済" count={overview.received.length} color="green" collapsed><BillingOverviewTable {...tableProps} units={overview.received} mode="received" /></OverviewSection>
     {([['表示期間より前の予定', overview.overduePlans], ['日付要確認', overview.undatedPlans], ['それ以降の予定', overview.laterPlans], ['記録要確認', overview.review]] as const)
       .filter(([, units]) => units.length).map(([label, units]) => <OverviewSection key={label} title={label} count={units.length} color="amber" collapsed={label==='それ以降の予定'}><BillingOverviewTable {...tableProps} units={units} mode="review" /></OverviewSection>)}
-    {!!remainingItems.length && <OverviewSection title="未保存・要確認の請求予定" count={remainingItems.length} color="amber">
+    {!!remainingItems.length && <OverviewSection title="請求内容の確認が必要" count={remainingItems.length} color="amber">
       <p className="billing-overview-help">「予定を確認」から、請求済みか・予定日の変更が必要か確認してください。</p>
       <BillingOverviewTable {...tableProps} candidates={remainingItems} mode="review" />
 
@@ -87,13 +87,13 @@ export function BillingOverviewPanel({ data, today, onViewDetail, setupItems = [
     {!!setupIssues.length && <OverviewSection title="請求設定要確認" count={setupIssues.length} color="amber" collapsed>
       <p className="billing-overview-help">「詳細で確認」から、不足している請求設定を入力してください。</p>
       {!!actionRequired.length && <><h4 className="billing-overview-subtitle">請求設定が必要（{actionRequired.length}件）</h4>{issueList(actionRequired)}</>}
-      {!!noBillingCandidates.length && <details className="billing-overview-secondary"><summary>自社請求なし候補（{noBillingCandidates.length}件・未確定）</summary><p className="billing-overview-help">他社保守などの可能性があります。発電所ごとに確認します。</p>{issueList(noBillingCandidates)}</details>}
+      {!!noBillingCandidates.length && <details className="billing-overview-secondary"><summary>自社で請求するか確認（{noBillingCandidates.length}件・未確定）</summary><p className="billing-overview-help">他社保守などの可能性があります。発電所ごとに確認します。</p>{issueList(noBillingCandidates)}</details>}
     </OverviewSection>}
 
     {routine&&onAddRoutine&&onSave&&data.recipients&&<Modal title={`${data.projectName(routine.contract.project_id)}：発行内容を記録`} width={720} closeDisabled={routineBusy} onClose={()=>setRoutine(null)}><div className="standard-editor">
       <RoutineInvoiceEditor context={routine} recipients={data.recipients} onAdd={onAddRoutine} onSave={onSave} onBusyChange={setRoutineBusy} onClose={()=>setRoutine(null)}/>
     </div></Modal>}
-    {editingUnit && onSave && <Modal title={`${data.projectName(editingUnit.projectId)}：${editor?.mode === 'plan' ? '請求先・予定を設定' : editor?.mode === 'debit' ? '振替結果を記録' : editingUnit.lifecycle === 'issued' ? '入金日を記録' : '請求内容を入力して発行'}`} width={720} onClose={closeEditor}>
+    {editingUnit && onSave && <Modal title={`${data.projectName(editingUnit.projectId)}：${editor?.mode === 'plan' ? '請求先・予定を設定' : editor?.mode === 'debit' ? '振替結果を記録' : editingUnit.lifecycle === 'issued' ? '入金日を記録' : '発行内容を記録'}`} width={720} onClose={closeEditor}>
       <div className="standard-editor">{editor?.mode === 'plan' && data.recipients ? <InvoicePlanEditor key={editingUnit.id} unit={editingUnit} recipients={data.recipients} onSave={onSave} onClose={closeEditor} />
         : editor?.mode === 'debit' ? <ManualDebitEditor key={editingUnit.id} unit={editingUnit} recipientName={data.recipientName} onSave={onSave} onClose={closeEditor} />
         : <InvoiceUnitEditor key={editingUnit.id} unit={editingUnit} recipientName={data.recipientName} onSave={onSave} onClose={closeEditor} />}</div>

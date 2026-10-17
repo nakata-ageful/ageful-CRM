@@ -67,7 +67,7 @@ function BillingDates({method,scheduledDate,issuedOn,paymentDueOn,receivedOn}:{
   </div>
 }
 
-export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartDate, onSavePeriod,contract,currentRecipientId,onAddSchedule,today,onAddRoutine,onRecordRemoval }: {
+export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartDate, onSavePeriod,contract,currentRecipientId,onAddSchedule,today,onAddRoutine,onRecordRemoval,onReviewPeriod }: {
   data: BillingHistoryData
   projectId: number
   onSave?: (request: InvoiceWriteRequest) => Promise<unknown>
@@ -79,6 +79,7 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
   today?:string
   onAddRoutine?:AddRoutineInvoice
   onRecordRemoval?:(request:BillingRecordRemovalRequest)=>Promise<unknown>
+  onReviewPeriod?:()=>void
 }) {
   const allUnits=data.units.filter(unit=>unit.projectId===projectId)
   const units = allUnits.filter(isActiveBillingUnit),removed=allUnits.filter(u=>!isActiveBillingUnit(u))
@@ -89,7 +90,7 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
   const [editor, setEditor] = useState<{ unitId: string; mode: EditorMode } | null>(null)
   const rawCandidate=contract?detailPlanCandidate(contract,currentRecipientId??0,allUnits,today??new Date().toLocaleDateString('sv-SE'),data.managementEvents,data.cycleRules):null
   const candidate=rawCandidate&&!currentRecipientId?{...rawCandidate,reviewReason:['請求先を選んでください',rawCandidate.reviewReason].filter(Boolean).join('。')}:rawCandidate
-  const canCreate=!!onAddSchedule&&!!data.recipients&&isBillingDate(contract?.maintenance_start_date??'')
+  const canCreate=!!onAddSchedule&&!!data.recipients&&isBillingDate(contract?.maintenance_start_date??'')&&!candidate?.periodChoiceRequired
   const active=first&&!['received','cancelled'].includes(first.lifecycle)
   const focused = focusedId==='auto-plan'&&candidate?undefined:units.find(unit => unit.id === focusedId) ?? (active||!candidate?first:undefined)
   const editingUnit = units.find(unit => unit.id === editor?.unitId)
@@ -138,13 +139,14 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
         <dl className="invoice-current-facts">
           <div className={candidate.method==='direct_debit'?'invoice-period-fact':undefined}><dt>{canRecord?'請求先（発行時に確認）':'請求先の候補'}</dt><dd>{candidate.recipientId>0?data.recipientName(candidate.recipientId):'請求先を選んでください'}</dd></div>
           {candidate.method!=='direct_debit'&&<div><dt>対象の回</dt><dd>第{candidate.round}回</dd></div>}
-          <div className="invoice-period-fact"><dt>保守期間（設定から表示）</dt><dd>{candidate.periodStart&&candidate.periodEnd?`${candidate.periodStart} ～ ${candidate.periodEnd}`:'保守開始日未設定'}</dd></div>
+          <div className="invoice-period-fact"><dt>保守期間（設定から表示）</dt><dd>{candidate.periodChoiceRequired?'今年分か翌年分か要確認':candidate.periodStart&&candidate.periodEnd?`${candidate.periodStart} ～ ${candidate.periodEnd}`:'保守開始日未設定'}</dd></div>
         </dl>
         <BillingDates method={candidate.method==='direct_debit'?'口座振替':'請求書'} scheduledDate={candidate.date}/>
         {contract&&<p className="invoice-current-basis">年間総額（税込・請求対象のみ）：{fmtYen(annualBillableTotalInc(contract))}</p>}
         <p className="invoice-reference-help">請求情報から自動表示しています。毎年の予定登録は不要です。</p>
         {candidate.reviewReason&&<p className="billing-overview-notice" role="alert">{candidate.recipientId>0?'保守期間要確認：':''}{candidate.reviewReason}</p>}
-        {!candidate.periodStart&&<p className="invoice-reference-help">「保守情報」で保守開始日を確認してください。委託契約の開始日とは別の項目です。</p>}
+        {!candidate.periodStart&&!candidate.periodChoiceRequired&&<p className="invoice-reference-help">「保守情報」で保守開始日を確認してください。委託契約の開始日とは別の項目です。</p>}
+        {candidate.periodChoiceRequired&&onReviewPeriod&&<div className="invoice-current-actions"><button type="button" className="btn btn-main" onClick={onReviewPeriod}>請求する年を設定</button></div>}
         {canCreate&&<div className="invoice-current-actions">{canRecord&&<button type="button" className="btn btn-main" onClick={()=>setRecording(routine)}>発行内容を記録</button>}{!canRecord&&!candidate.reviewReason&&<button type="button" className="btn btn-main" onClick={()=>setAdding({after:candidate.method==='direct_debit'?'debit':'invoice'})}>{candidate.method==='direct_debit'?'振替結果を記録':'発行内容を記録'}</button>}<button type="button" className={candidate.reviewReason?'btn btn-main':'btn'} onClick={()=>setAdding({after:null,adjust:true})}>{candidate.reviewReason?'予定を確認・調整':'今回の予定を変更'}</button></div>}
       </>:<p className="invoice-reference-help">{units.length?'表示できる次回の予定がありません。「請求情報」の設定と保存済み記録を確認してください。':'この発電所の請求記録はまだありません。「請求情報」で請求方法・予定日を確認してください。'}</p>}
       {!!contract?.notes&&<div className="invoice-current-lines"><h3>備考</h3><p style={{whiteSpace:'pre-wrap'}}>{contract.notes}</p></div>}
@@ -212,7 +214,7 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
         <div className="invoice-period-heading"><strong>次回の予定</strong><span>自動表示</span></div>
         <button type="button" className={`invoice-history-item ${!focused?'is-selected':''}`} aria-label="自動表示の次回予定を見る" onClick={()=>{setFocusedId('auto-plan');setEditor(null)}}>
           <span className="invoice-history-row">{showCandidateRound&&<b>{candidate.method==='direct_debit'?debitOccurrenceLabel(candidate.date):`第${candidate.round}回`}</b>}<em>{candidate.reviewReason?'要確認':candidate.method==='direct_debit'?'振替予定':'未発行'}</em><strong>{candidate.amount==null?'金額要確認':fmtYen(candidate.amount)}</strong></span>
-          <span className="invoice-history-meta">{candidate.periodStart&&candidate.periodEnd?`${candidate.periodStart} ～ ${candidate.periodEnd}`:'保守期間要確認'}</span>
+          <span className="invoice-history-meta">{candidate.periodChoiceRequired?'今年分か翌年分か要確認':candidate.periodStart&&candidate.periodEnd?`${candidate.periodStart} ～ ${candidate.periodEnd}`:'保守期間要確認'}</span>
           <span className="invoice-history-meta">請求先：{candidate.recipientId>0?data.recipientName(candidate.recipientId):'要確認'} ／ {candidate.method==='direct_debit'?'振替予定額':'請求予定額'}</span>
           <span className="invoice-history-dates"><span>{candidate.method==='direct_debit'?'振替予定日':'請求予定日'}：{candidate.date||'日付要確認'}</span></span>
         </button>

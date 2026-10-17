@@ -36,13 +36,14 @@ type Props = {
   billingHistory?: BillingHistoryData
   onSaveInvoice?:(request:InvoiceWriteRequest)=>Promise<unknown>
   onRecordRemoval?:(request:BillingRecordRemovalRequest)=>Promise<unknown>
+  onReviewPeriod?:()=>void
   onSavePeriod?:(change:SavedMaintenancePeriodChange)=>Promise<unknown>
   onAddSchedule?:AddBillingOccurrence
   onAddRoutine?:AddRoutineInvoice
 }
 
 
-export function BillingDetailView({ detail, onBack, onReload, onViewProject, embedded = false, billingHistory, onSaveInvoice, onSavePeriod,onAddSchedule,onAddRoutine,onRecordRemoval }: Props) {
+export function BillingDetailView({ detail, onBack, onReload, onViewProject, embedded = false, billingHistory, onSaveInvoice, onSavePeriod,onAddSchedule,onAddRoutine,onRecordRemoval,onReviewPeriod }: Props) {
   const toast = useToast()
   const { project, customer, contract, annualRecords, maintenanceResponses, periodicMaintenance } = detail
   const currentYear = new Date().getFullYear()
@@ -321,7 +322,7 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject, emb
   if (billingHistory) return <div>
     {!embedded && <button className="btn" onClick={onBack}>戻る</button>}
     {!onSaveInvoice&&<p role="status">新しい請求記録の表示確認中です。この画面ではまだ編集できません。</p>}
-    <InvoiceLedgerDetail data={billingHistory} projectId={project.id} onSave={onSaveInvoice} onRecordRemoval={onRecordRemoval} contract={contract} currentRecipientId={customer?.id??0} onAddSchedule={onAddSchedule} onAddRoutine={onAddRoutine} maintenanceStartDate={contract.maintenance_start_date} onSavePeriod={onSavePeriod}/>
+    <InvoiceLedgerDetail data={billingHistory} projectId={project.id} onSave={onSaveInvoice} onRecordRemoval={onRecordRemoval} contract={contract} currentRecipientId={customer?.id??0} onAddSchedule={onAddSchedule} onAddRoutine={onAddRoutine} maintenanceStartDate={contract.maintenance_start_date} onSavePeriod={onSavePeriod} onReviewPeriod={onReviewPeriod}/>
   </div>
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

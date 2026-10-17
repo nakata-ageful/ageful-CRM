@@ -1124,6 +1124,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             onBack={() => {}}
             onReload={reloadBillingDetail}
             onViewProject={() => setTab('基本情報')}
+            onReviewPeriod={readOnly?undefined:()=>setTab('請求情報')}
           />
         ) : (
           <div className="card" style={{ color: '#94a3b8', fontSize: 13 }}>{readOnly?'保管中の重複登録は請求対象から外しています。請求の操作は使用中の発電所で行ってください。':'請求詳細を表示できません（契約レコードがありません）'}</div>

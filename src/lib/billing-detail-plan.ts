@@ -8,8 +8,9 @@ import {validateIndividualPeriod} from './individual-maintenance-period'
 import {futureMaintenancePeriod,cycleInvoiceDate,cycleRuleForYear,validateCycleOccurrence,type BillingCycleRule} from './billing-cycle'
 import {inspectCandidatePeriod} from './billing-period-coverage'
 import {invoiceScheduleDate} from './invoice-schedule-date'
+import {invoiceOccurrenceYear,invoicePeriodChoiceRequired,invoicePeriodChoiceReason} from './invoice-occurrence'
 
-export type DetailPlanCandidate = Omit<MaintenanceScheduleItem,'periodStart'|'periodEnd'> & {periodStart:string|null;periodEnd:string|null;reviewReason?:string}
+export type DetailPlanCandidate = Omit<MaintenanceScheduleItem,'periodStart'|'periodEnd'> & {periodStart:string|null;periodEnd:string|null;reviewReason?:string;periodChoiceRequired?:boolean}
 
 export function detailPlanCount(contract:Contract):number {
   return contract.billing_count??(contract.billing_method==='口座振替'?12:contract.billing_schedule_days?.length||1)
@@ -46,12 +47,15 @@ export function detailPlanCandidate(contract:Contract,recipientId:number,units:r
       if(prepaidDate){options.push({year:serviceYear,round:1,date:prepaidDate,month:12});continue}
       for(let round=1;round<=count;round++){
         const {month}=parseScheduleDay(contract.billing_schedule_days?.[round-1]??'')
-        options.push({year:serviceYear,round,date:invoiceScheduleDate(contract,serviceYear,round)??'',month:month??1})
+        const date=invoiceScheduleDate(contract,serviceYear,round)??''
+        if(date&&invoiceOccurrenceYear(contract,date,round,rules)!==serviceYear)continue
+        options.push({year:serviceYear,round,date,month:month??1})
       }
     }
   }
   const next=options.find(o=>{
-    if(own.some(u=>u.serviceYear===o.year&&(u.roundLabel===`第${o.round}回`||!u.removedAt&&(u.roundLabel==='保存済み単回記録'||u.roundLabel.endsWith('月分')))))return false
+    if(own.some(u=>u.serviceYear===o.year&&(u.roundLabel===`第${o.round}回`||!u.removedAt
+      &&(debit||!invoicePeriodChoiceRequired(contract,o.year,rules))&&(u.roundLabel==='保存済み単回記録'||u.roundLabel.endsWith('月分')))))return false
     if(!debit){try{if(inspectCandidatePeriod(contract,o.year,futureMaintenancePeriod(contract,o.year,rules),own,rules).superseded)return false}catch{/* Keep uncertain candidates visible. */}}
     return true
   })
@@ -61,13 +65,15 @@ export function detailPlanCandidate(contract:Contract,recipientId:number,units:r
   const sameYear=own.filter(u=>!u.removedAt&&u.serviceYear===next.year)
   const stored=sameYear.find(u=>u.periodStart&&u.periodEnd)
   if(stored)period={periodStart:stored.periodStart!,periodEnd:stored.periodEnd!}
+  const periodChoiceRequired=!debit&&invoicePeriodChoiceRequired(contract,next.year,rules)
   if(!managementActiveOn(events,contract.project_id,'all',period.periodStart||next.date||today))return null
   const changes=period.periodStart&&period.periodEnd&&events.some(e=>e.project_id===contract.project_id&&e.effective_date>=period.periodStart!&&e.effective_date<=period.periodEnd!)
   const effective=managementBillingContract(contract,events,next.date||today)
   const assessment=debit?{superseded:false}:inspectCandidatePeriod(contract,next.year,period,own,rules)
   const removedUnknown=own.some(u=>u.removedAt&&u.serviceYear===next.year&&(u.roundLabel==='保存済み単回記録'||u.roundLabel.endsWith('月分')))
-  return {...next,...period,method:debit?'direct_debit':'invoice',recipientId,
-    ...(removedUnknown?{reviewReason:'削除済みの記録との回の対応を確認してください。同じ請求の再作成は行いません。「削除済みの記録」から確認・復元できます。'}:assessment.reason?{reviewReason:assessment.reason}:{}),
+  const sameDateOtherPeriod=!debit&&own.some(u=>!u.removedAt&&u.scheduledDate===next.date&&u.serviceYear!==next.year)
+  return {...next,...period,...(periodChoiceRequired?{periodStart:null,periodEnd:null,periodChoiceRequired:true}:{}),method:debit?'direct_debit':'invoice',recipientId,
+    ...(periodChoiceRequired?{reviewReason:invoicePeriodChoiceReason}:removedUnknown?{reviewReason:'削除済みの記録との回の対応を確認してください。同じ請求の再作成は行いません。「削除済みの記録」から確認・復元できます。'}:assessment.reason?{reviewReason:assessment.reason}:sameDateOtherPeriod?{reviewReason:'同日の保存済み記録は別の保守期間です。請求済みの範囲を確認してください。'}:{}),
     amount:changes?null:debit?withdrawalAmount(effective,next.month):invoiceAmount(effective,next.round,count)}
 }
 

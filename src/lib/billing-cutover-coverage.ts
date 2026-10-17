@@ -4,12 +4,12 @@ import {isBillingDate} from './billing-unit'
 import {managementActiveOn,type ManagementEvent} from './management-lifecycle'
 import type {BillingUnit} from './billing-unit'
 import {debitScheduleReminder} from './debit-schedule-reminder'
-import {cycleRuleForYear,cycleCompatibility,futureMaintenancePeriod,type BillingCycleRule} from './billing-cycle'
+import {cycleRuleForYear,cycleCompatibility,cycleInvoiceDate,futureMaintenancePeriod,type BillingCycleRule} from './billing-cycle'
 import {inspectCandidatePeriod} from './billing-period-coverage'
-import {invoiceServiceYear} from './invoice-schedule-date'
+import {invoiceOccurrenceYear,invoicePeriodChoiceRequired,invoicePeriodChoiceReason} from './invoice-occurrence'
 
 type StoredUnit={project_id:number;service_year?:number;recipient_customer_id:number;recipient_source?:string;collection_method:string;scheduled_date:string|null;lifecycle:string;planned_amount:number|null;round_number?:number|null;service_month?:number|null;period_start?:string|null;period_end?:string|null;removed_at?:string|null}
-export type CoverageCandidate={projectId:number;recipientId:number;method:'invoice'|'direct_debit';date:string;round:number;amount:number;status:'missing'|'matches'|'handled'|'review'|'overdue';reason?:string;serviceYear?:number;periodStart?:string;periodEnd?:string}
+export type CoverageCandidate={projectId:number;recipientId:number;method:'invoice'|'direct_debit';date:string;round:number;amount:number;status:'missing'|'matches'|'handled'|'review'|'overdue';reason?:string;serviceYear?:number;periodStart?:string;periodEnd?:string;periodChoiceRequired?:boolean}
 export type ScheduleSetupItem=CoverageCandidate&{projectName:string;customerName:string}
 export type ScheduleSetupIssue={
   projectId:number;projectName:string;reason:string
@@ -38,25 +38,34 @@ export function inspectFutureBillingCoverage(rows:readonly BillingRow[],recipien
       const prepaid=cycleRuleForYear(rules,row.project_id,y+1)?.mode==='calendar_prepaid'
       if(prepaid&&!cycleCompatibility(c)){issues.push({projectId:row.project_id,reason:'繰り返し設定は「請求書・年1回」です。請求情報と設定を確認してください'});break}
       if(!prepaid&&!days.length){issues.push({projectId:row.project_id,reason:'請求予定日が未設定'});break}
-      const expected:{date:string|null;round:number;amount:number;serviceYear?:number}[]=prepaid
-        ?m===12?[{date:`${y}-12-01`,round:1,amount:invoiceAmount(c,1,1),serviceYear:y+1}]:[]
-        :c.billing_method==='請求書'
+      const rawExpected:{date:string|null;round:number;amount:number;serviceYear?:number}[]=c.billing_method==='請求書'
         // The new ledger must decide correspondence. Legacy date-only "handled"
         // records may describe another period, so they cannot suppress this check.
         ?computeUpcomingInvoices([{...row,records:[]}],new Map([[m,y]])).map(i=>({date:i.scheduledDateISO,round:i.round,amount:i.amount}))
         :[{date:toIsoDate(y,days[0],m),round:m,amount:withdrawalAmount(c,m)}]
+      if(c.billing_method==='請求書'&&prepaid&&m===12)rawExpected.unshift({date:`${y}-12-01`,round:1,amount:invoiceAmount(c,1,1),serviceYear:y+1})
+      const seen=new Set<string>()
+      const expected=rawExpected.filter(item=>{
+        if(c.billing_method!=='請求書'||!item.date||!isBillingDate(item.date))return true
+        if(invoiceOccurrenceYear(c,item.date,item.round,rules)==null)return false
+        const key=`${item.date}:${item.round}`
+        if(seen.has(key))return false;seen.add(key);return true
+      })
       for(const item of expected){
         if(!item.date||!isBillingDate(item.date)||Number(item.date.slice(5,7))!==m||!Number.isSafeInteger(item.amount)||item.amount<0){issues.push({projectId:row.project_id,reason:'予定日または計算額が不正'});continue}
         const method=c.billing_method==='請求書'?'invoice':'direct_debit'
         let serviceYear=item.serviceYear,periodStart:string|undefined,periodEnd:string|undefined,periodReason:string|undefined
+        let periodChoiceRequired=false
         if(method==='invoice'){
           try{
-            if(serviceYear==null)serviceYear=invoiceServiceYear(c,item.date,item.round)??y
+            if(serviceYear==null)serviceYear=invoiceOccurrenceYear(c,item.date,item.round,rules)??y
             const period=futureMaintenancePeriod(c,serviceYear,rules)
             periodStart=period.periodStart;periodEnd=period.periodEnd
             const assessment=inspectCandidatePeriod(c,serviceYear,period,periodEvidence,rules)
             if(assessment.superseded)continue
             periodReason=assessment.reason
+            periodChoiceRequired=invoicePeriodChoiceRequired(c,serviceYear,rules)
+            if(periodChoiceRequired){periodStart=undefined;periodEnd=undefined;periodReason=invoicePeriodChoiceReason}
           }catch{serviceYear=item.serviceYear;periodReason='保守期間が未確認です。請求予定は隠さず、登録前に対象期間を確認してください'}
         }
         if(!managementActiveOn(managementEvents,row.project_id,'all',item.date))continue
@@ -78,13 +87,13 @@ export function inspectFutureBillingCoverage(rows:readonly BillingRow[],recipien
         let amount=item.amount
         if(maintenanceEnded){
           const withoutMaintenance={...c,billing_item_flags:{...c.billing_item_flags,annual_maintenance:false}}
-          amount=method==='invoice'?invoiceAmount(withoutMaintenance,item.round,item.serviceYear==null?days.length:1):withdrawalAmount(withoutMaintenance,m)
+          amount=method==='invoice'?invoiceAmount(withoutMaintenance,item.round,serviceYear!=null&&cycleInvoiceDate(c,serviceYear,rules)?1:days.length):withdrawalAmount(withoutMaintenance,m)
         }
         const matching=units.filter(u=>!u.removed_at&&u.project_id===row.project_id&&u.scheduled_date===item.date)
         let status:CoverageCandidate['status']='missing',reason:string|undefined
         if(matching.length){
           const u=matching[0]
-          const periodMatches=!periodStart||!u.period_start&&!u.period_end&&item.serviceYear==null||u.period_start===periodStart&&u.period_end===periodEnd
+          const periodMatches=!periodStart||!u.period_start&&!u.period_end&&(serviceYear==null||!cycleInvoiceDate(c,serviceYear,rules))||u.period_start===periodStart&&u.period_end===periodEnd
           const sameRound=(method==='invoice'?u.round_number===item.round:u.service_month===m)&&(serviceYear==null||u.service_year===serviceYear)&&periodMatches
           if(matching.length===1&&sameRound&&u.collection_method===method&&['fixed','issued','received'].includes(u.lifecycle))status='handled'
           else if(matching.length===1&&sameRound&&u.lifecycle==='planned'&&u.collection_method===method
@@ -107,7 +116,7 @@ export function inspectFutureBillingCoverage(rows:readonly BillingRow[],recipien
         }
         // Old imports with no anchor keep their existing date/round correspondence;
         // any actual overlap overrides "handled" instead of erasing an alert.
-        if(periodReason&&periodStart){status='review';reason=periodReason}
+        if(periodChoiceRequired||periodReason&&periodStart){status='review';reason=periodReason}
         if(method==='invoice'&&status==='missing'&&row.records.length&&
           !computeUpcomingInvoices([row],new Map([[m,y]])).some(i=>i.scheduledDateISO===item.date&&i.round===item.round)){
           status='review';reason='旧形式の請求記録があります。対象の保守期間・回と保存済み請求の対応を確認してください'
@@ -115,6 +124,7 @@ export function inspectFutureBillingCoverage(rows:readonly BillingRow[],recipien
         if(maintenanceEnded&&status!=='handled'){status='review';reason='保守終了後の対象費目・前払い期間・個別金額を確認してください（自動日割りなし）'}
         if(!recipientId&&status!=='handled'&&status!=='matches'){status='review';reason=['請求先を選んでください',reason].filter(Boolean).join('。')}
         candidates.push({projectId:row.project_id,recipientId,method,date:item.date,round:item.round,amount,status,reason,
+          ...(periodChoiceRequired?{periodChoiceRequired:true}:{}),
           ...(serviceYear==null?{}:{serviceYear}),...(periodStart&&periodEnd?{periodStart,periodEnd}:{})})
       }
     }

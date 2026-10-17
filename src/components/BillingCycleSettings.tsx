@@ -4,6 +4,8 @@ import type {BillingUnit} from '../lib/billing-unit'
 import {cycleCompatibility,validateCycleRule,type BillingCycleRule} from '../lib/billing-cycle'
 import {maintenancePeriod} from '../lib/maintenance-period-label'
 import {Modal} from './Modal'
+import {invoiceScheduleDate} from '../lib/invoice-schedule-date'
+import {invoiceOccurrenceYear,invoicePeriodChoiceRequired} from '../lib/invoice-occurrence'
 
 
 export type CycleSettingInput={year:number;mode:BillingCycleRule['mode'];reason:string}
@@ -13,24 +15,28 @@ export function BillingCycleSettings({contract,units,rules,onSave}:{contract:Con
   const [mode,setMode]=useState<BillingCycleRule['mode']>('calendar_prepaid'),[reason,setReason]=useState(''),[review,setReview]=useState(false),[busy,setBusy]=useState(false),[notice,setNotice]=useState('')
   const saving=useRef(false)
   const latest=own.at(-1),compatible=cycleCompatibility(contract)
+  const calendarYear=new Date().getFullYear()
+  const choiceYear=invoiceOccurrenceYear(contract,`${calendarYear}-12-01`,1,rules)??calendarYear
+  const needsPeriodChoice=invoicePeriodChoiceRequired(contract,choiceYear,rules)
+  const januaryDecember=invoicePeriodChoiceRequired(contract,calendarYear,[])
   const change=()=>{setReview(false);setNotice('')}
   function confirm(){try{validateCycleRule(contract,units,year,mode,reason);setReview(true);setNotice('')}catch(e){setReview(false);setNotice(e instanceof Error?e.message:String(e))}}
   async function save(){if(!onSave||!review||saving.current)return;saving.current=true;setBusy(true);try{validateCycleRule(contract,units,year,mode,reason);await onSave({year,mode,reason:reason.trim()});setOpen(false);setReview(false);setNotice('今後の保守期間・請求の繰り返し設定を保存しました。過去の記録は変更していません。')}catch(e){setNotice(e instanceof Error?e.message:String(e))}finally{saving.current=false;setBusy(false)}}
   const examples=Number.isInteger(year)&&year>=2001&&year<=2199?Array.from({length:Math.min(3,2200-year)},(_,i)=>year+i).map(y=>{
     let period={periodStart:'当初の保守開始日を確認してください',periodEnd:'未設定'}
     try{period=mode==='calendar_prepaid'?{periodStart:`${y}-01-01`,periodEnd:`${y}-12-31`}:maintenancePeriod(contract.maintenance_start_date,y)}catch{/* Input guidance remains available with a missing anchor. */}
-    return {year:y,...period,date:mode==='calendar_prepaid'?`${y-1}-12-01`:'「請求予定日」の標準設定'}
+    return {year:y,...period,date:mode==='calendar_prepaid'?`${y-1}-12-01`:invoiceScheduleDate(contract,y,1)??'請求予定日未設定'}
   }):[]
   return <section className="card billing-cycle-settings">
     <div className="card-header-row"><h3 className="section-title">今後の保守期間・請求の繰り返し</h3>{onSave&&<button type="button" className="btn btn-sub btn-sm" onClick={()=>{setOpen(true);change();setReason('');setYear(Math.max(new Date().getFullYear()+1,latest?.effective_year??0));setMode(latest?.mode??'calendar_prepaid')}}>繰り返し設定を変更</button>}</div>
-    <p>{latest?`${latest.effective_year}年の保守期間から：${latest.mode==='calendar_prepaid'?'毎年1月1日〜12月31日／前年12月1日に翌年分を請求':'当初の保守開始日を基準に1年間'}`:'標準設定：保守開始日から1年間。請求日は「請求情報」の予定日を使います。'}</p>
+    <p>{latest?`${latest.effective_year}年の保守期間から：${latest.mode==='calendar_prepaid'?'毎年1月1日〜12月31日／前年12月1日に翌年分を請求':'当初の保守開始日を基準に1年間'}`:needsPeriodChoice?'12月1日に今年分を請求するか、翌年分を請求するかを設定してください。':'標準設定：保守開始日から1年間。請求日は「請求情報」の予定日を使います。'}</p>
 
     {!compatible&&latest?.mode==='calendar_prepaid'&&<p role="alert" className="notice notice-error">繰り返し設定と請求方法・回数が一致していません。「請求書・年1回」にするか、繰り返し設定を変更してください。</p>}
     {!onSave&&<p role="status">繰り返し設定の保存機能は、この環境ではまだ利用できません。</p>}
     {!open&&notice&&<p role="status" className="notice">{notice}</p>}
     {open&&<Modal title="今後の保守期間・請求の繰り返し" width={760} onClose={()=>{if(!saving.current)setOpen(false)}}><div className="standard-editor"><fieldset disabled={busy} style={{border:0,padding:0}}>
       <label>繰り返し方法<select className="form-input" value={mode} onChange={e=>{setMode(e.target.value as BillingCycleRule['mode']);change()}}>
-        <option value="calendar_prepaid" disabled={!compatible}>1月〜12月の保守／前年12月1日に翌年分を請求</option><option value="anniversary">当初の保守開始日を基準に1年間</option>
+        <option value="calendar_prepaid" disabled={!compatible}>1月〜12月の保守／前年12月1日に翌年分を請求</option><option value="anniversary">{januaryDecember?'1月〜12月の保守／同じ年の12月1日に請求':'当初の保守開始日を基準に1年間'}</option>
       </select></label>
       {!compatible&&<p>1月〜12月・前年12月1日請求は「請求情報」が「請求書・年1回」の発電所で利用できます。</p>}
       <label>何年分の保守期間から適用するか<input className="form-input" type="number" min={2001} max={2199} value={year} onChange={e=>{setYear(Number(e.target.value));change()}}/></label>

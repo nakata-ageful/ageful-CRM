@@ -27,7 +27,8 @@ const csv=buildBillingUnitCsv(units,name,name);assert.ok(!csv.includes('187000')
 const contract={id:1,project_id:1,maintenance_start_date:'2023-10-27',billing_method:'請求書',billing_count:1,billing_schedule_days:['12月1日'],annual_maintenance_inc:187000}
 const rules=[{id:1,project_id:1,effective_year:2028,mode:'calendar_prepaid'}]
 assert.equal(inspectCandidatePeriod(contract,2027,{periodStart:'2027-10-27',periodEnd:'2028-10-26'},[removed],rules).superseded,false,'Deleted long range cannot claim another period was paid')
-const candidate=detailPlanCandidate(contract,1,[removed],'2026-10-28',[],rules);assert.equal(candidate.year,2027,'Do not re-create deleted identity, but do show a legitimate later year')
+const candidate=detailPlanCandidate(contract,1,[removed],'2026-10-28',[],rules);assert.equal(candidate.year,2028,'Do not re-create deleted identity; the explicit 2028 prepayment owns the next December date')
+assert.equal(candidate.date,'2027-12-01')
 const row={project_id:1,project_name:'検証発電所',customer_name:'検証顧客',contract,records:[],contract_count:1}
 assert.deepEqual(plain(legacyScheduleSetupItems([row],new Map([[1,1]]),[removed],'2026-10-28')),[],'Removed exact identity must not reappear as an unsaved December alert')
 const debitRow={...row,contract:{...contract,billing_method:'口座振替',billing_count:12,billing_schedule_days:['25日']}}

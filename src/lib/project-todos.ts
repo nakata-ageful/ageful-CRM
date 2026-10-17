@@ -1,7 +1,9 @@
 import {hasSupabaseEnv,supabase} from './supabase'
+import {projectStore} from './mock-store'
 
 export type ProjectTodo={id:string;project_id:number;content:string;is_completed:boolean;completed_at:string|null;revision:number;created_at:string;updated_at:string}
 export type TodoChange={id:string;projectId:number;revision:number|null;content:string;completed:boolean}
+export type IncompleteProjectTodo=ProjectTodo&{project_name:string}
 const fields='id,project_id,content,is_completed,completed_at,revision,created_at,updated_at'
 const demoTodos=new Map<string,ProjectTodo>()
 const demoOriginalContent=new Map<string,string>()
@@ -9,7 +11,7 @@ const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const date=(v:unknown):v is string=>typeof v==='string'&&Number.isFinite(Date.parse(v))
 export function parseProjectTodo(value:unknown,projectId:number):ProjectTodo{
  const t=value as ProjectTodo|null
- if(!t||typeof t.id!=='string'||!uuid.test(t.id)||t.project_id!==projectId||typeof t.content!=='string'||!t.content.trim()||t.content.length>2000
+ if(!Number.isSafeInteger(projectId)||projectId<1||!t||typeof t.id!=='string'||!uuid.test(t.id)||t.project_id!==projectId||typeof t.content!=='string'||!t.content.trim()||t.content.length>2000
   ||typeof t.is_completed!=='boolean'||!Number.isSafeInteger(t.revision)||t.revision<1||!date(t.created_at)||!date(t.updated_at)
   ||(t.is_completed?!date(t.completed_at):t.completed_at!==null))throw Error('Todoの保存内容を確認できません。読み込み直してください。')
  return {id:t.id,project_id:t.project_id,content:t.content,is_completed:t.is_completed,completed_at:t.completed_at,revision:t.revision,created_at:t.created_at,updated_at:t.updated_at}
@@ -23,7 +25,7 @@ export function validateTodoChange(input:TodoChange):TodoChange{
 }
 export const definiteTodoRejection=(e:unknown)=>!!e&&typeof e==='object'&&'code'in e&&/^(22|23|42|P0001)/.test(String(e.code))
 
-/** Only called by the Todo tab. No billing/maintenance queries or global reloads. */
+/** Independent Todo reads. No billing/maintenance queries or global reloads. */
 export async function loadProjectTodos(projectId:number):Promise<ProjectTodo[]>{
  if(!Number.isSafeInteger(projectId)||projectId<1)throw Error('発電所を確認してください。')
  if(!hasSupabaseEnv)return structuredClone([...demoTodos.values()].filter(t=>t.project_id===projectId))
@@ -35,6 +37,29 @@ export async function loadProjectTodos(projectId:number):Promise<ProjectTodo[]>{
   if(!data||count==null||!Number.isSafeInteger(count)||count<0||expected!==null&&count!==expected)throw Error('Todoの一覧が更新されました。もう一度読み込んでください。')
   expected=count
   for(const value of data){const t=parseProjectTodo(value,projectId);if(ids.has(t.id))throw Error('Todoの一覧を読み込み直してください。');ids.add(t.id);rows.push(t)}
+  if(rows.length===expected)return rows
+  if(!data.length||rows.length>expected)throw Error('Todoの一覧を最後まで取得できませんでした。')
+ }
+}
+/** Dashboard: all incomplete tasks on non-archived projects, oldest first. Read-only under existing RLS. */
+export async function loadIncompleteProjectTodos():Promise<IncompleteProjectTodo[]>{
+ if(!hasSupabaseEnv){
+  return [...demoTodos.values()].filter(t=>!t.is_completed).flatMap(t=>{const p=projectStore.getById(t.project_id);return p&&!p.archived_at?[{...structuredClone(t),project_name:p.plant_name?.trim()||p.project_name?.trim()||`発電所ID ${p.id}`}]:[]})
+   .sort((a,b)=>a.created_at.localeCompare(b.created_at)||a.id.localeCompare(b.id))
+ }
+ if(!supabase)throw Error('Todoの保存先に接続できません。')
+ const rows:IncompleteProjectTodo[]=[],ids=new Set<string>();let expected:number|null=null
+ for(;;){
+  const {data,error,count}=await supabase.from('project_todos').select(`${fields},projects!inner(id,project_name,plant_name,archived_at)`,{count:'exact'})
+   .eq('is_completed',false).is('projects.archived_at',null).order('created_at').order('id').range(rows.length,rows.length+499)
+  if(error)throw error
+  if(!data||count==null||!Number.isSafeInteger(count)||count<0||expected!==null&&count!==expected)throw Error('Todoの一覧が更新されました。もう一度読み込んでください。')
+  expected=count
+  for(const value of data){
+   const t=parseProjectTodo(value,value.project_id),p=value.projects as unknown as {id:number;project_name:string|null;plant_name:string|null;archived_at:string|null}|null
+   if(t.is_completed||ids.has(t.id)||!p||p.id!==t.project_id||p.archived_at!==null)throw Error('Todoの一覧を確認できません。もう一度読み込んでください。')
+   ids.add(t.id);rows.push({...t,project_name:p.plant_name?.trim()||p.project_name?.trim()||`発電所ID ${p.id}`})
+  }
   if(rows.length===expected)return rows
   if(!data.length||rows.length>expected)throw Error('Todoの一覧を最後まで取得できませんでした。')
  }

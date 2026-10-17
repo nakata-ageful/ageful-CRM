@@ -383,6 +383,7 @@ function MainApp() {
                 onNavigate={v => handleNavClick(v as ViewKey)}
                 onViewMaintenance={navToMaintenanceDetail}
                 onViewBilling={(id) => navToProjectDetail(id, '請求詳細')}
+                onViewTodo={(id) => navToProjectDetail(id, 'Todo')}
               />
             )}
             {view === 'projects' && (

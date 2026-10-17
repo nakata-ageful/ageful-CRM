@@ -339,6 +339,23 @@ body {
   grid-template-columns: 1fr 1fr;
   gap: 16px;
 }
+.dashboard-todos { grid-column:1 / -1;min-width:0; }
+.dashboard-todos .section-title { margin:0; }
+.dashboard-todo-scroll { max-height:360px;overflow:auto; }
+.dashboard-todo-scroll table { width:100%; }
+.dashboard-todo-project { width:22%;overflow-wrap:anywhere; }
+.dashboard-todo-task { white-space:pre-wrap;overflow-wrap:anywhere; }
+.dashboard-todo-date,.dashboard-todo-action { white-space:nowrap; }
+@media(max-width:640px){
+ .dashboard-todo-scroll table,.dashboard-todo-scroll tbody { display:block; }
+ .dashboard-todo-scroll thead { display:none; }
+ .dashboard-todo-scroll tr { display:grid;grid-template-columns:minmax(0,1fr) auto;padding:12px 0;gap:8px;border-bottom:1px solid #e2e8f0; }
+ .dashboard-todo-scroll td { padding:0;border:0;min-width:0; }
+ .dashboard-todo-project { grid-area:1 / 1;width:auto; }
+ .dashboard-todo-task { grid-area:2 / 1 / auto / 3; }
+ .dashboard-todo-date { grid-area:1 / 2;color:#64748b; }
+ .dashboard-todo-action { grid-area:3 / 1 / auto / 3;text-align:right; }
+}
 
 /* ── 2-column row ────────────────────────────────────────── */
 .row-2col {

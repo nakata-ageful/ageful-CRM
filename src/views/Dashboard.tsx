@@ -7,6 +7,7 @@ import type { BillingHistoryData } from '../components/BillingHistorySection'
 import { buildBillingOverview } from '../lib/billing-overview'
 import {debitScheduleReminder} from '../lib/debit-schedule-reminder'
 import {legacyScheduleSetupReview} from '../lib/billing-cutover-coverage'
+import {DashboardTodoPanel} from '../components/DashboardTodoPanel'
 
 type Props = {
   stats: DashboardStats
@@ -15,13 +16,14 @@ type Props = {
   onNavigate: (view: string) => void
   onViewMaintenance: (id: number) => void
   onViewBilling: (projectId: number) => void
+  onViewTodo?: (projectId:number) => void
   billingHistory?: BillingHistoryData
   billingToday?: string
   projectRecipients?: ReadonlyMap<number,number>
 }
 
 
-export function Dashboard({ stats, maintenanceList, billingRows, onNavigate, onViewMaintenance, onViewBilling, billingHistory, billingToday, projectRecipients }: Props) {
+export function Dashboard({ stats, maintenanceList, billingRows, onNavigate, onViewMaintenance, onViewBilling, onViewTodo, billingHistory, billingToday, projectRecipients }: Props) {
   const now = new Date()
   const today = billingToday ?? `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
   const overview = billingHistory ? buildBillingOverview(billingHistory.units, today) : null
@@ -81,6 +83,7 @@ export function Dashboard({ stats, maintenanceList, billingRows, onNavigate, onV
       </div>
 
       <div className="dash-grid">
+        {onViewTodo&&<DashboardTodoPanel onViewTodo={onViewTodo}/>}
         {/* 対応中の保守 */}
         <div className="card">
           <div className="card-header-row">

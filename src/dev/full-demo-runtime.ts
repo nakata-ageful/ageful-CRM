@@ -4,6 +4,7 @@ import {prepareOwnershipBillingPlan} from '../lib/ownership-billing-plan'
 import type {BillingRuntimeSnapshot} from '../lib/billing-runtime'
 import type {Contract,Project} from '../types'
 import type {OwnershipTransferInput} from '../components/OwnershipTransferEditor'
+import {applyManagementPractice,seedManagementPractice} from './management-demo'
 export const billingRuntimeEnabled=true
 let snapshot:BillingRuntimeSnapshot={units:[],events:[],transfers:[],managementEvents:[],cycleRules:[],ownershipWorkflowReady:true,ownershipWorkflowEvents:[],newProspectReady:true,cutoverOn:'2026-01-01'}
 let seeded=false
@@ -20,10 +21,13 @@ export function seedFullDemo(){
 }
 export async function loadBillingRuntime(){return structuredClone(snapshot)}
 export async function hasPendingBillingRuntime(){return false}
+export function seedManagementDemo(){location.hash=`project-detail/${seedManagementPractice(snapshot)}`}
 type Request={action:string;value:Record<string,unknown>}
 export async function saveBillingRuntime<T>(request:Record<string,unknown>|null,reload:()=>Promise<T>):Promise<T>{
   if(!request)throw Error('練習環境に未確認の保存はありません')
   const r=request as Request
+  const management=applyManagementPractice(snapshot,r.action,r.value)
+  if(management){snapshot=management;return reload()}
   const workflow=r.action==='ownership_workflow',action=workflow?String(r.value.action):r.action
   const v=(workflow?r.value.value:r.value) as Record<string,unknown>
   const input=(workflow?v.transfer:v) as OwnershipTransferInput|undefined

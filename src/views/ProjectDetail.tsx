@@ -1131,7 +1131,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       )}
 
       {/* ── その他タブ ── */}
-      {tab==='Todo'&&<ProjectTodoPanel key={project.id} projectId={project.id} readOnly={readOnly}/>}
+      {tab==='Todo'&&<ProjectTodoPanel key={project.id} projectId={project.id} readOnly={readOnly} initialCompleted={new URLSearchParams(window.location.hash.split('?')[1]??'').get('todoStatus')==='completed'}/>}
       {tab==='管理設定'&&!readOnly&&<div className="project-management-tab">{managementTools}
       {billingHistory&&(onAddDebit||(billingUnits&&onSaveBillingPlan))&&<BillingExceptionActions key={`billing-exceptions:${project.id}`} projectId={project.id} owner={customer??{id:0,name:'所有者未確認'}}
         recipients={billingHistory.recipients} units={billingUnits} onAddDebit={onAddDebit} onSavePlan={onSaveBillingPlan}/>}

@@ -234,7 +234,7 @@ function MainApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading])
 
-  async function navToProjectDetail(projectId: number, tab?: string) {
+  async function navToProjectDetail(projectId: number, tab?: string, todoCompleted?: boolean) {
     const detail = await getProjectDetail(projectId)
     if (detail) {
       setProjectDetail(detail)
@@ -242,7 +242,8 @@ function MainApp() {
       if (tab) {
         // setView 後に ?tab=... を URL ハッシュへ反映。ProjectDetail 側が readTabFromHash で拾う
         const base = `#project-detail/${projectId}`
-        window.history.replaceState(null, '', `${base}?tab=${encodeURIComponent(tab)}`)
+        const todoStatus=tab==='Todo'&&todoCompleted?'&todoStatus=completed':''
+        window.history.replaceState(null, '', `${base}?tab=${encodeURIComponent(tab)}${todoStatus}`)
       }
     }
   }
@@ -383,7 +384,7 @@ function MainApp() {
                 onNavigate={v => handleNavClick(v as ViewKey)}
                 onViewMaintenance={navToMaintenanceDetail}
                 onViewBilling={(id) => navToProjectDetail(id, '請求詳細')}
-                onViewTodo={(id) => navToProjectDetail(id, 'Todo')}
+                onViewTodo={(id,completed) => navToProjectDetail(id, 'Todo', completed)}
               />
             )}
             {view === 'projects' && (

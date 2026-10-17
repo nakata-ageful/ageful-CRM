@@ -16,7 +16,7 @@ type Props = {
   onNavigate: (view: string) => void
   onViewMaintenance: (id: number) => void
   onViewBilling: (projectId: number) => void
-  onViewTodo?: (projectId:number) => void
+  onViewTodo?: (projectId:number,completed?:boolean) => void
   billingHistory?: BillingHistoryData
   billingToday?: string
   projectRecipients?: ReadonlyMap<number,number>

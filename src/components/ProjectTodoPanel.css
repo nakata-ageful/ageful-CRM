@@ -16,6 +16,8 @@
 .project-todo-done { color:#64748b; }
 .project-todo-date { white-space:nowrap;color:#64748b;vertical-align:top; }
 .project-todo-actions { display:flex;gap:8px;align-items:center;white-space:nowrap; }
+.project-todo-filters { align-self:flex-start;max-width:100%; }
+.project-todo-filters .filter-tab:disabled { cursor:default;opacity:.65; }
 .project-detail-tabs { gap:2px; }
 .project-detail-tabs .tab-btn { padding-inline:8px; }
 @media(min-width:1600px){.project-detail-tabs .tab-btn { padding-inline:12px; }}

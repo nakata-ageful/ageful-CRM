@@ -31,9 +31,25 @@ html=render([older,base],split)
 const oldSection=saved(html).match(/aria-label="保守期間：2025-07-01 ～ 2026-06-30">([\s\S]*?)<\/section>/)[1]
 assert.ok(!hasRound(oldSection,1),'Current contract count must not relabel an old single invoice period')
 html=render([{...base,roundLabel:'保存済み単回記録'}]);assert.ok(saved(html).includes('<b>回数要確認</b>'),'Do not hide unresolved legacy warnings')
-html=render([{...base,method:'口座振替'}]);assert.ok(saved(html).includes('<b>6月分（第1回）</b>'),'Keep meaningful monthly debit labels')
-html=render([{...base,roundLabel:'8月分',method:'口座振替'}]);assert.ok(saved(html).includes('<b>8月分</b>'))
+html=render([{...base,method:'口座振替'}]);assert.ok(saved(html).includes('<b>2026年6月1日の口座振替</b>'),'Use withdrawal date, not a guessed service month or internal round')
+html=render([{...base,roundLabel:'8月分',method:'口座振替'}]);assert.ok(saved(html).includes('<b>2026年6月1日の口座振替</b>'))
 html=render([base,{...second,removedAt:'2026-10-01T00:00:00Z',removalReason:'検証'}]);assert.ok(!hasRound(saved(html),1),'Removed rows do not count as an active second round')
 html=render([{...base,periodStart:null,periodEnd:null}]);assert.ok(!hasRound(saved(html),1),'Inferred single period is also compact')
 html=render([base,{...second,projectId:2}]);assert.ok(!hasRound(saved(html),1),'Other plants must not affect numbering')
-console.log('PASS: single vs split invoice labels, partial saved/automatic periods, historical periods, round 2 alone, monthly debit, warnings, removed/other-project rows; no writes or data mutation')
+// Legacy past records need no warning solely because their round metadata is absent.
+const legacy={...base,roundLabel:'保存済み単回記録',lifecycle:'received',issuedOn:'2026-06-01',receivedOn:'2026-06-30',frozenAmount:165000,frozenAt:'2026-06-01T00:00:00Z',frozenLineItems:[{name:'保守料',amount:165000}]}
+html=render([legacy]);assert.ok(!html.includes('回数要確認')&&!html.includes('保存済み単回記録'));assert.ok(html.includes('<h2>請求・入金記録</h2>')&&!html.includes('<dt>対象の回</dt>'))
+for(const text of ['入金済','¥165,000','2026-06-01','2026-06-30','検証顧客'])assert.ok(saved(html).includes(text),text)
+html=render([legacy,{...legacy,id:'3',serviceYear:2025,periodStart:null,periodEnd:null}]);assert.ok(!html.includes('回数要確認'));assert.ok(html.includes('保守期間が未登録の記録があります'),'Period uncertainty must not be hidden along with the round')
+html=render([legacy,second]);assert.ok(saved(html).includes('<b>回数要確認</b>'),'Multiple invoices with unresolved correspondence still need a warning')
+html=render([legacy,{...second,removedAt:'2026-10-01T00:00:00Z',removalReason:'検証'}]);assert.ok(!saved(html).includes('回数要確認'))
+const debit={...base,method:'口座振替',roundLabel:'第5回',scheduledDate:'2026-10-25',periodStart:'2026-06-01',periodEnd:'2027-05-31'}
+html=render([debit]);assert.ok(html.includes('2026年10月25日の口座振替')&&!html.includes('第5回')&&!html.includes('対象の回'))
+const debitContract={...contract,maintenance_start_date:'2024-06-01',billing_method:'口座振替',billing_count:12,billing_schedule_days:['25日'],notes:'6月分を5月に開始'}
+html=render([],debitContract);assert.ok(html.includes('2026年10月25日の口座振替')&&!html.includes('第5回')&&!html.includes('対象の回'),'Automatic debit also uses the date without parsing notes or renumbering')
+for(const date of [null,'2026-02-30']){html=render([{...debit,scheduledDate:date}]);assert.ok(html.includes('口座振替（予定日未登録）')&&!html.includes('第5回'),'Missing/invalid withdrawal dates must not be guessed from payment/service dates')}
+const DebitEditor=load('src/components/ManualDebitEditor.tsx').ManualDebitEditor
+const editor=renderToStaticMarkup(React.createElement(DebitEditor,{unit:debit,recipientName:()=> '検証顧客',onSave:noWrite,onClose:noWrite}));assert.ok(editor.includes('2026年10月25日の口座振替')&&!editor.includes('第5回'))
+const Correction=load('src/components/InvoiceCorrectionEditor.tsx').InvoiceCorrectionEditor
+const correction=renderToStaticMarkup(React.createElement(Correction,{unit:legacy,recipients:[{id:1,name:'検証顧客'}],onSave:noWrite,onClose:noWrite}));assert.ok(!correction.includes('保存済み単回記録')&&!correction.includes('回数要確認'))
+console.log('PASS: single vs split invoice labels, legacy past/partial/automatic periods, dated debit, no guessed month, unknown/invalid dates, preserved warnings and editors; no writes or data mutation')

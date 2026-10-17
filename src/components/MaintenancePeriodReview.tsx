@@ -4,6 +4,8 @@ import {maintenancePeriodLabel} from '../lib/maintenance-period-label'
 import {SavedMaintenancePeriodEditor} from './SavedMaintenancePeriodEditor'
 import type {SavedMaintenancePeriodChange} from '../lib/saved-maintenance-period'
 import {Modal} from './Modal'
+import {billingDetailPeriods} from '../lib/billing-detail-periods'
+import {billingOccurrenceLabel,isSinglePastRecord} from '../lib/billing-occurrence-label'
 
 
 /** Display the stored service year separately from invoice/payment dates.
@@ -13,13 +15,14 @@ import {Modal} from './Modal'
 export function MaintenancePeriodReview({startDate,units,onSave}:{startDate:string|null;units:readonly BillingUnit[];onSave?:(change:SavedMaintenancePeriodChange)=>Promise<unknown>}){
  const [editingYear,setEditingYear]=useState<number|null>(null)
  const years=[...new Set(units.map(u=>u.serviceYear))].sort((a,b)=>b-a)
+ const singlePastIds=new Set(billingDetailPeriods(units,startDate).filter(group=>group.units.length===1&&isSinglePastRecord(group.units[0],group.units)).map(group=>group.units[0].id))
  return <details><summary>保守期間ごとの保存記録を確認</summary>
 
   {!years.length&&<p>保存記録はありません。</p>}
   {years.map(year=>{const group=units.filter(u=>u.serviceYear===year),first=group[0];const same=first.periodStart&&first.periodEnd&&group.every(u=>u.periodStart===first.periodStart&&u.periodEnd===first.periodEnd);return <section key={year} style={{marginBottom:14}}><h4>{same?`保守期間：${first.periodStart} ～ ${first.periodEnd}`:maintenancePeriodLabel(startDate,year)}</h4>
    {!same&&<p>{group.some(u=>u.periodStart||u.periodEnd)?'各回の期間が未設定または異なっています。下の記録を確認してください。':'対象の保守期間が記録されていません。実際の期間を確認してください。'}</p>}
    {units.filter(u=>u.serviceYear===year).map(u=><div key={u.id} style={{padding:8,borderBottom:'1px solid #ddd'}}>
-    <strong>{u.roundLabel==='保存済み単回記録'?'回数要確認':u.roundLabel}</strong>
+    <strong>{billingOccurrenceLabel(u,singlePastIds.has(u.id))}</strong>
     <span> ／ {u.lifecycle==='cancelled'?'取りやめ':u.receivedOn?'入金済み':u.issuedOn?'発行済み':'保存済みの予定'}</span>
     <div>請求予定日：{u.scheduledDate??'未登録'} ／ 請求日：{u.issuedOn??'未登録'} ／ 入金日：{u.receivedOn??'未登録'}</div>
     <div>金額：{(u.frozenAmount??u.plannedAmount)==null?'金額要確認':`${(u.frozenAmount??u.plannedAmount)!.toLocaleString()}円`}</div>

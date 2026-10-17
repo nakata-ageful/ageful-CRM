@@ -2,6 +2,7 @@ import { useRef,useState } from 'react'
 import { isBillingDate,type BillingUnit } from '../lib/billing-unit'
 import type { InvoiceWriteRequest } from '../lib/invoice-write-session'
 import { fmtYen } from '../lib/utils'
+import {debitOccurrenceLabel} from '../lib/billing-occurrence-label'
 
 export function ManualDebitEditor({unit:initialUnit,recipientName,onSave,onClose}:{unit:BillingUnit;recipientName:(id:number)=>string;
   onSave:(request:InvoiceWriteRequest)=>Promise<unknown>;onClose:()=>void}) {
@@ -27,7 +28,7 @@ export function ManualDebitEditor({unit:initialUnit,recipientName,onSave,onClose
       await onSave({unitId:id,revision:unit.revision,mode,value,reason:reason.trim()});onClose()
     }catch(e){setError(e instanceof Error?e.message:String(e))}finally{lock.current=false;setBusy(false)}
   }
-  return <section className="card"><h3>{unit.serviceYear}年 {unit.roundLabel}：{correcting?'振替記録を訂正':'振替結果を記録'}</h3>
+  return <section className="card"><h3>{debitOccurrenceLabel(unit.scheduledDate)}：{correcting?'振替記録を訂正':'振替結果を記録'}</h3>
     <p>銀行の処理は行いません。確認した結果を記録してください。</p>
     <p>請求先：{unit.recipientId===null?'要確認':recipientName(unit.recipientId)} ／ 振替予定額：{unit.plannedAmount==null?'要確認':fmtYen(unit.plannedAmount)}</p>
     {error&&<p role="alert">{error}</p>}<form onSubmit={submit}><fieldset disabled={busy} style={{border:0}}>

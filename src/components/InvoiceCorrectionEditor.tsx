@@ -4,6 +4,7 @@ import type {CustomerChoice} from '../lib/customer-search'
 import type {BillingUnit} from '../lib/billing-unit'
 import {isBillingDate} from '../lib/billing-unit'
 import type {InvoiceWriteRequest} from '../lib/invoice-write-session'
+import {billingOccurrenceLabel} from '../lib/billing-occurrence-label'
 
 export function InvoiceCorrectionEditor({unit:initial,recipients,onSave,onClose}:{unit:BillingUnit;recipients:readonly CustomerChoice[];onSave:(r:InvoiceWriteRequest)=>Promise<unknown>;onClose:()=>void}){
   const [unit]=useState(()=>structuredClone(initial)),[recipient,setRecipient]=useState(String(initial.recipientId??''))
@@ -11,7 +12,7 @@ export function InvoiceCorrectionEditor({unit:initial,recipients,onSave,onClose}
   const [due,setDue]=useState(initial.paymentDueOn??''),[reason,setReason]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('')
   const [items,setItems]=useState(()=>(initial.frozenLineItems??[]).map(i=>({name:i.name,amount:String(i.amount)})))
   const lock=useRef(false)
-  return <section className="card"><h3>{unit.serviceYear}年 {unit.roundLabel}：請求・入金記録を訂正</h3>
+  return <section className="card"><h3>{unit.serviceYear}年 {billingOccurrenceLabel(unit,true)}：請求・入金記録を訂正</h3>
     <p>この回だけを訂正します。元の記録と訂正理由は履歴に残ります。</p>
     <form onSubmit={async e=>{e.preventDefault();if(lock.current)return;lock.current=true;setBusy(true);setError('')
       try{

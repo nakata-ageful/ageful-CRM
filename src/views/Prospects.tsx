@@ -4,6 +4,7 @@ import { createProspect, deleteProspect } from '../lib/actions'
 import { fmtNum, dateInputRange } from '../lib/utils'
 import { useToast } from '../components/Toast'
 import {prospectCustomerId,ownershipProspectLabel} from '../lib/ownership-workflow'
+import {prospectCustomerDisplay} from '../lib/prospect-customer-display'
 
 const APPLY_STATUSES: ProspectApplyStatus[] = ['未', '提出済', '通過', '不通', '不可']
 const CONTRACT_STATUSES: ProspectContractStatus[] = ['未', '完了', '不可']
@@ -498,7 +499,7 @@ export function Prospects({
 
   async function handleDelete(e: React.MouseEvent, p: Prospect) {
     e.stopPropagation()
-    if (!confirm(`「${p.customer_name} / ${p.project_name}」を削除しますか？`)) return
+    if (!confirm(`「${prospectCustomerDisplay(p,customers).name} / ${p.project_name}」を削除しますか？`)) return
     await deleteProspect(p.id)
     onReload()
     toast('見込みを削除しました')
@@ -592,8 +593,8 @@ export function Prospects({
                     }
                   }}>
                     {prospectCustomerId(p) ? (
-                      <span style={{ color: '#2563eb', cursor: 'pointer', textDecoration: 'underline' }}>{p.customer_name}</span>
-                    ) : p.new_project_id ? '顧客未定' : p.customer_name}
+                      <span style={{ color: '#2563eb', cursor: 'pointer', textDecoration: 'underline' }}>{prospectCustomerDisplay(p,customers).name}</span>
+                    ) : prospectCustomerDisplay(p,customers).name}
                   </td>
                   <td style={tdStyle} onClick={e => {
                     if(p.new_project_id&&onViewExistingProject){e.stopPropagation();onViewExistingProject(p.new_project_id)}

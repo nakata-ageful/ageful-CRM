@@ -7,6 +7,7 @@ import type {RegistrationCustomer} from '../lib/customer-registration'
 import { updateProspect } from '../lib/actions'
 import { fmtNum, dateInputRange } from '../lib/utils'
 import { buildTaskMap, buildSubTaskMap, tasksForCompany } from '../lib/prospect-tasks'
+import {prospectCustomerDisplay} from '../lib/prospect-customer-display'
 
 const APPLY_STATUSES: ProspectApplyStatus[] = ['未', '提出済', '通過', '不通', '不可']
 const CONTRACT_STATUSES: ProspectContractStatus[] = ['未', '完了', '不可']
@@ -298,6 +299,7 @@ export function ProspectDetailView({
   onSetNewCustomer?:(p:Prospect,project:Project,customerId:number,operationKey:string)=>Promise<Prospect>
 }) {
   const [p, setP] = useState<Prospect>(initial)
+  const displayCustomer=prospectCustomerDisplay(p,customers)
   const [saving, setSaving] = useState(false)
   const [error,setError]=useState(''),[candidateOpen,setCandidateOpen]=useState(false),[candidateBusy,setCandidateBusy]=useState(false)
   const [candidateProject,setCandidateProject]=useState<Project|null>(null)
@@ -357,7 +359,7 @@ export function ProspectDetailView({
       </section>}
       {isOwnershipProspect(p)&&<section className="card">
         <h3>既存発電所の引継ぎ：{ownershipProspectLabel(p)}</h3>
-        <p>引継ぎ先：{p.candidate_customer_id?p.customer_name:'未定'}</p>
+        <p>引継ぎ先：{p.candidate_customer_id?displayCustomer.name:'未定'}</p>
         <div className="management-action-grid">
           {onViewExistingProject&&<button type="button" className="btn btn-sub" onClick={()=>onViewExistingProject(p.ownership_project_id!)}>発電所詳細へ</button>}
           {p.ownership_state==='open'&&onOwnershipAction&&<>
@@ -421,21 +423,22 @@ export function ProspectDetailView({
         <div className="section-title">基本情報</div>
         <div className="info-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
           {/* 1行目: 顧客名 / フリガナ / 発電所名 */}
+          {displayCustomer.corporate&&<div className="info-field"><span>顧客名（会社名）</span><input type="text" className="form-input" style={{marginTop:4}} value={displayCustomer.name} readOnly/></div>}
           <div className="info-field">
-            <span>顧客名</span>
+            <span>{displayCustomer.corporate?'担当者名':'顧客名'}</span>
             <input
               type="text" className="form-input" style={{ marginTop: 4 }}
-              value={p.customer_name}
-              readOnly={isOwnershipProspect(p)||p.new_project_id!=null}
+              value={displayCustomer.corporate?displayCustomer.customer!.name:p.customer_name}
+              readOnly={displayCustomer.corporate||isOwnershipProspect(p)||p.new_project_id!=null}
               onChange={e => save({ customer_name: e.target.value })}
             />
           </div>
           <div className="info-field">
-            <span>フリガナ</span>
+            <span>{displayCustomer.corporate?'担当者フリガナ':'フリガナ'}</span>
             <input
               type="text" className="form-input" style={{ marginTop: 4 }}
-              value={p.customer_name_kana ?? ''}
-              readOnly={isOwnershipProspect(p)||p.new_project_id!=null}
+              value={(displayCustomer.corporate?displayCustomer.customer!.name_kana:p.customer_name_kana) ?? ''}
+              readOnly={displayCustomer.corporate||isOwnershipProspect(p)||p.new_project_id!=null}
               onChange={e => save({ customer_name_kana: e.target.value || null })}
               placeholder="やまだ たろう"
             />

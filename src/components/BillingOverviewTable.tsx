@@ -23,7 +23,7 @@ export function BillingOverviewTable({ data, units = [], candidates = [], mode, 
   })
   if (!rows.length) return <p className="billing-overview-empty">{mode === 'upcoming' ? 'この期間の請求書予定はありません。' : mode === 'unpaid' ? '未入金の請求はありません。' : mode === 'received' ? '入金済の記録はありません。' : '対象の記録はありません。'}</p>
   const dateTitle = mode === 'received' ? '請求・振替日' : mode === 'unpaid' ? '請求日' : '予定日'
-  return <div className="billing-overview-scroll"><table className="billing-overview-table">
+  return <div className="billing-overview-scroll"><table className={`billing-overview-table${mode === 'upcoming' ? ' billing-overview-table-compact' : ''}`}>
     <thead><tr><th>発電所</th><th>請求先</th><th className="billing-overview-round">回数</th><th className="billing-overview-date">{dateTitle}</th>
       <th className="billing-overview-date">{mode === 'received' ? '入金日' : mode === 'unpaid' ? '入金予定日' : '状態'}</th>
       <th className="billing-overview-money">金額（税込）</th><th className="billing-overview-operation">操作</th></tr></thead>

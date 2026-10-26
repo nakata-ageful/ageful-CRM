@@ -35,6 +35,12 @@
 .billing-overview-operation { width: 118px; }
 .billing-overview-actions { display: flex; flex-wrap: wrap; gap: 5px; }
 .billing-overview-actions .btn-sm { padding: 4px 7px; font-size: 10px; }
+/* Upcoming work list: keep type and button sizes, reduce whitespace and avoid stacked actions. */
+.billing-overview-table-compact th { padding-block: 6px; }
+.billing-overview-table-compact td { padding-block: 5px; }
+.billing-overview-table-compact .billing-overview-operation { width: 160px; }
+.billing-overview-table-compact .billing-overview-actions { flex-wrap: nowrap; }
+.billing-overview-table-compact .billing-overview-actions .btn { white-space: nowrap; }
 .billing-overview-empty { padding: 18px; font-size: 12px; color: #94a3b8; }
 .billing-overview-help, .billing-overview-notice { padding: 10px 18px; font-size: 11px; line-height: 1.6; color: #64748b; }
 .billing-overview-notice { color: #92400e; background: #fffbeb; border-radius: 6px; }

@@ -44,7 +44,7 @@ export function BillingOverviewTable({ data, units = [], candidates = [], mode, 
           : unit!.recipientId == null ? <span className="billing-overview-warning">請求先要確認</span> : data.recipientName(unit!.recipientId)}</td>
         <td title={`保守期間：${period}`}>{candidate ? `第${candidate.round}回` : unit!.roundLabel === '保存済み単回記録' ? '回数要確認' : unit!.roundLabel}
           {unit && <small>{unit.serviceYear}年</small>}{candidate?.periodChoiceRequired?<small>対象年を確認</small>:candidate?.serviceYear&&<small>{candidate.serviceYear}年分</small>}</td>
-        <td className="billing-overview-date-value">{mode === 'unpaid' || mode === 'received' ? unit?.issuedOn ?? '—' : unit?.scheduledDate ?? candidate?.date ?? '日付要確認'}{candidate?.periodStart&&candidate.periodEnd&&<small><span>保守：{candidate.periodStart}</span>{' '}<span>～ {candidate.periodEnd}</span></small>}</td>
+        <td className="billing-overview-date-value">{mode === 'unpaid' || mode === 'received' ? unit?.issuedOn ?? '—' : unit?.scheduledDate ?? candidate?.date ?? '日付要確認'}</td>
         <td className={mode === 'unpaid' || mode === 'received' ? 'billing-overview-date-value' : undefined}>{mode === 'unpaid' ? unit?.paymentDueOn ?? '—' : mode === 'received' ? unit?.receivedOn ?? '—'
           : <span className={candidate&&!routine ? 'billing-overview-warning' : ''} title={candidate?.reason}>{status}</span>}</td>
         <td className="billing-overview-money"><strong>{amount.amount == null ? '金額要確認' : fmtYen(amount.amount)}</strong>

@@ -28,11 +28,9 @@
 .billing-overview-table .billing-overview-warning { color: #b45309; font-size: 10px; }
 .billing-overview-round { width: 68px; }
 .billing-overview-table td:nth-child(3) { white-space: nowrap; }
-.billing-overview-date { width: 145px; }
+.billing-overview-date { width: 100px; }
 .billing-overview-table th:nth-child(5) { width: 95px; }
 .billing-overview-table .billing-overview-date-value { font-size: 11px; white-space: nowrap; }
-.billing-overview-table .billing-overview-date-value small { white-space: normal; overflow-wrap: normal; }
-.billing-overview-table .billing-overview-date-value small span { display: inline-block; white-space: nowrap; }
 .billing-overview-table .billing-overview-money { width: 96px; text-align: right; white-space: nowrap; }
 .billing-overview-operation { width: 118px; }
 .billing-overview-actions { display: flex; flex-wrap: wrap; gap: 5px; }

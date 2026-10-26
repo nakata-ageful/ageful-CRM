@@ -6,9 +6,10 @@ function load(file,imports){const m={exports:{}};vm.runInNewContext(ts.transpile
 const nodes=(e,p)=>Array.isArray(e)?e.flatMap(v=>nodes(v,p)):!e?.props?[]:[...(p(e)?[e]:[]),...nodes(e.props.children,p)]
 const text=e=>Array.isArray(e)?e.map(text).join(''):e?.props?text(e.props.children):typeof e==='string'?e:''
 const flush=async()=>{for(let i=0;i<8;i++)await Promise.resolve()}
+const ordering=load('src/lib/project-todos.ts',{'./supabase':{hasSupabaseEnv:false}})
 function harness(props){const states=[],refs=[],effects=[];let pos=0,epos=0;const callbacks=[]
  const hooks={...React,useState(v){const n=pos++;if(!(n in states))states[n]=typeof v==='function'?v():v;return[states[n],v=>{states[n]=typeof v==='function'?v(states[n]):v}]},useEffect(fn,deps){const n=epos++,old=effects[n];if(!old||deps.some((x,i)=>x!==old.deps[i])){old?.cleanup?.();effects[n]={deps};callbacks.push(()=>{effects[n].cleanup=fn()})}}}
- const {DashboardTodoPanel}=load('src/components/DashboardTodoPanel.tsx',{'react':hooks,'../lib/project-todos':{loadDashboardProjectTodos:()=>{throw Error('Inject synthetic reader')}}})
+ const {DashboardTodoPanel}=load('src/components/DashboardTodoPanel.tsx',{'react':hooks,'../lib/project-todos':{compareTodoDueDate:ordering.compareTodoDueDate,loadDashboardProjectTodos:()=>{throw Error('Inject synthetic reader')}}})
  const h={render(){pos=0;epos=0;h.tree=DashboardTodoPanel(props);for(const fn of callbacks.splice(0))fn();return h.tree},refresh(){nodes(h.tree,e=>e.type==='button'&&text(e)==='再読み込み')[0].props.onClick()},unmount(){effects.forEach(e=>e.cleanup?.())}};h.render();return h
 }
 ;(async()=>{
@@ -22,6 +23,7 @@ function harness(props){const states=[],refs=[],effects=[];let pos=0,epos=0;cons
  }
  const repo=load('src/lib/project-todos.ts',{'./supabase':{hasSupabaseEnv:true,supabase:client}})
  all[1200]={...all[1200],is_completed:true,completed_at:'2026-10-17T01:00:00Z'}
+ all[1].due_date='2026-11-03';all[2].due_date='2026-10-30';
  const original=JSON.stringify(all),result=await repo.loadDashboardProjectTodos();assert.equal(result.length,1201);assert.equal(calls,3);assert.equal(result[0].project_name,'合成発電所2');assert.equal(result[1200].is_completed,true);assert.equal(JSON.stringify(all),original);assert.equal(rpc,0)
  for(const [value,re] of [['bad',/一覧を確認/],['short',/最後まで/],['drift',/一覧が更新/],['denied',/取得不可/]]){mode=value;await assert.rejects(repo.loadDashboardProjectTodos(),re)}
  const mock=load('src/lib/project-todos.ts',{'./supabase':{hasSupabaseEnv:false},'./mock-store':{projectStore:{getById:n=>n===1?{id:1,project_name:'合成の使用中発電所'}:n===2?{id:2,project_name:'合成の保管発電所',archived_at:'2026-10-17'}:undefined}}})
@@ -30,7 +32,7 @@ function harness(props){const states=[],refs=[],effects=[];let pos=0,epos=0;cons
  await mock.saveProjectTodo({id:id(1),projectId:1,revision:2,content:'架空作業1',completed:false});assert.equal((await mock.loadDashboardProjectTodos())[0].is_completed,false)
  let reads=0,fail=false;const nav=[],panelRows=[...result.slice(0,12),result[1200]],h=harness({onViewTodo:(n,done)=>nav.push([n,done]),load:async()=>{reads++;if(fail)throw Error('通信失敗');return panelRows}})
  assert.ok(text(h.tree).includes('読み込み中'));assert.ok(!text(h.tree).includes('タスクはありません'));await flush();h.render();assert.equal(reads,1);assert.ok(text(h.tree).includes('未完了（12件）'));assert.ok(text(h.tree).includes('完了（1件）'));assert.equal(nodes(h.tree,e=>e.type==='button'&&text(e)==='Todoへ').length,12,'No eight-row truncation')
- nodes(h.tree,e=>e.type==='button'&&text(e)==='Todoへ')[0].props.onClick();assert.deepEqual(nav,[[2,false]]);assert.equal(reads,1,'Navigation does not save or refresh global business data')
+ nodes(h.tree,e=>e.type==='button'&&text(e)==='Todoへ')[0].props.onClick();assert.deepEqual(nav,[[2,false]]);assert.deepEqual(nodes(h.tree,e=>e.type==='tbody')[0].props.children.slice(0,3).map(e=>e.key),[id(3),id(2),id(1)]);assert.ok(!text(h.tree).includes('追加日'));assert.ok(text(h.tree).includes('2026-10-30'));assert.equal(nodes(h.tree,e=>e.type==='tbody')[0].props.children[0].props.children[0].props.children.props.children,'合成発電所2');assert.equal(reads,1,'Navigation does not save or refresh global business data')
  nodes(h.tree,e=>e.type==='button'&&text(e)==='完了（1件）')[0].props.onClick();h.render();assert.equal(nodes(h.tree,e=>e.type==='button'&&text(e)==='Todoへ').length,1);assert.ok(text(h.tree).includes('架空の確認作業1201'));assert.ok(!text(h.tree).includes('架空の確認作業2'));assert.ok(text(h.tree).includes('完了日'));assert.equal(reads,1,'Switching status is read-only and makes no extra requests')
  nodes(h.tree,e=>e.type==='button'&&text(e)==='Todoへ')[0].props.onClick();assert.deepEqual(nav.at(-1),[2,true],'Completed dashboard rows open the completed project list')
  nodes(h.tree,e=>e.type==='button'&&text(e)==='未完了（12件）')[0].props.onClick();h.render();assert.equal(nodes(h.tree,e=>e.type==='button'&&text(e)==='Todoへ').length,12)

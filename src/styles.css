@@ -361,7 +361,11 @@ body {
  .dashboard-todo-project { grid-area:1 / 1;width:auto; }
  .dashboard-todo-task { grid-area:2 / 1 / auto / 3; }
  .dashboard-todo-date { grid-area:1 / 2;color:#64748b; }
+ .dashboard-todo-date::before { content:'期日：'; }
  .dashboard-todo-action { grid-area:3 / 1 / auto / 3;text-align:right; }
+ .dashboard-todo-completed-date { grid-area:3 / 1 / auto / 3;color:#64748b;white-space:nowrap; }
+ .dashboard-todo-completed-date::before { content:'完了日：'; }
+ .dashboard-todo-scroll tr:has(.dashboard-todo-completed-date) .dashboard-todo-action { grid-area:4 / 1 / auto / 3; }
 }
 
 /* ── 2-column row ────────────────────────────────────────── */

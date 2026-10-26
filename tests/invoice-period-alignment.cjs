@@ -53,5 +53,5 @@ assert.equal(coverage([{...row,contract:august}],pay,[],'2027-08',1,[],[rule]).c
 const twice={...contract,billing_count:2,billing_schedule_days:['6月1日','12月1日']}
 assert.equal(invoicePeriodChoiceRequired(twice,2026),false);assert.equal(coverage([{...row,contract:twice}],pay,[],'2026-12',1).candidates[0].round,2)
 assert.equal(invoiceOccurrenceYear(contract,'2026-12-01',1,[rule]),2027)
-html=renderToStaticMarkup(React.createElement(Table,{data:history([],[]),candidates:[{...a,projectName:'合成発電所',customerName:'検証顧客'}],mode:'upcoming',today:'2026-10-17'}));assert.ok(html.includes('保守：2026-01-01 ～ 2026-12-31'))
+html=renderToStaticMarkup(React.createElement(Table,{data:history([],[]),candidates:[{...a,projectName:'合成発電所',customerName:'検証顧客'}],mode:'upcoming',today:'2026-10-17'}));assert.ok(html.replace(/<[^>]*>/g,'').includes('保守：2026-01-01 ～ 2026-12-31'))
 console.log('PASS: shared service-year/date mapping, 16 rollover cases, explicit same-year/next-year rules, missing setup, immutable saved/legacy records, collision review, no hidden reminder and visible coverage dates')

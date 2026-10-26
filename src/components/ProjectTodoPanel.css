@@ -6,6 +6,9 @@
 .project-todo-add>div { display:flex;align-items:flex-end;gap:12px; }
 .project-todo-add textarea { flex:1;min-width:0;resize:vertical; }
 .project-todo-add button { flex-shrink:0; }
+.project-todo-due-input { display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;min-width:0; }
+.project-todo-due-input input { width:160px;max-width:100%;min-width:0; }
+.project-todo-content input[type="date"] { width:100%;min-width:0;box-sizing:border-box;margin:8px 0; }
 .project-todo-panel .project-todo-list { min-width:0;overflow:hidden;padding:0; }
 .project-todo-list .card-header-row { padding:16px 20px;margin:0; }
 .project-todo-list .section-title { margin:0; }
@@ -25,6 +28,7 @@
 @media(max-width:640px){
  .project-todo-add { padding:16px; }
  .project-todo-add>div { flex-direction:column;align-items:stretch; }
+ .project-todo-due-input input { width:100%; }
  .project-todo-actions { flex-direction:column;align-items:stretch;gap:6px; }
  .project-todo-content { min-width:140px; }
  .project-todo-date { font-size:12px; }

@@ -508,8 +508,8 @@ export function Prospects({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* フィルター */}
-      <div style={{ display: 'flex', gap: 12 }}>
-        <div className="card" style={{ padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+      <div className="prospect-status-filters">
+        <div className="card prospect-status-filter">
           <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '.05em' }}>申込</span>
           <button
             className={`filter-tab ${applyFilters.length === 0 ? 'active' : ''}`}
@@ -527,7 +527,7 @@ export function Prospects({
             </button>
           ))}
         </div>
-        <div className="card" style={{ padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+        <div className="card prospect-status-filter">
           <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '.05em' }}>契約</span>
           <button
             className={`filter-tab ${contractFilters.length === 0 ? 'active' : ''}`}

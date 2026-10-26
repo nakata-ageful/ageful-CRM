@@ -12,7 +12,7 @@ function Preview(){
  const [notice,setNotice]=useState('')
  return <div className="app"><aside className="sidebar"><div className="logo-block"><img className="logo-img" src="/logo.png" alt="Ageful"/><span className="logo-sub">隔離検証・合成データ</span></div>{['ダッシュボード','見込み管理','発電所','顧客','保守対応','請求'].map(label=><div key={label} className={`nav-btn ${label==='請求'?'active':''}`}>{label}</div>)}</aside><main className="main">
    <BillingOverviewPanel today="2026-10-03" data={{units,recipientName:id=>id===1?'検証顧客A':'検証顧客B',projectName:id=>`検証発電所${id}`,plannedAmount:()=>null,recipients:[{id:1,name:'検証顧客A'},{id:2,name:'検証顧客B'}]}}
-    setupItems={Array.from({length:12},(_,i)=>({projectId:10+i,projectName:`未保存発電所${i+1}`,customerName:'検証顧客C',recipientId:3,method:'invoice',date:'2026-12-01',round:1,amount:165000,status:'missing'}))}
+    setupItems={Array.from({length:12},(_,i)=>({projectId:10+i,projectName:`未保存発電所${i+1}`,customerName:i===0?'株式会社検証エネルギー保守管理':'検証顧客C',recipientId:3,method:'invoice',date:'2026-12-01',round:1,amount:165000,status:'missing',serviceYear:2027,periodStart:'2027-01-01',periodEnd:'2027-12-31'}))}
     debitProjects={[{projectId:30,projectName:'検証振替発電所',customerName:'検証顧客D',days:'25日',amount:10110}]}
     setupIssues={[{projectId:40,projectName:'要設定発電所',category:'action_required',code:'other',reason:'予定日未設定'}]}
     onViewDetail={id=>setNotice(`詳細の遷移先：検証発電所${id}。本番データは使用していません。`)}

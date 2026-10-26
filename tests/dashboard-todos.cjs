@@ -2,14 +2,15 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript'),React=require('react')
 const root=path.resolve(__dirname,'..'),id=n=>`aaaaaaaa-aaaa-4aaa-8aaa-${String(n).padStart(12,'0')}`
 const row=n=>({id:id(n),project_id:n%2+1,content:'架空の確認作業'+n,is_completed:false,completed_at:null,revision:1,created_at:'2026-10-17T00:00:00Z',updated_at:'2026-10-17T00:00:00Z',projects:{id:n%2+1,project_name:'合成発電所'+(n%2+1),plant_name:null,archived_at:null}})
-function load(file,imports){const m={exports:{}};vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(root,file),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText,{module:m,exports:m.exports,require:n=>{if(n in imports)return imports[n];if(n==='react/jsx-runtime')return require(n);if(n==='./mock-store')return {projectStore:{getById:()=>undefined}};throw Error('Forbidden import '+n)},Date,Map,Set,Number,Error,structuredClone});return m.exports}
+let panelDay='2026-10-26';const timers=new Map();let timerId=0
+function load(file,imports){const m={exports:{}};vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(root,file),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText,{module:m,exports:m.exports,require:n=>{if(n in imports)return imports[n];if(n==='react/jsx-runtime')return require(n);if(n==='./mock-store')return {projectStore:{getById:()=>undefined}};throw Error('Forbidden import '+n)},Date,Map,Set,Number,Error,structuredClone,setInterval:fn=>{timers.set(++timerId,fn);return timerId},clearInterval:id=>timers.delete(id)});return m.exports}
 const nodes=(e,p)=>Array.isArray(e)?e.flatMap(v=>nodes(v,p)):!e?.props?[]:[...(p(e)?[e]:[]),...nodes(e.props.children,p)]
 const text=e=>Array.isArray(e)?e.map(text).join(''):e?.props?text(e.props.children):typeof e==='string'?e:''
 const flush=async()=>{for(let i=0;i<8;i++)await Promise.resolve()}
 const ordering=load('src/lib/project-todos.ts',{'./supabase':{hasSupabaseEnv:false}})
 function harness(props){const states=[],refs=[],effects=[];let pos=0,epos=0;const callbacks=[]
  const hooks={...React,useState(v){const n=pos++;if(!(n in states))states[n]=typeof v==='function'?v():v;return[states[n],v=>{states[n]=typeof v==='function'?v(states[n]):v}]},useEffect(fn,deps){const n=epos++,old=effects[n];if(!old||deps.some((x,i)=>x!==old.deps[i])){old?.cleanup?.();effects[n]={deps};callbacks.push(()=>{effects[n].cleanup=fn()})}}}
- const {DashboardTodoPanel}=load('src/components/DashboardTodoPanel.tsx',{'react':hooks,'../lib/project-todos':{compareTodoDueDate:ordering.compareTodoDueDate,loadDashboardProjectTodos:()=>{throw Error('Inject synthetic reader')}}})
+ const {DashboardTodoPanel}=load('src/components/DashboardTodoPanel.tsx',{'react':hooks,'../lib/project-todos':{compareTodoDueDate:ordering.compareTodoDueDate,isTodoOverdue:ordering.isTodoOverdue,todoTodayInJapan:()=>panelDay,loadDashboardProjectTodos:()=>{throw Error('Inject synthetic reader')}}})
  const h={render(){pos=0;epos=0;h.tree=DashboardTodoPanel(props);for(const fn of callbacks.splice(0))fn();return h.tree},refresh(){nodes(h.tree,e=>e.type==='button'&&text(e)==='再読み込み')[0].props.onClick()},unmount(){effects.forEach(e=>e.cleanup?.())}};h.render();return h
 }
 ;(async()=>{
@@ -39,6 +40,16 @@ function harness(props){const states=[],refs=[],effects=[];let pos=0,epos=0;cons
  fail=true;h.refresh();h.render();await flush();h.render();assert.ok(text(h.tree).includes('読み込めません'));assert.ok(!text(h.tree).includes('（12件）'));assert.ok(!text(h.tree).includes('タスクはありません'))
  fail=false;h.refresh();h.render();await flush();h.render();assert.ok(text(h.tree).includes('（12件）'));assert.equal(reads,3)
  const empty=harness({onViewTodo(){},load:async()=>[]});await flush();empty.render();assert.ok(text(empty.tree).includes('未完了のタスクはありません'))
+
+ // Calendar boundary is Japan time; color and words never imply an overdue completed/due-today/undated task.
+ assert.equal(ordering.todoTodayInJapan(new Date('2026-10-25T14:59:59Z')),'2026-10-25');assert.equal(ordering.todoTodayInJapan(new Date('2026-10-25T15:00:00Z')),'2026-10-26')
+ const dueRows=[{...result[0],id:id(21),content:'期限を過ぎた未完了',due_date:'2026-10-25'}, {...result[1],id:id(22),content:'今日が期日',due_date:'2026-10-26'}, {...result[2],id:id(23),content:'明日が期日',due_date:'2026-10-27'}, {...result[3],id:id(24),content:'期日なし',due_date:null}, {...result[4],id:id(25),content:'完了済み',due_date:'2026-10-25',is_completed:true,completed_at:'2026-10-25T00:00:00Z'}]
+ const dueBefore=JSON.stringify(dueRows),overdue=harness({onViewTodo(){},load:async()=>dueRows});await flush();overdue.render()
+ assert.equal(nodes(overdue.tree,e=>e.type==='span'&&e.props.className==='dashboard-todo-overdue-label').length,1)
+ const late=nodes(overdue.tree,e=>e.type==='td'&&e.props.className?.includes('dashboard-todo-overdue'));assert.equal(late.length,1);assert.ok(text(late[0]).includes('2026-10-25期限超過'))
+ nodes(overdue.tree,e=>e.type==='button'&&text(e)==='完了（1件）')[0].props.onClick();overdue.render();assert.ok(!text(overdue.tree).includes('期限超過'));assert.equal(JSON.stringify(dueRows),dueBefore)
+ nodes(overdue.tree,e=>e.type==='button'&&text(e)==='未完了（4件）')[0].props.onClick();overdue.render();panelDay='2026-10-27';[...timers.values()].at(-1)();overdue.render();assert.equal(nodes(overdue.tree,e=>e.type==='span'&&e.props.className==='dashboard-todo-overdue-label').length,2,'Open dashboard updates when Japan date rolls over');panelDay='2026-10-26'
+ const timerCount=timers.size;overdue.unmount();assert.equal(timers.size,timerCount-1,'Unmount cancels the clock without leaving background timers')
  // Cancelled reads after navigation never update an unmounted Dashboard.
  let finish;const stale=harness({onViewTodo(){},load:()=>new Promise(resolve=>{finish=resolve})});stale.unmount();finish(result);await flush();stale.render();assert.ok(text(stale.tree).includes('読み込み中'))
  // Execute the real App navigation attribute and verify exact Todo destination.

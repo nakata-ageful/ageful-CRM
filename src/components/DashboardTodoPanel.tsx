@@ -1,8 +1,13 @@
 import {useEffect,useState} from 'react'
-import {compareTodoDueDate,loadDashboardProjectTodos,type DashboardProjectTodo} from '../lib/project-todos'
+import {compareTodoDueDate,isTodoOverdue,todoTodayInJapan,loadDashboardProjectTodos,type DashboardProjectTodo} from '../lib/project-todos'
 
 export function DashboardTodoPanel({onViewTodo,load=loadDashboardProjectTodos}:{onViewTodo:(projectId:number,completed?:boolean)=>void;load?:()=>Promise<DashboardProjectTodo[]>}){
  const [items,setItems]=useState<DashboardProjectTodo[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState(''),[refresh,setRefresh]=useState(0),[completed,setCompleted]=useState(false)
+ const [today,setToday]=useState(todoTodayInJapan)
+ useEffect(()=>{
+  const timer=setInterval(()=>setToday(todoTodayInJapan()),60_000)
+  return()=>clearInterval(timer)
+ },[])
  useEffect(()=>{
   let cancelled=false;setLoading(true);setError('')
   void load().then(rows=>{if(!cancelled)setItems(rows)}).catch(e=>{if(!cancelled)setError(e instanceof Error?e.message:typeof e==='object'&&e&&'message'in e?String(e.message):'通信に失敗しました。')})
@@ -16,7 +21,7 @@ export function DashboardTodoPanel({onViewTodo,load=loadDashboardProjectTodos}:{
   {loading?<p role="status">Todoを読み込み中…</p>:error?<div role="alert" className="form-error">Todoを読み込めませんでした。{error}「再読み込み」を押してください。</div>:
   !rows.length?<p className="empty-cell">{completed?'完了したタスクはありません':'未完了のタスクはありません'}</p>:<div className="dashboard-todo-scroll"><table><thead><tr><th>発電所</th><th>やること</th><th>期日</th>{completed&&<th>完了日</th>}<th>操作</th></tr></thead><tbody>
    {rows.map(t=><tr key={t.id}><td className="dashboard-todo-project"><strong>{t.project_name}</strong></td><td className="dashboard-todo-task">{t.content}</td>
-    <td className="dashboard-todo-date">{t.due_date??'—'}</td>{completed&&<td className="dashboard-todo-completed-date">{new Date(t.completed_at!).toLocaleDateString('ja-JP')}</td>}<td className="dashboard-todo-action"><button type="button" className="btn btn-sub btn-sm" aria-label={`${t.project_name}のTodoへ：${t.content}`} onClick={()=>onViewTodo(t.project_id,completed)}>Todoへ</button></td></tr>)}
+    <td className={`dashboard-todo-date${isTodoOverdue(t,today)?' dashboard-todo-overdue':''}`}>{t.due_date??'—'}{isTodoOverdue(t,today)&&<span className="dashboard-todo-overdue-label">期限超過</span>}</td>{completed&&<td className="dashboard-todo-completed-date">{new Date(t.completed_at!).toLocaleDateString('ja-JP')}</td>}<td className="dashboard-todo-action"><button type="button" className="btn btn-sub btn-sm" aria-label={`${t.project_name}のTodoへ：${t.content}`} onClick={()=>onViewTodo(t.project_id,completed)}>Todoへ</button></td></tr>)}
   </tbody></table></div>}
  </section>
 }

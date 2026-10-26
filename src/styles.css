@@ -353,6 +353,8 @@ body {
 .dashboard-todo-project { width:22%;overflow-wrap:anywhere; }
 .dashboard-todo-task { white-space:pre-wrap;overflow-wrap:anywhere; }
 .dashboard-todo-date,.dashboard-todo-action { white-space:nowrap; }
+.dashboard-todo-scroll .dashboard-todo-overdue { color:#b91c1c;font-weight:700; }
+.dashboard-todo-overdue-label { display:block;font-size:11px;line-height:1.5; }
 @media(max-width:640px){
  .dashboard-todo-scroll table,.dashboard-todo-scroll tbody { display:block; }
  .dashboard-todo-scroll thead { display:none; }

@@ -15,6 +15,8 @@ export const validTodoDueDate=(v:unknown):v is string=>typeof v==='string'&&/^\d
 export function compareTodoDueDate(a:ProjectTodo,b:ProjectTodo){
  return (a.due_date??'9999-99-99').localeCompare(b.due_date??'9999-99-99')||a.created_at.localeCompare(b.created_at)||a.id.localeCompare(b.id)
 }
+export const todoTodayInJapan=(now=new Date())=>new Date(now.getTime()+9*60*60*1000).toISOString().slice(0,10)
+export const isTodoOverdue=(todo:Pick<ProjectTodo,'due_date'|'is_completed'>,today=todoTodayInJapan())=>!todo.is_completed&&!!todo.due_date&&todo.due_date<today
 export function parseProjectTodo(value:unknown,projectId:number):ProjectTodo{
  const t=value as ProjectTodo|null
  if(!Number.isSafeInteger(projectId)||projectId<1||!t||typeof t.id!=='string'||!uuid.test(t.id)||t.project_id!==projectId||typeof t.content!=='string'||!t.content.trim()||t.content.length>2000

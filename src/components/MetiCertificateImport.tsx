@@ -38,10 +38,10 @@ export function MetiCertificateImport({project,customer,onClose,onSaved}:{projec
   }
   const customerName=customer?customerDisplayName(customer):'所有者未登録'
   const mismatch=data&&((project.grid_id&&!certificateSame(project.grid_id,data.gridId))||(data.businessName&&!certificateSame(customerName,data.businessName)))
-  return <Modal title="認定証明書PDFを読み込む" width={920} onClose={onClose} closeDisabled={saving}>
+  return <Modal title="認定書PDFを読み込む" width={920} onClose={onClose} closeDisabled={saving}>
     <div className="meti-import">
       <div className="meti-import-heading"><b>{project.plant_name||project.project_name}</b><span>顧客：{customerName}</span></div>
-      <div className="meti-file-row"><label className="meti-file">認定証明書PDF<input type="file" accept="application/pdf,.pdf" disabled={busy||saving||!!pending} onChange={e=>void read(e.target.files?.[0])}/></label>{pdfUrl&&<a className="btn btn-sub btn-sm" href={pdfUrl} title={fileName} target="_blank" rel="noreferrer">元のPDFを開く</a>}</div>
+      <div className="meti-file-row"><label className="meti-file">認定書PDF<input type="file" accept="application/pdf,.pdf" disabled={busy||saving||!!pending} onChange={e=>void read(e.target.files?.[0])}/></label>{pdfUrl&&<a className="btn btn-sub btn-sm" href={pdfUrl} title={fileName} target="_blank" rel="noreferrer">元のPDFを開く</a>}</div>
       <small>PDFはこの端末内で読み取ります。チェックして「反映する」を押すまで登録内容は変わりません。</small>
       {busy&&<p role="status">{progress}</p>}
       {error&&<p role="alert" className="meti-error">{error}</p>}

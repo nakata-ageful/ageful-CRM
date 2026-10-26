@@ -15,9 +15,11 @@ export const certificateSame=(a:unknown,b:unknown)=>compact(String(a??''))===com
  * Ambiguous repeated labels are never silently resolved to the first match. */
 export function parseCertificate(items:CertificateText[]):CertificateData {
   const content=items.map(i=>({...i,text:norm(i.text)})).filter(i=>i.text)
-  if(!content.some(i=>compact(i.text).includes('発電の認定の証明について')))throw Error('認定証明書の書式を確認できませんでした。JPEAの認定証明書PDFを選んでください。')
-  function value(label:string):string {
-    const labels=content.filter(i=>compact(i.text)===label)
+  const titles=[...new Set(content.map(i=>i.page))].map(page=>content.filter(i=>i.page===page).map(i=>compact(i.text)).join(''))
+  if(!titles.some(t=>t.includes('発電の認定の証明について')||t.includes('再生可能エネルギー発電事業計画の変更認定について')))throw Error('対応する認定書の書式を確認できませんでした。JPEAの認定証明書または変更認定通知書PDFを選んでください。')
+  function value(label:string|string[]):string {
+    const names=Array.isArray(label)?label:[label]
+    const labels=content.filter(i=>names.includes(compact(i.text)))
     if(labels.length!==1)return ''
     const l=labels[0]
     const next=content.filter(i=>i.page===l.page&&Math.abs(i.x-l.x)<4&&i.y<l.y-3).sort((a,b)=>b.y-a.y)[0]
@@ -34,7 +36,7 @@ export function parseCertificate(items:CertificateText[]):CertificateData {
   return {
     businessName:value('事業者名'),businessAddress:value('事業者住所'),siteAddress:value('発電設備の設置場所'),
     gridId:/^[A-Z0-9]{6,30}$/.test(gridId)?gridId:'',certifiedAt:validCertificateDate(certifiedAt)?certifiedAt:'',
-    panelMaker:value('製造事業者名'),panelModel:value('型式番号'),panelCount:count?.[1]??'',panelKw:kw?.[1]??'',
+    panelMaker:value(['製造事業者名','製造事業者']),panelModel:value('型式番号'),panelCount:count?.[1]??'',panelKw:kw?.[1]??'',
   }
 }
 export function validCertificateDate(s:string){const date=new Date(`${s}T00:00:00Z`);return /^\d{4}-\d{2}-\d{2}$/.test(s)&&s>='1900-01-01'&&s<='9999-12-31'&&!Number.isNaN(date.getTime())&&date.toISOString().slice(0,10)===s}

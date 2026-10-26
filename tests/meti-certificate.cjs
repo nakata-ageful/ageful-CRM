@@ -23,3 +23,17 @@ assert.deepEqual(plain(p).site_address,'詳細な住所は残す')
 console.log('PASS: positional JPEA extraction, original certification date vs certificate date, panel output vs facility output, ambiguous labels, invalid dates/numbers, explicit selection, no identity/site/contract/billing writes, preserve notes and deduplicate addresses')
 
 assert.throws(()=>a.certificateRequest(p,c,{...d,panelKw:'84.375'},new Set(['panel_kw'])),/小数点以下2桁/)
+// A change-recognition notice uses a different title and manufacturer label.
+{
+ const notice=plain(items)
+ notice[0].text='再生可能エネルギー発電事業計画の変更'
+ notice.splice(1,0,{text:'認定について(通知)',x:300,y:800,width:100,page:1})
+ notice.find(i=>i.text==='製造事業者名').text='製造事業者'
+ notice.push({text:'変更認定日',x:50,y:690,width:65,page:1},{text:'２０２２年９月６日',x:220,y:690,width:120,page:1})
+ const result=a.parseCertificate(notice)
+ assert.equal(result.certifiedAt,'2018-11-29','Never use the later change-recognition date')
+ assert.equal(result.panelMaker,'Test Solar');assert.equal(result.panelKw,'84.4');assert.equal(result.panelCount,'268')
+ notice.push({text:'製造事業者名',x:50,y:500,width:65,page:2})
+ assert.equal(a.parseCertificate(notice).panelMaker,'','Two manufacturer aliases remain ambiguous')
+ console.log('PASS: change-recognition notice, split title, manufacturer label alias, original/change-date separation and conflicting aliases')
+}

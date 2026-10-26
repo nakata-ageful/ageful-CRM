@@ -33,6 +33,7 @@ try{
  await db.exec(`create function fail_customer_import_test() returns trigger language plpgsql as $$begin raise exception 'synthetic customer save failure';end$$; create trigger fail_customer_import_test before update on customers for each row execute function fail_customer_import_test();`)
  const atomicBefore=await snapshot('projects');await assert.rejects(run({...req,patch:{panel_kw:100},before:{panel_kw:84.4},customerBefore:'読み取り住所',customerAddress:'新しい住所'}),/synthetic customer save failure/);assert.deepEqual(await snapshot('projects'),atomicBefore,'A customer UPDATE failure rolls back the earlier project UPDATE');await db.exec('drop trigger fail_customer_import_test on customers')
  await db.exec("set test.actor='22222222-2222-4222-8222-222222222222'");await assert.rejects(run(req),/利用権限/);await db.exec("set test.actor='11111111-1111-4111-8111-111111111111'")
+ await assert.rejects(run({...req,patch:{panel_kw:84.375},before:{panel_kw:84.4}}),/小数点以下2桁/)
  await assert.rejects(run({...req,customerId:2}),/所有者/)
  await db.exec("update projects set archived_at=now() where id=1");await assert.rejects(run(req),/所有者/)
  await db.exec("set test.actor=''");await assert.rejects(run(req),/利用権限/)

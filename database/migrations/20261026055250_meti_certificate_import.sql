@@ -5,7 +5,7 @@ SET LOCAL statement_timeout='60s';
 DO $$ BEGIN
  IF (SELECT count(*) FROM public.ageful_migration_target)<>1 OR NOT EXISTS(SELECT 1 FROM public.ageful_migration_target WHERE project_ref='ufawaiddntqqbjhycbxn') THEN RAISE EXCEPTION 'Wrong project: new app only';END IF;
 END $$;
-CREATE FUNCTION public.meti_certificate_apply(p_request jsonb) RETURNS jsonb
+CREATE OR REPLACE FUNCTION public.meti_certificate_apply(p_request jsonb) RETURNS jsonb
 LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
 DECLARE
  p public.projects%ROWTYPE;c public.customers%ROWTYPE;
@@ -25,6 +25,7 @@ BEGIN
  IF patch ? 'grid_certified_at' AND ((patch->>'grid_certified_at') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' OR (patch->>'grid_certified_at')::date<'1900-01-01'::date) THEN RAISE EXCEPTION '認定日を確認してください';END IF;
  IF patch ? 'panel_count' AND ((patch->>'panel_count') !~ '^[0-9]+$' OR (patch->>'panel_count')::numeric NOT BETWEEN 1 AND 1000000) THEN RAISE EXCEPTION 'パネル枚数を確認してください';END IF;
  IF patch ? 'panel_kw' AND ((patch->>'panel_kw') !~ '^[0-9]+(\.[0-9]+)?$' OR (patch->>'panel_kw')::numeric NOT BETWEEN 0.001 AND 1000000) THEN RAISE EXCEPTION 'パネル合計出力を確認してください';END IF;
+ IF patch ? 'panel_kw' AND round((patch->>'panel_kw')::numeric,2)<>(patch->>'panel_kw')::numeric THEN RAISE EXCEPTION 'パネル合計出力は小数点以下2桁まで保存できます。元のPDFを確認してください';END IF;
  IF length(patch->>'panel_maker')>300 OR length(patch->>'panel_model')>300 OR length(patch->>'meti_notes')>20000 THEN RAISE EXCEPTION '反映内容が長すぎます';END IF;
  IF change_customer THEN
   IF p.customer_id IS NULL OR desired_address IS NULL OR length(trim(desired_address)) NOT BETWEEN 1 AND 2000 THEN RAISE EXCEPTION '顧客の住所を確認してください';END IF;

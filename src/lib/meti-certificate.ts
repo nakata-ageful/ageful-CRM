@@ -61,6 +61,7 @@ export function certificateRequest(project:Project,customer:Customer|null,d:Cert
     if(!v)throw Error(`${f.label}が空欄です。読み取り内容を確認してください。`)
     if(f.type==='date'&&!validCertificateDate(v))throw Error('認定日を確認してください。')
     if(f.key==='grid_id'&&!/^[A-Z0-9]{6,30}$/.test(v))throw Error('設備IDは半角英数字で確認してください。')
+    if(f.key==='panel_kw'&&(v.split('.')[1]??'').replace(/0+$/,'').length>2)throw Error('パネル合計出力は小数点以下2桁まで保存できます。元のPDFを確認し、この項目を外すか入力内容を調整してください。')
     if(f.type==='number'&&(!/^\d+(?:\.\d+)?$/.test(v)||Number(v)<=0||Number(v)>1000000||(f.key==='panel_count'&&!Number.isInteger(Number(v)))))throw Error(`${f.label}を確認してください。`)
     Object.assign(patch,{[f.key]:f.type==='number'?Number(v):v});Object.assign(before,{[f.key]:project[f.key]??null})
   }

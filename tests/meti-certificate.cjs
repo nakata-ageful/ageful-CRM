@@ -21,3 +21,5 @@ assert.throws(()=>a.certificateRequest(p,c,{...d,panelCount:'2.5'},new Set(['pan
 assert.throws(()=>a.certificateRequest(p,c,{...d,panelKw:'NaN'},new Set(['panel_kw'])),/合計出力/)
 assert.deepEqual(plain(p).site_address,'詳細な住所は残す')
 console.log('PASS: positional JPEA extraction, original certification date vs certificate date, panel output vs facility output, ambiguous labels, invalid dates/numbers, explicit selection, no identity/site/contract/billing writes, preserve notes and deduplicate addresses')
+
+assert.throws(()=>a.certificateRequest(p,c,{...d,panelKw:'84.375'},new Set(['panel_kw'])),/小数点以下2桁/)

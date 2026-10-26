@@ -1,7 +1,8 @@
 // Real repository and component callbacks, synthetic storage only. No credentials/network.
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript'),React=require('react'),crypto=require('node:crypto')
 const root=path.resolve(__dirname,'..'),id=n=>`aaaaaaaa-aaaa-4aaa-8aaa-${String(n).padStart(12,'0')}`
-function moduleFor(file,imports){const m={exports:{}};vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(root,file),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText,{module:m,exports:m.exports,require:n=>{if(n in imports)return imports[n];if(n==='react/jsx-runtime')return require(n);if(n==='./mock-store')return {projectStore:{getById:()=>undefined}};if(n.endsWith('.css'))return{};throw Error('Forbidden import '+n)},Date,Map,Set,Number,Error,structuredClone,crypto});return m.exports}
+const timers=new Map();let timerId=0
+function moduleFor(file,imports){const m={exports:{}};vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(root,file),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText,{module:m,exports:m.exports,require:n=>{if(n in imports)return imports[n];if(n==='react/jsx-runtime')return require(n);if(n==='./mock-store')return {projectStore:{getById:()=>undefined}};if(n.endsWith('.css'))return{};throw Error('Forbidden import '+n)},Date,Map,Set,Number,Error,structuredClone,crypto,setInterval:fn=>{timers.set(++timerId,fn);return timerId},clearInterval:id=>timers.delete(id)});return m.exports}
 const row=(n=1,p=1)=>({id:id(n),project_id:p,content:'合成の確認作業',is_completed:false,completed_at:null,revision:1,created_at:'2026-10-17T00:00:00Z',updated_at:'2026-10-17T00:00:00Z'})
 const same=(a,b)=>assert.equal(JSON.stringify(a),JSON.stringify(b))
 const repo=moduleFor('src/lib/project-todos.ts',{'./supabase':{hasSupabaseEnv:false}})
@@ -11,7 +12,7 @@ const flush=async()=>{for(let i=0;i<8;i++)await Promise.resolve()}
 function harness(props){const state=[],refs=[],effects=[];let pos=0,rpos=0,initial=true,cleanup
  const hooks={...React,useState(value){const n=pos++;if(!(n in state))state[n]=typeof value==='function'?value():value;return[state[n],v=>{state[n]=typeof v==='function'?v(state[n]):v}]},useRef(value){const n=rpos++;return refs[n]??(refs[n]={current:value})},useEffect(fn){if(initial)effects.push(fn)}}
  const {ProjectTodoPanel}=moduleFor('src/components/ProjectTodoPanel.tsx',{'react':hooks,'../lib/project-todos':repo})
- const h={render(){pos=0;rpos=0;h.tree=ProjectTodoPanel(props);if(initial){initial=false;cleanup=effects[0]()}return h.tree},button(label){return nodes(h.tree,e=>e.type==='button'&&text(e)===label)[0]},area(){return nodes(h.tree,e=>e.type==='textarea')[0]},submit(){return nodes(h.tree,e=>e.type==='form')[0].props.onSubmit({preventDefault(){}})},unmount(){cleanup?.()}};h.render();return h
+ const h={render(){pos=0;rpos=0;h.tree=ProjectTodoPanel(props);if(initial){initial=false;cleanup=effects.map(fn=>fn())}return h.tree},button(label){return nodes(h.tree,e=>e.type==='button'&&text(e)===label)[0]},area(){return nodes(h.tree,e=>e.type==='textarea')[0]},submit(){return nodes(h.tree,e=>e.type==='form')[0].props.onSubmit({preventDefault(){}})},unmount(){cleanup?.forEach(fn=>fn?.())}};h.render();return h
 }
 ;(async()=>{
  let t=await repo.saveProjectTodo({id:id(1),projectId:1,revision:null,content:' 書類を送る ',completed:false});assert.equal(t.content,'書類を送る')
@@ -52,6 +53,15 @@ function harness(props){const state=[],refs=[],effects=[];let pos=0,rpos=0,initi
  const failure=harness({projectId:1,load:async()=>{throw Error('読込失敗')},save});await flush();failure.render();assert.equal(failure.button('追加する').props.disabled,true);assert.ok(text(failure.tree).includes('読み込めません'))
  const readonly=harness({projectId:1,readOnly:true,load:async()=>structuredClone(store),save});await flush();readonly.render();assert.equal(readonly.button('追加する'),undefined);assert.equal(readonly.button('完了にする').props.disabled,true)
  const completed=harness({projectId:1,initialCompleted:true,load:async()=>[{...row(8),is_completed:true,completed_at:'2026-10-17T01:00:00Z'}],save});await flush();completed.render();assert.ok(completed.button('未完了に戻す'));assert.equal(completed.button('完了にする'),undefined)
+
+ // The project list uses the exact same overdue rule as Dashboard; rendering never saves.
+ const today=repo.todoTodayInJapan(),shift=d=>new Date(Date.parse(today+'T00:00:00Z')+d*86400000).toISOString().slice(0,10)
+ const dueRows=[{...row(91),content:'昨日までの未完了',due_date:shift(-1)},{...row(92),content:'本日期日',due_date:today},{...row(93),content:'今後の期日',due_date:shift(1)},{...row(94),content:'期日なし',due_date:null},{...row(95),content:'過去の完了済み',due_date:shift(-1),is_completed:true,completed_at:today+'T00:00:00Z'}]
+ let dueWrites=0;const dueBefore=JSON.stringify(dueRows),deadline=harness({projectId:1,load:async()=>dueRows,save:async()=>{dueWrites++;throw Error('Rendering cannot save')}});await flush();deadline.render()
+ assert.equal(nodes(deadline.tree,e=>e.type==='span'&&e.props.className==='project-todo-overdue-label').length,1)
+ assert.ok(text(nodes(deadline.tree,e=>e.type==='td'&&e.props.className?.includes('project-todo-overdue'))[0]).includes(shift(-1)+'期限超過'))
+ deadline.button('完了（1件）').props.onClick();deadline.render();assert.ok(!text(deadline.tree).includes('期限超過'));assert.equal(dueWrites,0);assert.equal(JSON.stringify(dueRows),dueBefore)
+ const timerCount=timers.size;deadline.unmount();assert.equal(timers.size,timerCount-1,'Leaving the project stops its date timer')
  // ProjectDetail only mounts independent Todo panel when selected; billing/maintenance callbacks unchanged.
  const detail=fs.readFileSync(path.join(root,'src/views/ProjectDetail.tsx'),'utf8');assert.ok(/tab\s*===\s*'Todo'/.test(detail));assert.ok(/key=\{project.id\} projectId=\{project.id\} readOnly=\{readOnly\}/.test(detail))
  assert.ok(!fs.readFileSync(path.join(root,'src/lib/project-todos.ts'),'utf8').includes("from './actions'"))

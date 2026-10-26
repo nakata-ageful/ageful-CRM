@@ -18,6 +18,8 @@
 .project-todo-content textarea { width:100%;box-sizing:border-box;display:block;margin:8px 0; }
 .project-todo-done { color:#64748b; }
 .project-todo-date { white-space:nowrap;color:#64748b;vertical-align:top; }
+.project-todo-date.project-todo-overdue { color:#b91c1c;font-weight:700; }
+.project-todo-overdue-label { display:block;font-size:11px;line-height:1.5; }
 .project-todo-actions { display:flex;gap:8px;align-items:center;white-space:nowrap; }
 .project-todo-filters { align-self:flex-start;max-width:100%; }
 .project-todo-filters .filter-tab:disabled { cursor:default;opacity:.65; }

@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState} from 'react'
-import {compareTodoDueDate,definiteTodoRejection,loadProjectTodos,parseProjectTodo,saveProjectTodo,validateTodoChange,type ProjectTodo,type TodoChange} from '../lib/project-todos'
+import {compareTodoDueDate,isTodoOverdue,todoTodayInJapan,definiteTodoRejection,loadProjectTodos,parseProjectTodo,saveProjectTodo,validateTodoChange,type ProjectTodo,type TodoChange} from '../lib/project-todos'
 import './ProjectTodoPanel.css'
 
 const errorText=(e:unknown)=>e instanceof Error?e.message:typeof e==='object'&&e&&'message'in e?String(e.message):'通信に失敗しました。'
@@ -12,6 +12,7 @@ export function ProjectTodoPanel({projectId,readOnly=false,initialCompleted=fals
  const [dueDate,setDueDate]=useState(''),[draftDueDate,setDraftDueDate]=useState('')
  const [error,setError]=useState(''),[notice,setNotice]=useState(''),[pending,setPending]=useState<TodoChange|null>(null),[retry,setRetry]=useState(false)
  const [showCompleted,setShowCompleted]=useState(initialCompleted)
+ const [today,setToday]=useState(todoTodayInJapan)
  const mounted=useRef(false),lock=useRef(false),readVersion=useRef(0)
  useEffect(()=>{
   mounted.current=true;const version=++readVersion.current;setReady(false);setError('')
@@ -19,6 +20,10 @@ export function ProjectTodoPanel({projectId,readOnly=false,initialCompleted=fals
    .catch(e=>{if(mounted.current&&readVersion.current===version)setError(`Todoを読み込めませんでした。${errorText(e)}`)})
   return()=>{mounted.current=false;readVersion.current++}
  },[projectId,load])
+ useEffect(()=>{
+  const timer=setInterval(()=>setToday(todoTodayInJapan()),60_000)
+  return()=>clearInterval(timer)
+ },[])
  async function reload(){
   if(lock.current)return;lock.current=true;setBusy(true);setError('');setNotice('')
   try{
@@ -58,7 +63,7 @@ export function ProjectTodoPanel({projectId,readOnly=false,initialCompleted=fals
      <label>タスクを編集<textarea className="form-input" autoFocus rows={2} required maxLength={2000} value={draft} disabled={disabled} onChange={e=>setDraft(e.target.value)}/></label>
      <label>期日（任意）<input className="form-input" type="date" min="0001-01-01" max="9999-12-31" value={draftDueDate} disabled={disabled} onChange={e=>setDraftDueDate(e.target.value)}/></label>
      <div className="project-todo-actions"><button type="submit" className="btn btn-main btn-sm" disabled={disabled||!draft.trim()}>保存</button><button type="button" className="btn btn-sub btn-sm" disabled={disabled} onClick={()=>{setEditing(null);setDraft('');setDraftDueDate('')}}>キャンセル</button></div>
-    </form>:<span className={completed?'project-todo-done':''}>{t.content}</span>}</td><td className="project-todo-date">{t.due_date??'—'}</td>{completed&&<td className="project-todo-date">{day(t.completed_at!)}</td>}<td>
+    </form>:<span className={completed?'project-todo-done':''}>{t.content}</span>}</td><td className={`project-todo-date${isTodoOverdue(t,today)?' project-todo-overdue':''}`}>{t.due_date??'—'}{isTodoOverdue(t,today)&&<span className="project-todo-overdue-label">期限超過</span>}</td>{completed&&<td className="project-todo-date">{day(t.completed_at!)}</td>}<td>
      <div className="project-todo-actions"><button className="btn btn-sub btn-sm" type="button" disabled={disabled||!!editing} onClick={()=>void write({id:t.id,projectId,revision:t.revision,content:t.content,completed:!t.is_completed,dueDate:t.due_date??null})}>{completed?'未完了に戻す':'完了にする'}</button>
      <button className="btn btn-sub btn-sm" type="button" disabled={disabled||!!editing} onClick={()=>{setEditing(t.id);setDraft(t.content);setDraftDueDate(t.due_date??'');setError('');setNotice('')}}>編集</button></div>
     </td></tr>)}

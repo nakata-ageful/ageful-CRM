@@ -1,0 +1,17 @@
+.meti-import{display:flex;flex-direction:column;gap:12px;min-width:0}
+.meti-import-heading,.meti-file-row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.meti-file-row{align-items:flex-end}.meti-file-row .meti-file{min-width:0}
+.meti-file{display:flex;flex-direction:column;gap:6px;font-weight:600}
+.meti-import small{font-size:12px;color:#64748b;line-height:1.5}
+.meti-import-heading span{color:#64748b}.meti-identity{display:flex;align-items:center;flex-wrap:wrap;gap:6px 16px;padding:10px 12px;background:#f1f5f9;border-radius:8px}
+.meti-identity strong{flex-basis:100%;font-size:13px;color:#9a3412}.meti-error{color:#b91c1c;background:#fef2f2;padding:10px;border-radius:6px;overflow-wrap:anywhere}
+.meti-instruction{margin:0;font-weight:600}.meti-comparison{border:1px solid #e2e8f0;border-radius:8px;overflow:hidden}
+.meti-compare-row,.meti-compare-head{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.5fr);gap:12px;padding:12px;border-bottom:1px solid #e2e8f0;align-items:start}
+.meti-compare-row:last-child{border-bottom:0}.meti-compare-head{background:#f8fafc;font-weight:600}
+.meti-compare-row>label:first-child{display:flex;gap:7px;align-items:flex-start;font-weight:600;flex-wrap:wrap}.meti-compare-row input[type=checkbox],.meti-confirm input{width:17px;height:17px;flex-shrink:0;margin:2px 0;accent-color:#0ea5e9}
+.meti-current{white-space:pre-wrap;overflow-wrap:anywhere;color:#475569}.meti-extracted{display:flex;flex-direction:column;gap:6px;min-width:0;overflow-wrap:anywhere}.meti-extracted label{display:flex;flex-direction:column;gap:5px}
+.meti-extracted .form-input{width:100%;min-width:0;box-sizing:border-box;resize:vertical}.meti-mobile-label{display:none}
+.meti-confirm{display:flex;gap:8px;align-items:flex-start;padding:10px 0}.meti-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+@media(max-width:700px){.meti-compare-head{display:none}.meti-compare-row{grid-template-columns:1fr;gap:8px}.meti-current:before{content:'現在：';color:#64748b}.meti-mobile-label{display:block;color:#64748b;font-size:12px}.meti-actions{position:sticky;bottom:-16px;background:white;padding:12px 0}.meti-import-heading{align-items:flex-start;flex-direction:column}}
+
+@media(max-width:700px){.modal-box:has(.meti-import){max-height:calc(100dvh - 32px)}.modal-box:has(.meti-import) .modal-body{padding:14px}.meti-file input{max-width:100%}.meti-actions .btn{white-space:nowrap}}

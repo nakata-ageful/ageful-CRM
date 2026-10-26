@@ -1,10 +1,18 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import {readFileSync} from 'node:fs'
+import {readFileSync,cpSync,mkdirSync} from 'node:fs'
 import {fileURLToPath} from 'node:url'
 
 export default defineConfig(({mode})=>({
-  plugins: [react(),...(mode==='operator-demo'?[{name:'isolate-full-app-demo',enforce:'pre' as const,
+  plugins: [react(),{
+    name:'local-pdf-resources',
+    configureServer(server){server.middlewares.use((req,res,next)=>{
+      const match=req.url?.match(/^\/pdf-resources\/cmaps\/([A-Za-z0-9_-]+\.bcmap)$/)
+      if(!match)return next()
+      try{res.setHeader('Content-Type','application/octet-stream');res.end(readFileSync(new URL(`./node_modules/pdfjs-dist/cmaps/${match[1]}`,import.meta.url)))}catch{res.statusCode=404;res.end()}
+    })},
+    writeBundle(options){const out=options.dir??'dist';mkdirSync(`${out}/pdf-resources`,{recursive:true});cpSync(new URL('./node_modules/pdfjs-dist/cmaps',import.meta.url),`${out}/pdf-resources/cmaps`,{recursive:true})},
+  },...(mode==='operator-demo'?[{name:'isolate-full-app-demo',enforce:'pre' as const,
     resolveId(id:string){if(/(?:^|\/)supabase(?:\.ts)?$/.test(id))return fileURLToPath(new URL('./src/dev/full-demo-supabase.ts',import.meta.url));
       if(/(?:^|\/)billing-runtime(?:\.ts)?$/.test(id))return fileURLToPath(new URL('./src/dev/full-demo-runtime.ts',import.meta.url))}
   }]:[]),...(mode==='rehearsal'?[{name:'deny-real-actions',enforce:'pre' as const,

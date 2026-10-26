@@ -57,6 +57,7 @@ function fmtFormNum(v: string | number | null | undefined): string {
 }
 import { useToast } from '../components/Toast'
 import {ProjectTodoPanel} from '../components/ProjectTodoPanel'
+import {MetiCertificateImport} from '../components/MetiCertificateImport'
 
 
 /** カーソルを合わせる（スマホはタップ）と説明の吹き出しが出る「?」インフォマーク */
@@ -166,6 +167,7 @@ function writeTabToHash(t: Tab) {
 
 export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, onViewMaintenance,billingHistory,onSaveInvoice,onCheckBillingPending,onSavePeriod,onAddSchedule,onAddRoutine,onOwnershipTransfer,billingUnits,onAddDebit,onSaveBillingPlan,managementTools,changeHistory,billingCycleSettings,onRecordRemoval,ownershipStatus,onViewCanonicalProject,canonicalProjectName }: Props) {
   const toast = useToast()
+  const [certificateOpen,setCertificateOpen]=useState(false)
   const [scheduleReview,setScheduleReview]=useState<ScheduleDateReview|null>(null)
   const [scheduleFailure,setScheduleFailure]=useState('')
   const [scheduleOutcome,setScheduleOutcome]=useState<ScheduleChangeSaveError|null>(null)
@@ -839,6 +841,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       </div>
 
       {/* ── 基本情報タブ ── */}
+      {certificateOpen&&<MetiCertificateImport project={project} customer={customer} onClose={()=>setCertificateOpen(false)} onSaved={()=>{setCertificateOpen(false);toast('選んだ項目を反映しました');onReload()}}/>}
       {tab === '基本情報' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {/* 中項目: 概要 */}
@@ -862,7 +865,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           <div className="card">
             <div className="card-header-row">
               <h3 className="section-title" style={{ margin: 0 }}>経済産業省</h3>
-              {!readOnly&&<button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('meti')}>編集</button>}
+              {!readOnly&&<div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className="btn btn-sub btn-sm" onClick={()=>setCertificateOpen(true)}>PDFを読み込む</button><button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('meti')}>編集</button></div>}
             </div>
             <div className="info-grid">
               <div className="info-field"><span>設備ID</span><b>{project.grid_id ?? '-'}</b></div>

@@ -6,7 +6,7 @@ function env(options={}){
  let destroyCount=0,created=0,cleaned=0,reads=0,timer,cleared=false,parsed=0,terminated=0,cleanupTimer
  const fakePage={getTextContent:()=>options.textPending?pending():Promise.resolve({items:options.items??[{str:'text',transform:[1,0,0,1,50,60],width:100}]}),cleanup(){cleaned++}}
  const task={promise:options.documentPending?pending():Promise.resolve({numPages:options.pages??2,getPage:()=>Promise.resolve(fakePage)}),destroy:()=>{destroyCount++;return options.destroyPending?pending():Promise.resolve()}}
- const fakePdf={PDFWorker:class{destroy(){}},getDocument(){created++;return task}}
+ const fakePdf={PDFWorker:class{static create(){return new this()}destroy(){}},getDocument(){created++;return task}}
  const m={exports:{}}
  vm.runInNewContext(code,{module:m,exports:m.exports,Error,Promise,TextDecoder,Uint8Array,location:{origin:'http://local.invalid'},
   Worker:class{terminate(){terminated++}},setTimeout(fn,ms){if(ms===45000)timer=fn;else{assert.equal(ms,1000);cleanupTimer=fn}return 1},clearTimeout(){cleared=true},

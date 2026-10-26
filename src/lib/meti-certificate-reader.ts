@@ -23,7 +23,7 @@ export async function readCertificate(file:File,signal:AbortSignal,onProgress:(s
     const port=new Worker(worker.default,{type:'module'})
     let engineWorker:InstanceType<typeof pdfjs.PDFWorker>|undefined,disposed=false
     forceStop=()=>{if(disposed)return;disposed=true;engineWorker?.destroy();port.terminate()}
-    engineWorker=new pdfjs.PDFWorker({port})
+    engineWorker=pdfjs.PDFWorker.create({port})
     const task=pdfjs.getDocument({data:bytes,worker:engineWorker,cMapUrl:`${location.origin}/pdf-resources/cmaps/`,cMapPacked:true,stopAtErrors:true})
     let destroyed:Promise<void>|undefined
     destroy=()=>destroyed??(destroyed=task.destroy().finally(()=>forceStop?.()))

@@ -5,7 +5,7 @@ export const contractSectionKeys = {
   'equipment-contract': ['equipment_contract_date', 'sales_to_neosys', 'neosys_to_referrer', 'equipment_contract_notes'],
   'land-contract': ['land_contract_date', 'land_contract_notes'],
   'maintenance-contract': ['maintenance_contractor', 'annual_maintenance_ex', 'annual_maintenance_inc',
-    'maintenance_contract_date', 'maintenance_start_date', 'maintenance_contract_notes'],
+    'maintenance_contract_date', 'maintenance_start_date', 'maintenance_period_start_memo_date', 'maintenance_contract_notes'],
   'maintenance-content': ['plan_weeding', 'plan_inspection', 'plan_emergency', 'land_cost_monthly',
     'local_association_fee', 'communication_fee', 'insurance_fee', 'other_fee', 'has_meti_setup_report',
     'has_meti_periodic_report', 'meti_setup_report_date', 'meti_setup_report_status', 'maintenance_content_notes'],

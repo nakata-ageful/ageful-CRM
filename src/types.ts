@@ -130,6 +130,8 @@ export type Contract = {
   subcontract_billing_day: string | null
   subcontract_start_date: string | null
   maintenance_start_date: string | null
+  /** Independent date memo only; never an anchor for billing/maintenance periods. */
+  maintenance_period_start_memo_date?: string | null
   maintenance_contractor: string | null  // 受託会社
   // 保守プラン
   plan_inspection: MaintenancePlanLevel | null  // 点検

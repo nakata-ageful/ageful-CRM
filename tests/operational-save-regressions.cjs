@@ -7,15 +7,17 @@ function fn(file,name){const source=ts.createSourceFile(file,fs.readFileSync(pat
 function load(file){const module={exports:{}};vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(root,file),'utf8'),{
  compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText,{module,exports:module.exports});return module.exports;}
 const {contractSectionPatch,contractSectionKeys}=load('src/lib/contract-section-patch.ts');
+const {maintenanceMemoPayload}=loadMemo();
+function loadMemo(){const m={exports:{}};vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(root,'src/lib/maintenance-period-memo.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{module:m,exports:m.exports,require:()=>({isBillingDate:()=>true})});return m.exports}
 async function main(){
  const original={billing_method:'口座振替',billing_count:12,billing_schedule_days:['10日'],billing_amount_overrides:{2:100},billing_item_flags:{insurance:false},
   ownership_transfer_date:'2026-09-01',subcontract_notes:'変更前',subcontract_billing_day:'12月1日',notes:'請求の備考'};
  for(const section of Object.keys(contractSectionKeys)){
   let saved;const form=new Proxy({...original,billing_count:'12',subcontract_notes:'備考だけ変更'},{get:(t,k)=>k in t?t[k]:''});
   const context={readOnly:false,editSection:section,PROJECT_SECTIONS:[],CONTRACT_SECTIONS:Object.keys(contractSectionKeys),projForm:{},contractForm:form,contract:{id:1},
-   contractSectionPatch,sectionSaveLock:{current:false},scheduleFailure:'',billingHistory:undefined,onCheckBillingPending:undefined,setScheduleReview(){},ScheduleChangeSaveError:class extends Error{},setSaving(){},setErr(e){if(e)throw Error(e)},setEditSection(){},onReload(){},toast(){},updateContract:async(id,p)=>{assert.equal(id,1);saved=p}};
+   contractSectionPatch,maintenanceMemoPayload,sectionSaveLock:{current:false},scheduleFailure:'',billingHistory:undefined,onCheckBillingPending:undefined,setScheduleReview(){},ScheduleChangeSaveError:class extends Error{},setSaving(){},setErr(e){if(e)throw Error(e)},setEditSection(){},onReload(){},toast(){},updateContract:async(id,p)=>{assert.equal(id,1);saved=p}};
   vm.createContext(context);vm.runInContext(fn('src/views/ProjectDetail.tsx','handleSaveSection')+';globalThis.run=handleSaveSection',context);await context.run();
-  assert.deepEqual(Object.keys(saved).sort(),[...contractSectionKeys[section]].sort());
+  assert.deepEqual(Object.keys(saved).sort(),[...contractSectionKeys[section]].filter(k=>k!=='maintenance_period_start_memo_date').sort());
   if(section!=='billing')for(const k of ['billing_method','billing_schedule_days','billing_count','billing_item_flags','billing_amount_overrides','notes'])assert(!Object.hasOwn(saved,k),`${section} resubmitted ${k}`);
   else assert.deepEqual(JSON.parse(JSON.stringify(saved.billing_schedule_days)),['10日']);
   assert(!Object.hasOwn(saved,'ownership_transfer_date'));

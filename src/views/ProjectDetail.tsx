@@ -13,6 +13,8 @@ import { getBillingDetail } from '../lib/data'
 import { hasSupabaseEnv } from '../lib/supabase'
 import { BASIC_NOTE_KEYS } from '../lib/project-basic-notes'
 import { contractSectionPatch } from '../lib/contract-section-patch'
+import {maintenanceMemoPayload,maintenanceMemoReady} from '../lib/maintenance-period-memo'
+import {MaintenancePeriodMemoField} from '../components/MaintenancePeriodMemoField'
 import { BILLING_ITEMS, annualBillableTotalInc } from '../lib/billing'
 import { StatusBadge } from '../components/StatusBadge'
 import { Modal } from '../components/Modal'
@@ -347,6 +349,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
     subcontract_billing_day: contract?.subcontract_billing_day ?? '',
     subcontract_start_date: contract?.subcontract_start_date ?? '',
     maintenance_start_date: contract?.maintenance_start_date ?? '',
+    maintenance_period_start_memo_date: contract?.maintenance_period_start_memo_date ?? '',
     plan_inspection: contract?.plan_inspection ?? '',
     plan_weeding: contract?.plan_weeding ?? '',
     plan_emergency: contract?.plan_emergency ?? '',
@@ -548,6 +551,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
         subcontract_billing_day: contractForm.subcontract_billing_day || null,
         subcontract_start_date: contractForm.subcontract_start_date || null,
         maintenance_start_date: contractForm.maintenance_start_date || null,
+        ...maintenanceMemoPayload(contract,contractForm.maintenance_period_start_memo_date),
         plan_inspection: (contractForm.plan_inspection || null) as MaintenancePlanLevel | null,
         plan_weeding: (contractForm.plan_weeding || null) as MaintenancePlanLevel | null,
         plan_emergency: (contractForm.plan_emergency || null) as MaintenancePlanLevel | null,
@@ -671,6 +675,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
         subcontract_billing_day: contract.subcontract_billing_day ?? '',
         subcontract_start_date: contract.subcontract_start_date ?? '',
         maintenance_start_date: contract.maintenance_start_date ?? '',
+        maintenance_period_start_memo_date: contract.maintenance_period_start_memo_date ?? '',
         plan_inspection: contract.plan_inspection ?? '',
         plan_weeding: contract.plan_weeding ?? '',
         plan_emergency: contract.plan_emergency ?? '',
@@ -750,6 +755,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           subcontract_billing_day: contractForm.subcontract_billing_day || null,
           subcontract_start_date: contractForm.subcontract_start_date || null,
           maintenance_start_date: contractForm.maintenance_start_date || null,
+          ...maintenanceMemoPayload(contract,contractForm.maintenance_period_start_memo_date),
           plan_inspection: (contractForm.plan_inspection || null) as MaintenancePlanLevel | null,
           plan_weeding: (contractForm.plan_weeding || null) as MaintenancePlanLevel | null,
           plan_emergency: (contractForm.plan_emergency || null) as MaintenancePlanLevel | null,
@@ -992,7 +998,8 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
               <div className="info-field"><span>年次保守料（税別）</span><b>{fmtYen(contract?.annual_maintenance_ex)}</b></div>
               <div className="info-field"><span>年次保守料（税込）</span><b>{fmtYen(contract?.annual_maintenance_inc)}</b></div>
               <div className="info-field"><span>保守契約日</span><b>{contract?.maintenance_contract_date ?? '-'}</b></div>
-              <div className="info-field"><span>保守開始日</span><b>{contract?.maintenance_start_date ?? '-'}</b></div>
+              <div className="info-field"><span>保守契約開始日</span><b>{contract?.maintenance_start_date ?? '-'}</b></div>
+              <div className="info-field" title="独立した日付メモです。請求や保守期間の計算には使用しません。"><span>保守期間開始日</span><b>{contract?.maintenance_period_start_memo_date || '-'}</b></div>
               <div className="info-field" style={{ gridColumn: '1/-1' }}><span>備考</span><b style={{ whiteSpace: 'pre-wrap' }}>{contract?.maintenance_contract_notes || '-'}</b></div>
             </div>
           </div>
@@ -1285,7 +1292,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                   <span style={{ fontSize: 12, color: '#64748b' }}>駆けつけ 契約: {contract.plan_emergency}</span>
                 )}
                 {contract?.maintenance_start_date && (
-                  <span style={{ fontSize: 12, color: '#64748b' }}>保守開始日: {contract.maintenance_start_date}</span>
+                  <span style={{ fontSize: 12, color: '#64748b' }}>保守契約開始日: {contract.maintenance_start_date}</span>
                 )}
               </div>
               <button className="btn btn-main btn-sm" disabled={readOnly} onClick={() => { if(readOnly)return;setMrForm({ inquiry_date: '', occurrence_date: '', target_area: '', serial_number: '', situation: '', response_content: '', report: '' }); setErr(''); setMrModal(true) }}>
@@ -1623,9 +1630,10 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
             </label>
             <p style={{ gridColumn: '1/-1', margin: '8px 0 4px', fontWeight: 600, fontSize: 13, color: '#475569' }}>── 保守委託情報</p>
             <label className="form-label">
-              保守開始日
+              保守契約開始日
               <input className="form-input" type="date" {...dateInputRange()} value={contractForm.maintenance_start_date} onChange={e => setContractForm(f => ({ ...f, maintenance_start_date: e.target.value }))} />
             </label>
+            <MaintenancePeriodMemoField value={contractForm.maintenance_period_start_memo_date} ready={maintenanceMemoReady(contract)} onChange={value=>setContractForm(f=>({...f,maintenance_period_start_memo_date:value}))}/>
             <label className="form-label">
               保守委託先
               <input className="form-input" value={contractForm.subcontractor} onChange={e => setContractForm(f => ({ ...f, subcontractor: e.target.value }))} />
@@ -2209,9 +2217,10 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
                   <input className="form-input" type="date" {...dateInputRange()} value={contractForm.maintenance_contract_date} onChange={e => setContractForm(f => ({ ...f, maintenance_contract_date: e.target.value }))} />
                 </label>
                 <label className="form-label">
-                  保守開始日
+                  保守契約開始日
                   <input className="form-input" type="date" {...dateInputRange()} value={contractForm.maintenance_start_date} onChange={e => setContractForm(f => ({ ...f, maintenance_start_date: e.target.value }))} />
                 </label>
+                <MaintenancePeriodMemoField value={contractForm.maintenance_period_start_memo_date} ready={maintenanceMemoReady(contract)} onChange={value=>setContractForm(f=>({...f,maintenance_period_start_memo_date:value}))}/>
                 <label className="form-label" style={{ gridColumn: '1/-1' }}>
                   備考
                   <textarea className="form-input" rows={4} value={contractForm.maintenance_contract_notes} onChange={e => setContractForm(f => ({ ...f, maintenance_contract_notes: e.target.value }))} style={{ resize: 'vertical' }} />

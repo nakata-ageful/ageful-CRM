@@ -14,6 +14,8 @@ export const contractFieldKinds = {
   land_contract_date:'date', maintenance_contract_date:'date', sales_to_neosys:'text', neosys_to_referrer:'text',
   contractor_name:'text', billing_count:'number', subcontractor:'text', subcontract_fee_ex:'number',
   subcontract_fee_inc:'number', subcontract_billing_day:'text', subcontract_start_date:'date',
+  // Standalone memo is kept in snapshots, never changed by the transfer wizard.
+  maintenance_period_start_memo_date:'protected',
   maintenance_start_date:'date', maintenance_contractor:'text', plan_inspection:'text', plan_weeding:'text',
   plan_emergency:'text', notes:'text', equipment_contract_notes:'text', land_contract_notes:'text',
   maintenance_contract_notes:'text', maintenance_content_notes:'text', subcontract_notes:'text',

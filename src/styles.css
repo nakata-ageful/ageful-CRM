@@ -340,9 +340,10 @@ body {
 /* ── Dashboard 2-column grid ─────────────────────────────── */
 .dash-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
 }
+.dash-grid > * { min-width: 0; }
 .dashboard-todos { grid-column:1 / -1;min-width:0; }
 .dashboard-todos .section-title { margin:0; }
 .dashboard-todos .filter-tabs { width:fit-content;max-width:100%;margin-bottom:14px; }
@@ -761,7 +762,7 @@ input[type="number"] {
   .card { padding: 16px; }
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
   .row-2col { grid-template-columns: 1fr; }
-  .dash-grid { grid-template-columns: 1fr; }
+  .dash-grid { grid-template-columns: minmax(0, 1fr); }
   .info-grid { grid-template-columns: 1fr; }
   .form-grid { grid-template-columns: 1fr; }
   .toolbar > .search-input { flex-basis: 100%; max-width: none; }

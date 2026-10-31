@@ -10,7 +10,7 @@ function env(options={}){
  const m={exports:{}}
  vm.runInNewContext(code,{module:m,exports:m.exports,Error,Promise,TextDecoder,Uint8Array,location:{origin:'http://local.invalid'},
   Worker:class{terminate(){terminated++}},setTimeout(fn,ms){if(ms===120000)timer=fn;else{assert.equal(ms,1000);cleanupTimer=fn}return 1},clearTimeout(){cleared=true},
-  require(name){if(name==='pdfjs-dist')return options.importPending?pending():fakePdf;if(name.includes('pdf.worker'))return{default:'/local-worker.mjs'};if(name==='./power-contract-ocr')return{createPowerOcr(){throw Error('synthetic OCR unavailable')}};if(name==='./power-contract')return{parsePowerContract(items){parsed++;if(options.parseError)throw Error('unsupported form');return{count:items.length}}};throw Error(name)}
+  require(name){if(name==='pdfjs-dist')return options.importPending?pending():fakePdf;if(name.includes('pdf.worker'))return{default:'/local-worker.mjs'};if(name==='./power-contract-table')return{powerTableRows:()=>[]};if(name==='./power-contract-ocr')return{createPowerOcr(){throw Error('synthetic OCR unavailable')}};if(name==='./power-contract')return{parsePowerContract(items){parsed++;if(options.parseError)throw Error('unsupported form');return{count:items.length}}};throw Error(name)}
  })
  const file={name:options.name??'test.pdf',size:options.size??128,arrayBuffer:()=>{reads++;return options.filePending?pending():Promise.resolve(new TextEncoder().encode(options.badHeader?'not pdf':'%PDF-1.7\n').buffer)}}
  const controller=new AbortController()

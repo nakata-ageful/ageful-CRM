@@ -23,15 +23,16 @@
     "test:billing-cycle": "node tests/billing-cycle.cjs && node tests/billing-alert-safety.cjs && node tests/billing-cycle-postgres.mjs",
     "test:operational-fixes": "node tests/operational-save-regressions.cjs && node tests/atomic-project-create-postgres.mjs && node tests/normal-billing-views.cjs",
     "test:billing-runtime": "node tests/ownership-field-selection.cjs && node tests/billing-item-selection.cjs && node tests/management-lifecycle.cjs && node tests/maintenance-schedule.cjs && node tests/maintenance-period-label.cjs && node tests/maintenance-period-review.cjs && node tests/saved-maintenance-period.cjs && node tests/future-schedule-review.cjs && node tests/legacy-schedule-setup.cjs && node tests/normal-billing-views.cjs && node tests/cutover-manifest.cjs && node tests/billing-runtime-rehearsal.cjs && node tests/project-search.cjs",
-    "test:power-contract": "node tests/power-contract.cjs && node tests/power-contract-close.cjs && node tests/power-contract-reader.cjs && node tests/power-contract-ocr.cjs && node tests/power-contract-postgres.mjs"
+    "test:power-contract": "node tests/power-contract.cjs && node tests/power-contract-table.cjs && node tests/power-contract-close.cjs && node tests/power-contract-reader.cjs && node tests/power-contract-ocr.cjs && node tests/power-contract-postgres.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
+    "@tesseract.js-data/eng": "1.0.0",
+    "@tesseract.js-data/jpn": "1.0.0",
     "pdfjs-dist": "6.4.299",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "tesseract.js": "7.0.0",
-    "@tesseract.js-data/jpn": "1.0.0"
+    "tesseract.js": "7.0.0"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",

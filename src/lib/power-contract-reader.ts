@@ -1,6 +1,7 @@
 import type {CertificateText} from './meti-certificate'
 import {parsePowerContract} from './power-contract'
 import {createPowerOcr} from './power-contract-ocr'
+import {powerTableRows} from './power-contract-table'
 
 const stopped=()=>new Error('PDFの読み込みを中止しました。')
 /** File bytes stay in this browser. Parsing runs in PDF.js's worker, created
@@ -51,7 +52,8 @@ export async function readPowerContract(file:File,signal:AbortSignal,onProgress:
             const context=canvas.getContext('2d');if(!context)throw Error('このブラウザーでは画像を読み取れません。')
             await wait(page.render({canvasContext:context,canvas,viewport}).promise)
             const blob=await wait(new Promise<Blob>((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(Error('画像を読み取れませんでした。')),'image/png')))
-            const extracted=await wait(ocr.read(new Uint8Array(await wait(blob.arrayBuffer())),n,canvas.height,scale))
+            const cells=powerTableRows(context.getImageData(0,0,canvas.width,canvas.height),scale)
+            const extracted=await wait(ocr.read(new Uint8Array(await wait(blob.arrayBuffer())),n,canvas.height,scale,cells))
             if(extracted.length+items.length>20000)throw Error('PDFの情報量が多すぎます。')
             items.push(...extracted)
           }finally{canvas.width=0;canvas.height=0}

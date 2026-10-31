@@ -6,6 +6,7 @@ import {fileURLToPath} from 'node:url'
 const ocrAssets:Record<string,string>={
  'worker.min.js':'tesseract.js/dist/worker.min.js',
  'jpn.traineddata.gz':'@tesseract.js-data/jpn/4.0.0_best_int/jpn.traineddata.gz',
+ 'eng.traineddata.gz':'@tesseract.js-data/eng/4.0.0_best_int/eng.traineddata.gz',
  ...Object.fromEntries(['tesseract-core-lstm','tesseract-core-simd-lstm','tesseract-core-relaxedsimd-lstm'].flatMap(n=>['wasm.js','wasm'].map(ext=>[`core/${n}.${ext}`,`tesseract.js-core/${n}.${ext}`]))),
 }
 

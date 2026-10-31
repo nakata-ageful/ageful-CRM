@@ -59,6 +59,7 @@ function fmtFormNum(v: string | number | null | undefined): string {
 }
 import { useToast } from '../components/Toast'
 import {ProjectTodoPanel} from '../components/ProjectTodoPanel'
+import {PowerContractImport} from '../components/PowerContractImport'
 import {MetiCertificateImport} from '../components/MetiCertificateImport'
 
 
@@ -170,6 +171,7 @@ function writeTabToHash(t: Tab) {
 export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, onViewMaintenance,billingHistory,onSaveInvoice,onCheckBillingPending,onSavePeriod,onAddSchedule,onAddRoutine,onOwnershipTransfer,billingUnits,onAddDebit,onSaveBillingPlan,managementTools,changeHistory,billingCycleSettings,onRecordRemoval,ownershipStatus,onViewCanonicalProject,canonicalProjectName }: Props) {
   const toast = useToast()
   const [certificateOpen,setCertificateOpen]=useState(false)
+  const [powerContractOpen,setPowerContractOpen]=useState(false)
   const [scheduleReview,setScheduleReview]=useState<ScheduleDateReview|null>(null)
   const [scheduleFailure,setScheduleFailure]=useState('')
   const [scheduleOutcome,setScheduleOutcome]=useState<ScheduleChangeSaveError|null>(null)
@@ -843,6 +845,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       </div>
 
       {/* ── 基本情報タブ ── */}
+      {powerContractOpen&&<PowerContractImport project={project} customer={customer} onClose={()=>setPowerContractOpen(false)} onSaved={()=>{setPowerContractOpen(false);toast('選んだ項目を反映しました');onReload()}}/>}
       {certificateOpen&&<MetiCertificateImport project={project} customer={customer} onClose={()=>setCertificateOpen(false)} onSaved={()=>{setCertificateOpen(false);toast('選んだ項目を反映しました');onReload()}}/>}
       {tab === '基本情報' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -880,7 +883,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           <div className="card">
             <div className="card-header-row">
               <h3 className="section-title" style={{ margin: 0 }}>電力会社</h3>
-              {!readOnly&&<button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('power-company')}>編集</button>}
+              {!readOnly&&<div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className="btn btn-sub btn-sm" onClick={()=>setPowerContractOpen(true)}>PDFを読み込む</button><button className="btn btn-sub btn-sm" onClick={() => openSectionEdit('power-company')}>編集</button></div>}
             </div>
             <div className="info-grid">
               <div className="info-field"><span>受給地点番号</span><b>{project.generation_point_id ?? '-'}</b></div>

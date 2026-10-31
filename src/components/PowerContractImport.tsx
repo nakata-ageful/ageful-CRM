@@ -1,4 +1,4 @@
-import {useEffect,useRef,useState} from 'react'
+import {useEffect,useLayoutEffect,useRef,useState} from 'react'
 import type {Customer,Project} from '../types'
 import {Modal} from './Modal'
 import {FormError} from './FormError'
@@ -12,13 +12,34 @@ export function PowerContractImport({project,customer,onClose,onSaved}:{project:
  const [data,setData]=useState<PowerContractData|null>(null),[pdfUrl,setPdfUrl]=useState(''),[selected,setSelected]=useState<Set<string>>(new Set()),[confirmed,setConfirmed]=useState(false)
  const [busy,setBusy]=useState(false),[saving,setSaving]=useState(false),[progress,setProgress]=useState(''),[error,setError]=useState(''),[pending,setPending]=useState<PowerContractRequest|null>(null)
  const reader=useRef<AbortController|null>(null),lock=useRef(false)
+ const [closeConfirm,setCloseConfirm]=useState(false)
+ const original=useRef<PowerContractData|null>(null),form=useRef<HTMLDivElement|null>(null)
+ const returnTo=useRef<{focus:HTMLElement|null;scrollTop:number}|null>(null)
+ const edited=!!data&&!!original.current&&(powerFields.some(f=>data[f.source]!==original.current![f.source])||data.notes!==original.current.notes)
+ const hasDraft=edited||selected.size>0||confirmed||!!pending
+ useLayoutEffect(()=>{
+  if(closeConfirm||!returnTo.current)return
+  const previous=returnTo.current;returnTo.current=null
+  const body=form.current?.closest('.modal-body')
+  if(body instanceof HTMLElement)body.scrollTop=previous.scrollTop
+  if(previous.focus?.isConnected)previous.focus.focus({preventScroll:true})
+ },[closeConfirm])
+ function requestClose(){
+  if(lock.current)return
+  // Escape, background and the header X dismiss only the confirmation itself.
+  if(closeConfirm){setCloseConfirm(false);return}
+  if(!hasDraft){onClose();return}
+  const body=form.current?.closest('.modal-body'),box=form.current?.closest('.modal-box'),active=document.activeElement
+  returnTo.current={focus:active instanceof HTMLElement&&box?.contains(active)?active:null,scrollTop:body?.scrollTop??0}
+  setCloseConfirm(true)
+ }
  useEffect(()=>()=>reader.current?.abort(),[])
  useEffect(()=>()=>{if(pdfUrl)URL.revokeObjectURL(pdfUrl)},[pdfUrl])
  async function read(file:File|undefined){
   if(!file||busy||saving||pending)return
   reader.current?.abort();const c=new AbortController();reader.current=c
-  setBusy(true);setError('');setData(null);setSelected(new Set());setConfirmed(false);setPdfUrl('');setProgress('PDFを読み込み中…')
-  try{const {readPowerContract}=await import('../lib/power-contract-reader');const result=await readPowerContract(file,c.signal,setProgress);if(!c.signal.aborted){setData(result);setPdfUrl(URL.createObjectURL(file))}}
+  original.current=null;setBusy(true);setError('');setData(null);setSelected(new Set());setConfirmed(false);setPdfUrl('');setProgress('PDFを読み込み中…')
+  try{const {readPowerContract}=await import('../lib/power-contract-reader');const result=await readPowerContract(file,c.signal,setProgress);if(!c.signal.aborted){original.current=result;setData(result);setPdfUrl(URL.createObjectURL(file))}}
   catch(e){if(!c.signal.aborted)setError(e instanceof Error?e.message:'PDFを読み込めませんでした。元のPDFをご確認ください。')}
   finally{if(!c.signal.aborted)setBusy(false)}
  }
@@ -31,7 +52,7 @@ export function PowerContractImport({project,customer,onClose,onSaved}:{project:
  const customerName=customer?customerDisplayName(customer):'所有者未登録'
  const mismatch=data&&((data.businessName&&!certificateSame(customerName,data.businessName))||(project.grid_id&&data.gridId&&!certificateSame(project.grid_id,data.gridId)))
  const fields=powerFields.filter(f=>data?.provider!=='kyushu'||!['grid_certified_at','power_supply_start_date'].includes(f.key))
- return <Modal title="電力会社の契約書PDFを読み込む" width={920} onClose={onClose} closeDisabled={saving}><div className="meti-import">
+ return <Modal title={closeConfirm?(pending?'保存結果を確認せずに閉じますか？':'保存せずに閉じますか？'):'電力会社の契約書PDFを読み込む'} width={closeConfirm?560:920} onClose={requestClose} closeDisabled={saving}><div ref={form} className="meti-import" style={closeConfirm?{display:'none'}:undefined}>
   <div className="meti-import-heading"><b>{project.plant_name||project.project_name}</b><span>顧客：{customerName}</span></div>
   <div className="meti-file-row"><label className="meti-file">電力会社の契約書<input type="file" accept="application/pdf,.pdf" disabled={busy||saving||!!pending} onChange={e=>void read(e.target.files?.[0])}/></label>{pdfUrl&&<a className="btn btn-sub btn-sm" href={pdfUrl} target="_blank" rel="noreferrer">元のPDFを開く</a>}</div>
   <small>端末内で読み取ります。チェックして「反映する」を押すまで登録内容は変わりません。</small>
@@ -48,6 +69,9 @@ export function PowerContractImport({project,customer,onClose,onSaved}:{project:
    </div>
    <label className="meti-confirm"><input type="checkbox" checked={confirmed} disabled={saving||!!pending} onChange={e=>setConfirmed(e.target.checked)}/>この発電所の書類であることと、選んだ項目の内容を確認しました</label>
   </>}
-  <div className="meti-actions"><button type="button" className="btn btn-sub" disabled={saving} onClick={onClose}>閉じる</button><button type="button" className="btn btn-main" disabled={busy||saving||!data||!confirmed||!selected.size} onClick={()=>void save()}>{saving?'保存中…':pending?'同じ内容で保存を再確認':selected.size?`選んだ${selected.size}項目を反映する`:'選んだ項目を反映する'}</button></div>
- </div></Modal>
+  <div className="meti-actions"><button type="button" className="btn btn-sub" disabled={saving} onClick={requestClose}>閉じる</button><button type="button" className="btn btn-main" disabled={busy||saving||!data||!confirmed||!selected.size} onClick={()=>void save()}>{saving?'保存中…':pending?'同じ内容で保存を再確認':selected.size?`選んだ${selected.size}項目を反映する`:'選んだ項目を反映する'}</button></div>
+ </div>{closeConfirm&&<div style={{display:'flex',flexDirection:'column',gap:16}}>
+  {pending?<><p style={{margin:0}}>保存が完了したか確認できていません。画面に戻り、同じ内容で保存を再確認できます。</p><p style={{margin:0}}>閉じても、すでに保存された内容は取り消されません。</p></>:<p style={{margin:0}}>手直しした内容やチェックした項目は、この画面を閉じると消えます。</p>}
+  <div className="meti-actions"><button type="button" className="btn btn-main" autoFocus onClick={()=>setCloseConfirm(false)}>{pending?'画面に戻る':'編集を続ける'}</button><button type="button" className="btn btn-sub" onClick={()=>{if(!lock.current)onClose()}}>{pending?'閉じる':'保存せずに閉じる'}</button></div>
+ </div>}</Modal>
 }

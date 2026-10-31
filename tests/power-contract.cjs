@@ -36,3 +36,22 @@ console.log('PASS: FIT rule and month rollover, tax conversion without rounding,
  assert.equal(d.gridId,'ZZ54321B98');assert.equal(d.pointId,'09-1111-2222-3333-4444-5555');assert.equal(d.changeDate,'2023-02-01');assert.equal(d.supplyStart,'');assert.equal(d.certifiedAt,'');assert.equal(d.fitMonth,'2039-03');assert.equal(d.fitPrice,'18');assert.match(d.notes,/49.5kW/);assert.match(d.notes,/60Hz/);assert.match(d.notes,/0800-111-2222/);assert.doesNotMatch(d.notes,/090-1111-2222/)
  console.log('PASS: Kyushu positional columns, crossed-out supply-date mapping, tax-exclusive price, FIT month, label OCR variation, utility/customer contact separation')
 }
+// New three-column scan, synthetic values: no transaction counter; customer
+// number is a separate row and must not become the generation-point number.
+{
+ const items=[];let y=800
+ const line=pairs=>{for(const [text,x]of pairs)items.push({text,x,y,width:30,page:1});y-=22}
+ line([['九州電力株式会社',50]]);line([['合成名前さま',50]]);line([['電力受給契約のご案内',50]])
+ line([['最大受電電力(発電出力)',50],['|',300],['認定ID',380]]);line([['49.000kW',60],['Z123456B78',390]])
+ line([['お客さま番号',50]]);line([['40-100-200-00-1234567-89',60]])
+ line([['受電地点特定番号',50]]);line([['09-2222-3333-4444-5555-6666',60]])
+ line([['受給開始日',50],['固定買取終了年月',220],['購入料金単価(注1)',400]])
+ line([['2024年5月8日',60],['2040年4月',230],['39.60円',410]])
+ const d=a.parsePowerContract(items,true)
+ assert.equal(d.gridId,'Z123456B78');assert.equal(d.pointId,'09-2222-3333-4444-5555-6666');assert.equal(d.changeDate,'2024-05-08');assert.equal(d.fitMonth,'2040-04');assert.equal(d.fitPrice,'36');assert.equal(d.supplyStart,'');assert.equal(d.certifiedAt,'')
+ for(const bad of ['XZ123456B78','Z123456B789','Z12345GB78','Z123456B78Z'])assert.equal(a.parsePowerContract(items.map(i=>i.text==='Z123456B78'?{...i,text:bad}:i),true).gridId,'','Do not extract an ID substring or repair OCR characters')
+ // Missing labels leave the associated value blank, rather than borrowing
+ // an adjacent month, the issue date, or another unrelated number.
+ for(const [label,key]of [['受給開始日','changeDate'],['固定買取終了年月','fitMonth'],['購入料金単価(注1)','fitPrice']])assert.equal(a.parsePowerContract(items.filter(i=>i.text!==label),true)[key],'')
+ console.log('PASS: three-column form, both complete ID families, customer/point separation, no adjacent-cell or malformed-ID guessing')
+}

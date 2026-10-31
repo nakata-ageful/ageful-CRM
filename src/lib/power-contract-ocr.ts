@@ -27,11 +27,25 @@ export function createPowerOcr(signal:AbortSignal,onProgress:(s:string)=>void){
   async read(image:Uint8Array,page:number,height:number,scale:number):Promise<CertificateText[]>{
    await job('setParameters',{params:{tessedit_pageseg_mode:'11'}})
    const result=await job('recognize',{image,options:{},output:{text:false,blocks:true}})
-   const lines=(result.blocks??[]).flatMap(b=>b.paragraphs.flatMap(p=>p.lines))
+   let lines=(result.blocks??[]).flatMap(b=>b.paragraphs.flatMap(p=>p.lines))
    const compact=(s:string)=>s.normalize('NFKC').replace(/\s/g,'')
    // A table rule can obscure decimal points or the first characters. Re-read
    // just these two labelled cells as single lines; accept only complete values.
    if(lines.some(l=>compact(l.words.map(w=>w.text).join('')).includes('九州電力'))){
+    // Sparse-text segmentation can omit almost an entire ruled table. The
+    // three-column form has no transaction-counter heading to anchor a crop.
+    // Retry once as a text block, accepting it only when the actual table
+    // headings and the same contract/provider are present. Do not combine
+    // competing OCR passes or infer cells from hard-coded page coordinates.
+    const tableLabels=['受給開始日','固定買取終了年月','購入料金単価','受電地点特定番号','最大受電電力']
+    const textOf=(ls:OcrLine[])=>compact(ls.flatMap(l=>l.words.map(w=>w.text)).join(''))
+    if(!tableLabels.every(label=>textOf(lines).includes(label))){
+     onProgress('契約書の表を読み取り直しています…')
+     await job('setParameters',{params:{tessedit_pageseg_mode:'6'}})
+     const table=await job('recognize',{image,options:{},output:{text:false,blocks:true}})
+     const tableLines=(table.blocks??[]).flatMap(b=>b.paragraphs.flatMap(p=>p.lines)),text=textOf(tableLines)
+     if(text.includes('九州電力')&&!text.includes('関西電力')&&text.includes('電力受給契約のご案内')&&tableLabels.every(label=>text.includes(label)))lines=tableLines
+    }
     const startLines=lines.filter(l=>compact(l.words.map(w=>w.text).join('')).startsWith('受給開始日'))
     const thirdLines=lines.filter(l=>compact(l.words.map(w=>w.text).join('')).startsWith('取引開始指示数'))
     if(startLines.length===1&&thirdLines.length===1&&Math.abs(startLines[0].bbox.y0-thirdLines[0].bbox.y0)<10*scale){

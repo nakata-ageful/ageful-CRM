@@ -54,7 +54,9 @@ export function parsePowerContract(input:CertificateText[],ocr=false):PowerContr
   return rows.filter(v=>v.y<r.y-5&&v.y>r.y-25).flatMap(v=>v.items.filter(i=>i.x>=x-12&&i.x<end-5)).map(i=>i.text).join('')
  }
  const gridRaw=k?right('認定ID').split('認定日')[0]:below('認定')
- const ids=[...new Set(gridRaw.match(/[A-Z]{2}[0-9]{5}[A-Z][0-9]{2}/g)??[])]
+ // Both certified-ID families occur on utility contracts. Match the complete
+ // cell value, never a valid-looking substring of a longer OCR mistake.
+ const ids=[...new Set(gridRaw.match(/^(?:[A-Z]{2}[0-9]{5}|[A-Z][0-9]{6})[A-Z][0-9]{2}$/g)??[])]
  const gridId=ids.length===1?ids[0]:''
  const allPoints=text.match(/\d{2}(?:-\d{4}){5}/g)??[]
  if(allPoints.length>1)throw Error('複数の受給地点番号があります。契約書を1件ずつ選んでください。')

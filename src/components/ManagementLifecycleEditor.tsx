@@ -1,3 +1,5 @@
+import {errorDetail,formErrorText} from '../lib/form-error'
+import {FormError} from './FormError'
 import {useState} from 'react'
 import type {TransferBillingUnit} from '../lib/ownership-billing-plan'
 import {managementActiveOn,validateManagementRequest,type ManagementEvent,type ManagementChoice,type ManagementRequest} from '../lib/management-lifecycle'
@@ -32,14 +34,14 @@ export function ManagementLifecycleEditor({projectId,events,units,onSave,expande
       {choices[i].action==='amount'&&<label>変更後の予定額（円）<input className="form-input" type="number" min="0" step="1" value={choices[i].amount??''} onChange={e=>patch(i,{amount:e.target.value===''?null:Number(e.target.value)})}/></label>}
     </div>)}
     <label>備考・確認内容（必須）<textarea className="form-input" value={reason} onChange={e=>setReason(e.target.value)}/></label>
-    <button type="button" className="btn" onClick={()=>{try{validateManagementRequest(request,events,units);setError('');setReviewed(true)}catch(e){setError(e instanceof Error?e.message:String(e))}}}>内容を確認</button>
+    <button type="button" className="btn" onClick={()=>{try{validateManagementRequest(request,events,units);setError('');setReviewed(true)}catch(e){setError(errorDetail(e)||formErrorText(e))}}}>内容を確認</button>
     {reviewed&&<div><p>{scope==='all'?'すべての取引':'保守だけ'}を{date}に{action==='end'?'終了':'再開'}します。</p>
       <p>そのまま：{choices.filter(c=>c.action==='keep').length}回 ／ 予定額変更：{choices.filter(c=>c.action==='amount').length}回 ／ 取りやめ：{choices.filter(c=>c.action==='cancel').length}回</p>
       {choices.filter(c=>c.action==='amount').map(c=><p key={c.unitId}>請求回ID {c.unitId}：{fmtYen(plans.find(u=>u.id===c.unitId)?.plannedAmount)} → {fmtYen(c.amount)}</p>)}
-      <button type="button" className="btn btn-main" onClick={async()=>{if(busy)return;setBusy(true);try{validateManagementRequest(request,events,units);await onSave(request)}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setBusy(false)}}}>確認した内容を一括保存</button>
+      <button type="button" className="btn btn-main" onClick={async()=>{if(busy)return;setBusy(true);try{validateManagementRequest(request,events,units);await onSave(request)}catch(e){setError(errorDetail(e)||formErrorText(e))}finally{setBusy(false)}}}>確認した内容を一括保存</button>
     </div>}
    </fieldset></EditorBody>
-   {error&&<p role="alert">{error}</p>}
+   <FormError message={error}/>
    {!expanded&&<details><summary>終了・再開の履歴（{events.length}件）</summary>{[...events].reverse().map(e=><p key={e.id}>{e.effective_date}：{e.scope==='all'?'全取引':'保守'}{e.action==='end'?'終了':'再開'} ／ {e.reason}</p>)}</details>}
  </section>
 }

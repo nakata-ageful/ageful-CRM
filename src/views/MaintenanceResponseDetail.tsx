@@ -1,3 +1,5 @@
+import {errorDetail,formErrorText} from '../lib/form-error'
+import {FormError} from '../components/FormError'
 import { useState } from 'react'
 import type { MaintenanceResponse } from '../types'
 import { StatusBadge } from '../components/StatusBadge'
@@ -37,7 +39,7 @@ export function MaintenanceResponseDetail({ response, onBack, onReload, onViewPr
       setEditModal(false)
       onReload()
       toast('保守対応を保存しました')
-    } catch (e) { setError(String(e)) } finally { setSaving(false) }
+    } catch (e) { setError(errorDetail(e)||formErrorText(e)) } finally { setSaving(false) }
   }
 
   async function handleComplete() {
@@ -46,7 +48,7 @@ export function MaintenanceResponseDetail({ response, onBack, onReload, onViewPr
       await completeMaintenanceResponse(response.id)
       onReload()
       toast('保守対応を完了にしました')
-    } catch (e) { setError(String(e)) }
+    } catch (e) { setError(errorDetail(e)||formErrorText(e)) }
   }
 
   return (
@@ -68,7 +70,7 @@ export function MaintenanceResponseDetail({ response, onBack, onReload, onViewPr
         <button className="back-btn" onClick={onBack} style={{ marginLeft: 'auto' }}>← 戻る</button>
       </div>
 
-      {error && !editModal && <div className="form-error" style={{ marginBottom: 12 }}>{error}</div>}
+      {!editModal&&<FormError message={error}/>}
 
       <div className="card">
         <div className="card-header-row">
@@ -136,7 +138,7 @@ export function MaintenanceResponseDetail({ response, onBack, onReload, onViewPr
 
       {editModal && (
         <Modal title="保守対応を編集" onClose={() => setEditModal(false)} width={600}>
-          {error && <div className="form-error">{error}</div>}
+          <FormError message={error}/>
           <div className="form-grid">
             <label className="form-label">
               管理番号

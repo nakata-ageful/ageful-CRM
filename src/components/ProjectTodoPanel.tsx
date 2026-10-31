@@ -1,3 +1,4 @@
+import {FormError} from './FormError'
 import {useEffect,useRef,useState} from 'react'
 import {compareTodoDueDate,isTodoOverdue,todoTodayInJapan,definiteTodoRejection,loadProjectTodos,parseProjectTodo,saveProjectTodo,validateTodoChange,type ProjectTodo,type TodoChange} from '../lib/project-todos'
 import './ProjectTodoPanel.css'
@@ -72,7 +73,7 @@ export function ProjectTodoPanel({projectId,readOnly=false,initialCompleted=fals
  }
  return <div className="project-todo-panel"><div className="project-todo-heading"><h2>Todo</h2><button className="btn btn-sub btn-sm" type="button" disabled={busy||!!editing&&!pending} onClick={()=>void reload()}>{pending?'保存結果を再確認':'再読み込み'}</button></div>
   {readOnly&&<p className="notice">保管中の発電所のため、Todoは閲覧のみです。</p>}
-  {error&&<p className="form-error" role="alert">{error}</p>}{notice&&<p role="status" className="notice">{notice}</p>}
+  <FormError message={error}/>{notice&&<p role="status" className="notice">{notice}</p>}
   {pending&&<div className="notice"><p>入力は残しています。再読み込みや別の追加をせず、まず「保存結果を再確認」を押してください。</p>{retry&&<button className="btn btn-sub" type="button" disabled={busy||readOnly} onClick={()=>void write(pending)}>同じ内容で再保存</button>}</div>}
   {!readOnly&&<form className="card project-todo-add" onSubmit={e=>{e.preventDefault();if(!disabled&&!editing)void write({id:crypto.randomUUID(),projectId,revision:null,content,completed:false,dueDate:dueDate||null})}}><label htmlFor={`todo-add-${projectId}`}>やることを追加</label><div><textarea id={`todo-add-${projectId}`} className="form-input" rows={2} maxLength={2000} required value={content} onChange={e=>setContent(e.target.value)} disabled={disabled||!!editing} placeholder="例：契約書を送る、所有者に連絡する"/><label className="project-todo-due-input">期日（任意）<input className="form-input" type="date" min="0001-01-01" max="9999-12-31" value={dueDate} onChange={e=>setDueDate(e.target.value)} disabled={disabled||!!editing}/></label><button className="btn btn-main" type="submit" disabled={disabled||!!editing||!content.trim()}>{busy?'保存中…':'追加する'}</button></div></form>}
   <div className="filter-tabs project-todo-filters" role="group" aria-label="Todoの表示を切り替え">{[false,true].map(done=><button type="button" key={String(done)} className={`filter-tab ${showCompleted===done?'active':''}`} aria-pressed={showCompleted===done} disabled={!ready||busy||!!editing||!!pending} onClick={()=>setShowCompleted(done)}>{done?'完了':'未完了'}{ready?`（${items.filter(t=>t.is_completed===done).length}件）`:''}</button>)}</div>

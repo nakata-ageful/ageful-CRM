@@ -1,3 +1,4 @@
+import {FormError} from '../components/FormError'
 import { useState, useMemo, useRef } from 'react'
 import type { Prospect, ProspectApplyStatus, ProspectContractStatus, ProspectInput, Customer } from '../types'
 import { createProspect, deleteProspect } from '../lib/actions'
@@ -142,6 +143,13 @@ function AddModal({ onSave, onClose, existingCustomers, newProspectReady }: {
     onClose()
   }
 
+  const saveHint=saving||uncertain||checkList?'':
+    mode==='undecided'&&!newProspectReady?'顧客未定の登録を準備できません。最新の一覧を確認してください。':
+    mode==='new'&&!customerType?'個人・法人を選択してください。':
+    mode==='existing'&&(!selectedCustomer||!form.existing_customer_id)?'既存顧客を検索して選択してください。':
+    mode==='new'&&customerType==='corporate'&&!(form.company_name??'').trim()?'会社名を入力してください。':
+    mode!=='undecided'&&!form.customer_name.trim()?(customerType==='corporate'?'担当者名を入力してください。':'顧客名を入力してください。'):
+    !form.project_name.trim()?'発電所名を入力してください。':''
   return (
     <div className="modal-overlay" onClick={close}>
       <div className="modal-box" role="dialog" aria-modal="true" aria-label="案件を追加" style={{ maxWidth: 560, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
@@ -150,7 +158,7 @@ function AddModal({ onSave, onClose, existingCustomers, newProspectReady }: {
           <button className="modal-close" disabled={saving || uncertain} onClick={close}>✕</button>
         </div>
         <div className="modal-body" style={{ minHeight: 0 }}>
-          {error && <p className="form-error" role="alert">{error}</p>}
+          <FormError message={error}/>
           {uncertain && <p role="alert">保存結果が未確認です。再読み込みや別の登録をせず、同じ内容で保存結果を確認してください。</p>}
           {checkList && <p role="alert">保存結果が未確認です。再保存せず、この画面を閉じて見込み・顧客の一覧を確認してください。</p>}
           <fieldset disabled={saving || uncertain || checkList} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
@@ -366,6 +374,7 @@ function AddModal({ onSave, onClose, existingCustomers, newProspectReady }: {
           </fieldset>
         </div>
           <div className="modal-footer" style={{ position: 'static', flexShrink: 0, margin: 0, padding: '16px 24px 20px', flexWrap: 'wrap' }}>
+            <span role="status" style={{flexBasis:'100%',color:'#475569'}}>{saveHint}</span>
             <button className="btn btn-sub" disabled={saving || uncertain} onClick={close}>{checkList ? '閉じて一覧を確認' : 'キャンセル'}</button>
             <button className="btn btn-main" onClick={handleSave} disabled={saving || checkList || !form.project_name.trim()
               || (mode === 'undecided' && !newProspectReady)
@@ -401,6 +410,7 @@ export function Prospects({
   newProspectReady?: boolean
 }) {
   const toast = useToast()
+  const [actionError,setActionError]=useState<unknown>(null)
   // 複数選択フィルター: 空配列 = 全件、非空 = OR 条件で絞り込み
   // sessionStorage で詳細画面遷移→戻る時にフィルタを復元
   const [applyFilters, setApplyFilters] = useState<ProspectApplyStatus[]>(() => {
@@ -500,13 +510,13 @@ export function Prospects({
   async function handleDelete(e: React.MouseEvent, p: Prospect) {
     e.stopPropagation()
     if (!confirm(`「${prospectCustomerDisplay(p,customers).name} / ${p.project_name}」を削除しますか？`)) return
-    await deleteProspect(p.id)
-    onReload()
-    toast('見込みを削除しました')
+    setActionError(null)
+    try{await deleteProspect(p.id);onReload();toast('見込みを削除しました')}catch(e){setActionError(e)}
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <FormError message={actionError}/>
       {/* フィルター */}
       <div className="prospect-status-filters">
         <div className="card prospect-status-filter">

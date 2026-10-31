@@ -1,3 +1,4 @@
+import {FormError} from './FormError'
 import {createContext,useContext,useEffect,useState,type ReactNode} from 'react'
 import {supabase} from '../lib/supabase'
 
@@ -25,6 +26,6 @@ export function BillingAccessGate({children}:{children:ReactNode}){
     <form onSubmit={async e=>{e.preventDefault();if(busy||!supabase)return;setBusy(true);setError('');try{const {error}=await supabase.auth.signInWithPassword({email,password});if(error)setError('ログインできません。メールアドレスとパスワードを確認してください');else setPassword('')}catch{setError('接続できませんでした。時間をおいて再度お試しください')}finally{setBusy(false)}}}>
       <label>メールアドレス<input className="form-input" type="email" autoComplete="username" value={email} onChange={e=>setEmail(e.target.value)} required/></label>
       <label>パスワード<input className="form-input" type="password" autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)} required/></label>
-      <button className="btn btn-main" disabled={busy}>ログイン</button><p role="alert">{error}</p>
+      <button className="btn btn-main" disabled={busy}>ログイン</button><FormError message={error}/>
     </form></main>
 }

@@ -1,3 +1,5 @@
+import {errorDetail,formErrorText} from '../lib/form-error'
+import {FormError} from './FormError'
 import {useRef,useState} from 'react'
 import {CustomerPicker} from './CustomerPicker'
 import type {CustomerChoice} from '../lib/customer-search'
@@ -23,7 +25,7 @@ export function InvoiceCorrectionEditor({unit:initial,recipients,onSave,onClose}
         if(!Number.isSafeInteger(amount))throw Error('金額が大きすぎます')
         await onSave({unitId:Number(unit.id),revision:unit.revision,mode:'correction',reason:reason.trim(),value:{recipient_customer_id:Number(recipient),scheduled_date:scheduled||null,issued_on:issued||null,received_on:received||null,payment_due_on:due||null,frozen_amount:amount,frozen_line_items:lines}})
         onClose()
-      }catch(e){setError(e instanceof Error?e.message:String(e))}finally{lock.current=false;setBusy(false)}
+      }catch(e){setError(errorDetail(e)||formErrorText(e))}finally{lock.current=false;setBusy(false)}
     }}><fieldset disabled={busy} style={{border:0,padding:0}}>
       <CustomerPicker label="請求先" value={recipient} onChange={setRecipient} customers={recipients}/>
       <div className="invoice-correction-dates">
@@ -39,7 +41,7 @@ export function InvoiceCorrectionEditor({unit:initial,recipients,onSave,onClose}
       {items.map((i,n)=><div key={n} className="editor-line-item"><label>明細名<input value={i.name} onChange={e=>setItems(items.map((v,k)=>k===n?{...v,name:e.target.value}:v))}/></label><label>金額（税込）<input inputMode="numeric" value={i.amount} onChange={e=>setItems(items.map((v,k)=>k===n?{...v,amount:e.target.value}:v))}/></label><button type="button" onClick={()=>setItems(items.filter((_,k)=>k!==n))}>明細を削除</button></div>)}
       <button type="button" onClick={()=>setItems([...items,{name:'',amount:''}])}>明細を追加</button>
       <label>訂正理由<textarea className="form-input" required value={reason} onChange={e=>setReason(e.target.value)}/></label>
-      <p role="alert">{error}</p><div className="editor-footer"><button className="btn btn-sub" type="button" onClick={onClose}>キャンセル</button><button className="btn btn-main" disabled={busy}>訂正を保存</button></div>
+      <FormError message={error}/><div className="editor-footer"><button className="btn btn-sub" type="button" onClick={onClose}>キャンセル</button><button className="btn btn-main" disabled={busy}>訂正を保存</button></div>
     </fieldset></form>
   </section>
 }

@@ -32,7 +32,7 @@ assert.ok(renderToStaticMarkup(React.createElement(Component,{contract})).includ
 const source=fs.readFileSync(path.join(root,'src/views/CsvImport.tsx'),'utf8'),ast=ts.createSourceFile('CsvImport.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX)
 const names=new Set(['KINGAKU_COLS','colLetter','buildKingakuCsv','csvEscape'])
 const snippets=ast.statements.filter(n=>ts.isFunctionDeclaration(n)&&names.has(n.name?.text)||ts.isVariableStatement(n)&&n.declarationList.declarations.some(d=>names.has(d.name.getText(ast)))).map(n=>n.getText(ast)).join('\n')
-const exported={};vm.runInNewContext(ts.transpileModule(snippets+'\nexports.build=buildKingakuCsv',{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText,{exports:exported,billingItemSummary:summary,annualBillableTotalInc,managementBillingContract,managementEventFromStorage,managementActiveOn})
+const exported={};vm.runInNewContext(ts.transpileModule(snippets+'\nexports.build=buildKingakuCsv',{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText,{exports:exported,customerDisplayName:load('src/lib/customer-search.ts').customerDisplayName,billingItemSummary:summary,annualBillableTotalInc,managementBillingContract,managementEventFromStorage,managementActiveOn})
 const tables={customers:[{id:1,name:'テスト顧客'}],projects:[{id:1,customer_id:1,plant_name:'テスト発電所'}],contracts:[{...contract,project_id:1}]}
 const before=JSON.stringify(tables),csv=exported.build(tables),lines=csv.split('\n')
 assert.ok(lines[0].includes('自社請求対象額'));assert.ok(lines[0].includes('年次保守料：自社請求対象'))

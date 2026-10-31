@@ -1,3 +1,5 @@
+import {errorDetail,formErrorText} from '../lib/form-error'
+import {FormError} from './FormError'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {CustomerPicker} from './CustomerPicker'
 import {customerDisplayName,type CustomerChoice} from '../lib/customer-search'
@@ -27,7 +29,7 @@ export function OwnershipBillingPlanEditor({projectId,oldOwner,newOwner,units:in
     if(!reason.trim()){setError('確認内容・理由を入力してください');return}
     saving.current=true;setBusy(true);setError('')
     try{await onSave(result.changes.map(c=>({...c})),reason.trim())}
-    catch(e){setError(e instanceof Error?e.message:String(e))}
+    catch(e){setError(errorDetail(e)||formErrorText(e))}
     finally{saving.current=false;setBusy(false)}
   }
   const options=recipientOptions??[oldOwner,newOwner]
@@ -40,21 +42,21 @@ export function OwnershipBillingPlanEditor({projectId,oldOwner,newOwner,units:in
     try{
       onReview?.()
       const choices:TransferBillingChoice[]=drafts.map(d=>{
-        if(d.amount!==''&&(!/^\d+$/.test(d.amount)||!Number.isSafeInteger(Number(d.amount))))throw Error('予定額は0円以上の整数で入力してください')
+        if(d.amount!==''&&(!/^\d+$/.test(d.amount)||!Number.isSafeInteger(Number(d.amount))))throw Error(`${units.find(u=>u.id===d.unitId)?.serviceYear}年・${units.find(u=>u.id===d.unitId)?.roundLabel}の「予定額」に0円以上の整数を入力してください`)
         return {unitId:d.unitId,expectedRevision:d.expectedRevision,recipientId:Number(d.recipientId),method:d.method,
           scheduledDate:d.scheduledDate,plannedAmount:d.amount===''?null:Number(d.amount),
           periodStart:d.periodStart||null,periodEnd:d.periodEnd||null,note:d.note}
       })
       setResult(prepareOwnershipBillingPlan({projectId,oldOwnerId:oldOwner.id,newOwnerId:newOwner.id,units,choices,
         allowedRecipientIds:saveScope==='plan'&&recipientOptions?recipientOptions.map(o=>o.id):undefined}))
-    }catch(e){setError(e instanceof Error?e.message:String(e))}
+    }catch(e){setError(errorDetail(e)||formErrorText(e))}
   }
   return <section className="card ownership-billing-editor">
     <div className="ownership-billing-title"><div><span>{saveScope==='ownership'?'STEP 2':'請求予定'}</span><h2>{saveScope==='ownership'?'所有者変更後の請求予定':'保存済みの請求予定を変更'}</h2></div><b>{drafts.length}回を確認</b></div>
     {saveScope==='ownership'&&<div className="ownership-billing-owners"><span>現在の所有者<br/><strong>{customerDisplayName(oldOwner)}</strong></span><span aria-hidden="true">→</span><span>変更後の所有者<br/><strong>{customerDisplayName(newOwner)}</strong></span></div>}
     <p>保存済みの未発行予定を表示しています。変更したい回だけ、請求先や方法を選び直してください。</p>
     <div className="ownership-billing-notice">発行済み・入金済みなど {units.filter(u=>u.lifecycle!=='planned').length} 件は変更対象外です。自動の日割り計算・請求追加・銀行への振替手配は行いません。</div>
-    {error&&<p role="alert" style={{color:'#b91c1c'}}>{error}</p>}
+    <FormError message={error}/>
     <form onSubmit={review}><fieldset disabled={busy} style={{border:0,padding:0,minWidth:0}}>
       {drafts.map((d,i)=>{const unit=units.find(u=>u.id===d.unitId)!;const failed=unit.collectionState==='failed'
         return <fieldset key={d.unitId} className="ownership-billing-row">

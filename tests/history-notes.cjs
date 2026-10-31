@@ -22,7 +22,7 @@ for(const kind of ['billing','management']){
  assert.equal(historyNoteState([note],'ownership','1',original,1).text,original,'Same numeric ID across kinds stays isolated')
 }
 const nodes=(e,p)=>Array.isArray(e)?e.flatMap(v=>nodes(v,p)):!e?.props?[]:[...(p(e)?[e]:[]),...nodes(e.props.children,p)]
-const text=e=>Array.isArray(e)?e.map(text).join(''):e?.props?text(e.props.children):typeof e==='string'?e:''
+const text=e=>typeof e?.type==='function'&&e.type.name==='FormError'?String(e.props.message??''):Array.isArray(e)?e.map(text).join(''):e?.props?text(e.props.children):typeof e==='string'?e:''
 let props={projectId:1,kind:'ownership',targetId:'1',original,notes:[n]},tree
 function render(){cursor=0;refCursor=0;tree=HistoryNoteEditor(props);return tree}
 const button=label=>nodes(tree,e=>e.type==='button'&&text(e)===label)[0]

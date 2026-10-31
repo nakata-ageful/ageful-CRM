@@ -1,3 +1,5 @@
+import {errorDetail,formErrorText} from '../lib/form-error'
+import {FormError} from './FormError'
 import {useState} from 'react'
 import {isBillingDate} from '../lib/billing-unit'
 import {scheduleDateRequest,type ScheduleDateReview} from '../lib/billing-schedule-change'
@@ -14,13 +16,13 @@ export function BillingScheduleChangeReview({review,name,recipientName,busy,onSa
   const previewChanged=!!impact?.after&&(!impact.before||impact.before.date!==impact.after.date||impact.before.year!==impact.after.year||impact.before.round!==impact.after.round||impact.before.period!==impact.after.period||impact.before.method!==impact.after.method)
   const choices=[...review.changes,...editable.map(c=>({...c,date:dates[c.unit.id]??''}))].filter(c=>selected.includes(c.unit.id))
   const invalid=choices.some(c=>!isBillingDate(c.date)||c.date===c.unit.scheduledDate||!!c.unit.paymentDueOn&&c.unit.paymentDueOn<c.date)
-  function saveSelected(){try{setError('');onSave(choices.map(scheduleDateRequest))}catch(e){setError(e instanceof Error?e.message:String(e))}}
+  function saveSelected(){try{setError('');onSave(choices.map(scheduleDateRequest))}catch(e){setError(errorDetail(e)||formErrorText(e))}}
   return <section className="schedule-change-review" aria-label="保存済み請求予定の変更確認">
     <h3>今回の予定と今後の設定を確認</h3><p>{name}</p>
     {hasChoices&&<><h4>① 今回の保存済み予定も変更しますか？</h4><p>変更する回にチェックしてください。チェックしない回は、今の日付のまま残します。</p></>}
 
     <fieldset disabled={busy}>
-      {error&&<p role="alert" className="form-error">{error}</p>}
+      <FormError message={error}/>
       {review.changes.map(c=><label className="schedule-change-row" key={c.unit.id}><input type="checkbox" checked={selected.includes(c.unit.id)} onChange={e=>setSelected(s=>e.target.checked?[...s,c.unit.id]:s.filter(id=>id!==c.unit.id))}/><span><strong>{c.unit.serviceYear}年・{c.unit.roundLabel}</strong><span>{c.period}</span><span className="schedule-change-dates">{c.unit.scheduledDate} → <b>{c.date}</b></span><span>{c.unit.plannedAmount==null?'金額要確認':fmtYen(c.unit.plannedAmount)} ／ {c.unit.recipientId==null?'請求先要確認':recipientName(c.unit.recipientId)}</span></span></label>)}
       {!!editable.length&&<div className="schedule-change-manual"><h4>変更後の日付を入力（{editable.length}件）</h4><p>チェックを入れると日付を入力できます。</p>{editable.map(c=>{const checked=selected.includes(c.unit.id),date=dates[c.unit.id]??'';return <section className="schedule-change-editable" key={c.unit.id}>
         <label className="schedule-change-row"><input type="checkbox" checked={checked} onChange={e=>setSelected(s=>e.target.checked?[...s,c.unit.id]:s.filter(id=>id!==c.unit.id))}/><span><strong>{c.unit.serviceYear}年・{c.unit.roundLabel}</strong><span>{c.period}</span><span>現在の請求予定日：{c.unit.scheduledDate||'未登録'}</span><span>{c.unit.plannedAmount==null?'金額要確認':fmtYen(c.unit.plannedAmount)} ／ {c.unit.recipientId==null?'請求先要確認':recipientName(c.unit.recipientId)}</span></span></label>

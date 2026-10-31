@@ -1,3 +1,5 @@
+import {errorDetail,formErrorText} from '../lib/form-error'
+import {FormError} from '../components/FormError'
 import { useRef, useState } from 'react'
 import type { CustomerDetailData, CustomerInput } from '../types'
 import type { ProjectInput } from '../lib/actions'
@@ -72,18 +74,19 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject, bi
 
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [actionError,setActionError]=useState<unknown>(null)
 
   async function handleSaveCustomer() {
     if(saving)return
     let input:CustomerInput
-    try{input=validateCustomerRegistration(editForm,{email:customer.email})}catch(e){setError(e instanceof Error?e.message:String(e));return}
+    try{input=validateCustomerRegistration(editForm,{email:customer.email})}catch(e){setError(errorDetail(e)||formErrorText(e));return}
     setSaving(true)
     try {
       await updateCustomer(customer.id, input)
       setEditModal(false)
       onReload()
       toast('顧客情報を保存しました')
-    } catch (e) { setError(String(e)) } finally { setSaving(false) }
+    } catch (e) { setError(errorDetail(e)||formErrorText(e)) } finally { setSaving(false) }
   }
 
   async function handleSaveProject() {
@@ -96,7 +99,7 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject, bi
       setProjectModal(false)
       onReload()
       toast('案件を追加しました')
-    } catch (e) { setError(String(e)) } finally { setSaving(false) }
+    } catch (e) { setError(errorDetail(e)||formErrorText(e)) } finally { setSaving(false) }
   }
 
   // ── ファイル選択 ──────────────────────────────────────────
@@ -125,7 +128,7 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject, bi
       onReload()
       toast('ファイルをアップロードしました')
     } catch (e) {
-      setUploadErr(String(e))
+      setUploadErr(errorDetail(e)||formErrorText(e))
     } finally {
       setUploading(false)
     }
@@ -133,14 +136,14 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject, bi
 
   async function handleDeleteAttachment(id: number, fileUrl: string) {
     if (!confirm('この添付ファイルを削除しますか？')) return
-    await deleteAttachment(id, fileUrl)
-    onReload()
-    toast('ファイルを削除しました')
+    setActionError(null)
+    try{await deleteAttachment(id,fileUrl);onReload();toast('ファイルを削除しました')}catch(e){setActionError(e)}
   }
 
   return (
     <>
       <button className="back-btn" onClick={onBack}>← 顧客一覧に戻る</button>
+      <FormError message={actionError}/>
 
       <div className="card">
         <div className="card-header-row">
@@ -262,7 +265,7 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject, bi
       {/* 顧客編集モーダル */}
       {editModal && (
         <Modal title="顧客情報を編集" width={840} closeDisabled={saving} onClose={() => setEditModal(false)}>
-          {error && <div className="form-error">{error}</div>}
+          <FormError message={error}/>
           <fieldset disabled={saving} className="customer-fields-fieldset"><CustomerFields value={editForm} onChange={patch=>setEditForm(f=>({...f,...patch}))}/></fieldset>
           <div className="modal-footer">
             <button className="btn btn-sub" onClick={() => setEditModal(false)}>キャンセル</button>
@@ -274,7 +277,7 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject, bi
       {/* 案件追加モーダル */}
       {projectModal && (
         <Modal title="案件を追加" onClose={() => setProjectModal(false)}>
-          {error && <div className="form-error">{error}</div>}
+          <FormError message={error}/>
           <div className="form-grid">
             <label className="form-label required" style={{ gridColumn: '1/-1' }}>
               案件名
@@ -311,7 +314,7 @@ export function CustomerDetailView({ detail, onBack, onReload, onViewProject, bi
       {/* ファイルアップロードモーダル */}
       {uploadModal && (
         <Modal title="ファイルを追加" onClose={() => setUploadModal(false)}>
-          {uploadErr && <div className="form-error">{uploadErr}</div>}
+          <FormError message={uploadErr}/>
 
           {/* ドロップゾーン */}
           <div

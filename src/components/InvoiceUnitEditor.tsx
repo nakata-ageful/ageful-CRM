@@ -1,3 +1,5 @@
+import {errorDetail,formErrorText} from '../lib/form-error'
+import {FormError} from './FormError'
 import { useRef, useState } from 'react'
 import type { BillingUnit } from '../lib/billing-unit'
 import { isBillingDate, isEditableInvoicePlan } from '../lib/billing-unit'
@@ -20,26 +22,29 @@ export function InvoiceUnitEditor({unit:initialUnit,recipientName,onSave,onClose
     lock.current=true;setBusy(true);setError('')
     try {
       const id=Number(unit.id)
-      if(!Number.isSafeInteger(id)||id<=0||!isBillingDate(date))throw Error('対象回と日付を確認してください')
+      if(!Number.isSafeInteger(id)||id<=0)throw Error('請求記録を確認できません。画面を閉じて、一覧から選び直してください')
+      if(!isBillingDate(date))throw Error(issuing?'「請求日」を入力してください':'「入金日」を入力してください')
       let value:object={received_on:date}
       if(issuing){
         if(unit.recipientId==null)throw Error('先に請求先を設定してください')
         const lines=items.map(i=>({name:i.name.trim(),amount:Number(i.amount)}))
-        if(items.some(i=>!/^\d+$/.test(i.amount))||lines.some(i=>!i.name||!Number.isSafeInteger(i.amount)))throw Error('明細名と0円以上の整数を入力してください')
+        const invalid=items.findIndex((item,i)=>!/^\d+$/.test(item.amount)||!lines[i].name||!Number.isSafeInteger(lines[i].amount))
+        if(invalid>=0)throw Error(`明細${invalid+1}の「明細名」と「金額（税込）」を確認してください。金額は0円以上の整数で入力してください`)
         const amount=lines.reduce((sum,i)=>sum+i.amount,0)
-        if(!Number.isSafeInteger(amount)||(due&&!isBillingDate(due)))throw Error('金額・入金予定日を確認してください')
+        if(!Number.isSafeInteger(amount))throw Error('明細の合計金額が大きすぎます。各明細の金額を確認してください')
+        if(due&&!isBillingDate(due))throw Error('「入金予定日」を確認してください')
         value={recipient_customer_id:unit.recipientId,scheduled_date:unit.scheduledDate,issued_on:date,received_on:null,
           payment_due_on:due||null,frozen_amount:amount,frozen_line_items:lines}
       }
       await onSave({unitId:id,revision:unit.revision,mode:issuing?'issue':'collection',value,reason:null})
       onClose()
-    }catch(e){setError(e instanceof Error?e.message:String(e))}finally{lock.current=false;setBusy(false)}
+    }catch(e){setError(errorDetail(e)||formErrorText(e))}finally{lock.current=false;setBusy(false)}
   }
   return <section className="card"><h3>{unit.serviceYear}年 {unit.roundLabel}：{issuing?'発行内容を記録':'入金日を記録'}</h3>
     <p>請求先：{unit.recipientId===null?'請求先要確認':recipientName(unit.recipientId)}</p>
     {issuing&&<p>請求予定額：{unit.plannedAmount==null?'金額要確認':fmtYen(unit.plannedAmount)}。実際の請求明細を確認して入力してください。</p>}
     {!issuing&&<p>確定額：{unit.frozenAmount===null?'金額要確認':fmtYen(unit.frozenAmount)}</p>}
-    {error&&<p role="alert">{error}</p>}
+    <FormError message={error}/>
     <form onSubmit={save}><fieldset disabled={busy} style={{border:0}}>
       <label>{issuing?'請求日':'入金日'}<input type="date" required value={date} onChange={e=>setDate(e.target.value)}/></label>
       {issuing&&<><label>入金予定日<input type="date" value={due} onChange={e=>setDue(e.target.value)}/></label>

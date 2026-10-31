@@ -1,3 +1,5 @@
+import {errorDetail,formErrorText} from '../lib/form-error'
+import {FormError} from './FormError'
 import {useRef,useState} from 'react'
 import {historyNoteState,type HistoryNote,type HistoryNoteKind,type HistoryNoteRequest} from '../lib/history-notes'
 import {historyDate} from '../lib/change-history-display'
@@ -8,12 +10,12 @@ export function HistoryNoteEditor({projectId,kind,targetId,original,notes=[],onS
   const [editRevision,setEditRevision]=useState(0)
   const locked=useRef(false)
   let current:ReturnType<typeof historyNoteState>
-  try{current=historyNoteState(notes,kind,targetId,original,projectId)}catch(e){return <p role="alert">{e instanceof Error?e.message:String(e)}</p>}
+  try{current=historyNoteState(notes,kind,targetId,original,projectId)}catch(e){return <p role="alert">{errorDetail(e)||formErrorText(e)}</p>}
   async function save(){
     if(!onSave||locked.current||editRevision!==current.revision||!draft.trim()||draft.trim()===current.text||draft.trim().length>4000)return
     locked.current=true;setBusy(true);setError('')
     try{await onSave({projectId,kind,targetId,expectedRevision:editRevision,text:draft.trim()});setEditing(false)}
-    catch(e){setError(e instanceof Error?e.message:String(e))}
+    catch(e){setError(errorDetail(e)||formErrorText(e))}
     finally{locked.current=false;setBusy(false)}
   }
   return <div className="history-note">
@@ -26,7 +28,7 @@ export function HistoryNoteEditor({projectId,kind,targetId,original,notes=[],onS
       <div style={{display:'flex',flexWrap:'wrap',gap:8}}><button type="button" className="btn btn-sub" onClick={()=>{setEditing(false);setError('')}}>キャンセル</button>
         <button type="button" className="btn btn-main" disabled={editRevision!==current.revision||!draft.trim()||draft.trim()===current.text||draft.trim().length>4000} onClick={()=>void save()}>{busy?'保存中…':'確認内容を保存'}</button></div>
     </fieldset>}
-    {error&&<p className="form-error" role="alert">{error}</p>}
+    <FormError message={error}/>
     {current.changes.length>0&&<details style={{marginTop:8}}><summary>訂正履歴（{current.changes.length}件）</summary>
       <p style={{whiteSpace:'pre-wrap'}}>最初の内容：{original||'記録なし'}</p>
       {current.changes.map(n=><p key={n.operation_key} style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{historyDate(n.created_at)}：{n.text}</p>)}

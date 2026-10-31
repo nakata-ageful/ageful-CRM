@@ -1,3 +1,5 @@
+import {errorDetail,formErrorText} from '../lib/form-error'
+import {FormError} from './FormError'
 import {useState} from 'react'
 import type {Contract} from '../types'
 import {billingItemSummary,billingItemSelectionPatch} from '../lib/billing-item-selection'
@@ -23,8 +25,8 @@ export function BillingItemSelection({contract,onSave,managementEvents=[]}:{cont
       {summary.hasOverrides&&<p role="status">各回・各月に個別金額が設定されています。チェックを外しても、その個別金額は変わりません。「請求情報」で確認してください。</p>}
       {summary.hasFees&&<p role="status">手数料ありの設定です。費目をすべて外しても手数料は自動で解除しません。</p>}
       <p>過去の請求・入金と保存済み予定は変更しません。すでにある予定を変更・終了する場合は「請求詳細」で各回を確認してください。</p>
-      {onSave&&<button type="button" className="btn btn-main" onClick={async()=>{if(busy)return;setBusy(true);setError('');try{await onSave(billingItemSelectionPatch(flags).billing_item_flags);setSaved(true)}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setBusy(false)}}}>{busy?'保存中…':'請求対象の選択を保存'}</button>}
+      {onSave&&<button type="button" className="btn btn-main" onClick={async()=>{if(busy)return;setBusy(true);setError('');try{await onSave(billingItemSelectionPatch(flags).billing_item_flags);setSaved(true)}catch(e){setError(errorDetail(e)||formErrorText(e))}finally{setBusy(false)}}}>{busy?'保存中…':'請求対象の選択を保存'}</button>}
     </fieldset>
-    {error&&<p role="alert">{error}</p>}{saved&&<p role="status">請求対象の選択を保存しました。</p>}
+    <FormError message={error}/>{saved&&<p role="status">請求対象の選択を保存しました。</p>}
   </section>
 }

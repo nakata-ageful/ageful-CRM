@@ -1,3 +1,4 @@
+import {customerDisplayName} from '../lib/customer-search'
 import { useRef, useState } from 'react'
 import type { CsvImportRow, BillingImportRow } from '../types'
 import { bulkImportProjects, exportAllData, restoreAllData } from '../lib/actions'
@@ -63,7 +64,7 @@ function buildKingakuCsv(tables: Record<string, Record<string, unknown>[]>, asOf
     const rowTotalFormula = `=SUM(${colLetter(feeStart)}${excelRow}:${colLetter(feeEnd)}${excelRow})`
     return [
       String(p.plant_name ?? p.project_name ?? ''),
-      String((cust?.company_name as string) ?? (cust?.name as string) ?? ''),
+      cust?customerDisplayName({name:String(cust.name??''),company_name:cust.company_name as string|null,is_corporate:cust.is_corporate as boolean|undefined}):'',
       String(con?.maintenance_contractor ?? ''),
       String(con?.billing_method ?? ''),
       ...amounts.map(String),
@@ -894,7 +895,7 @@ export function CsvImport({ onReload }: Props) {
   async function handleUnitCsv(){setExporting(true);try{
     const raw=await exportAllData();const data=raw as unknown as Record<string,Record<string,unknown>[]>;
     if(raw.version!==2||!Array.isArray(data.billing_units))throw Error('新しい請求記録を取得できません');
-    const customers=new Map(data.customers.map(c=>[c.id,String(c.name)])),projects=new Map(data.projects.map(p=>[p.id,String(p.project_name??p.plant_name??p.id)]));
+    const customers=new Map(data.customers.map(c=>[c.id,customerDisplayName({name:String(c.name??''),company_name:c.company_name as string|null,is_corporate:c.is_corporate as boolean|undefined})])),projects=new Map(data.projects.map(p=>[p.id,String(p.project_name??p.plant_name??p.id)]));
     downloadBillingUnitCsv(buildBillingUnitCsv(data.billing_units.map(billingUnitFromStorage),id=>customers.get(id)??`顧客ID ${id}（名称要確認）`,id=>projects.get(id)??`発電所ID ${id}`));
   }catch(e){alert(`各回CSVを出力できません: ${String(e)}`)}finally{setExporting(false)}}
 
@@ -1259,7 +1260,7 @@ export function CsvImport({ onReload }: Props) {
                     {rows.map((row, i) => (
                       <tr key={i}>
                         <td style={{ color: '#64748b', fontSize: 12 }}>{i + 1}</td>
-                        <td>{row.customer_name}{row.company_name && <><br /><span style={{ fontSize: 11, color: '#64748b' }}>{row.company_name}</span></>}</td>
+                        <td>{row.company_name?.trim()||row.customer_name}{row.company_name?.trim()&&row.customer_name&&row.customer_name!==row.company_name&&<><br /><span>担当者：{row.customer_name}</span></>}</td>
                         <td><strong>{row.project_name}</strong></td>
                         <td>{row.site_address || '-'}</td>
                         <td>{csvFormat === 'template' ? (row.fit_end_date || '-') : (row.power_supply_start_date || '-')}</td>

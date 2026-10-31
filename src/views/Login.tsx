@@ -1,3 +1,4 @@
+import {FormError} from '../components/FormError'
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 
@@ -60,7 +61,7 @@ export function Login({ onLogin }: LoginProps) {
           {isSignUp ? 'アカウント作成' : 'ログイン'}
         </h2>
 
-        {error && <div className="form-error">{error}</div>}
+        <FormError message={error}/>
         {message && (
           <div className="notice" style={{ marginBottom: 14 }}>{message}</div>
         )}

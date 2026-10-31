@@ -1,3 +1,5 @@
+import {errorDetail,formErrorText} from '../lib/form-error'
+import {FormError} from '../components/FormError'
 import { useRef,useState } from 'react'
 import type { Prospect, ProspectApplyStatus, ProspectContractStatus,Customer,CustomerInput,Project } from '../types'
 import {Modal} from '../components/Modal'
@@ -311,7 +313,7 @@ export function ProspectDetailView({
     const next = { ...p, ...updated }
     setP(next)
     setSaving(true)
-    try{await updateProspect(p.id, updated, p.converted_customer_id)}catch(e){setP(p);setError(e instanceof Error?e.message:String(e))}finally{setSaving(false)}
+    try{await updateProspect(p.id, updated, p.converted_customer_id)}catch(e){setP(p);setError(errorDetail(e)||formErrorText(e))}finally{setSaving(false)}
   }
 
   async function handleLoanCompanyChange(company: string | null) {
@@ -341,13 +343,13 @@ export function ProspectDetailView({
         </>)}
       </div>
 
-      {error&&<p role="alert" className="form-error">{error}</p>}
+      <FormError message={error}/>
       {p.new_project_id!=null&&<section className="card">
         <h3>{p.converted_customer_id?'新規案件':'新規案件・顧客未定'}</h3>
         <div className="management-action-grid">
           {onViewExistingProject&&<button type="button" className="btn btn-sub" onClick={()=>onViewExistingProject(p.new_project_id!)}>発電所詳細へ</button>}
           {!p.converted_customer_id&&onLoadOwnershipProject&&onSetNewCustomer&&<button type="button" className="btn btn-main" disabled={candidateBusy||saving} onClick={async()=>{
-            setCandidateBusy(true);setError('');try{setCandidateProject(await onLoadOwnershipProject(p.new_project_id!));setCandidateOpen(true)}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setCandidateBusy(false)}
+            setCandidateBusy(true);setError('');try{setCandidateProject(await onLoadOwnershipProject(p.new_project_id!));setCandidateOpen(true)}catch(e){setError(errorDetail(e)||formErrorText(e))}finally{setCandidateBusy(false)}
           }}>顧客を設定</button>}
         </div>
         {candidateOpen&&candidateProject&&onSetNewCustomer&&onCreateCustomer&&onReloadCustomers&&<Modal title="顧客を設定" width={760} closeDisabled={candidateBusy} onClose={()=>setCandidateOpen(false)}>
@@ -364,12 +366,12 @@ export function ProspectDetailView({
           {onViewExistingProject&&<button type="button" className="btn btn-sub" onClick={()=>onViewExistingProject(p.ownership_project_id!)}>発電所詳細へ</button>}
           {p.ownership_state==='open'&&onOwnershipAction&&<>
             {!p.candidate_customer_id&&onLoadOwnershipProject&&<button type="button" className="btn btn-main" disabled={saving||candidateBusy} onClick={async()=>{
-              setCandidateBusy(true);setError('');try{setCandidateProject(await onLoadOwnershipProject(p.ownership_project_id!));setCandidateOpen(true)}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setCandidateBusy(false)}
+              setCandidateBusy(true);setError('');try{setCandidateProject(await onLoadOwnershipProject(p.ownership_project_id!));setCandidateOpen(true)}catch(e){setError(errorDetail(e)||formErrorText(e))}finally{setCandidateBusy(false)}
             }}>引継ぎ先を設定</button>}
-            {p.candidate_customer_id&&onOwnershipComplete&&<button type="button" className="btn btn-main" disabled={saving} onClick={()=>void onOwnershipComplete(p).catch(e=>setError(e instanceof Error?e.message:String(e)))}>所有者を確定する</button>}
+            {p.candidate_customer_id&&onOwnershipComplete&&<button type="button" className="btn btn-main" disabled={saving} onClick={()=>void onOwnershipComplete(p).catch(e=>setError(errorDetail(e)||formErrorText(e)))}>所有者を確定する</button>}
             <button type="button" className="btn btn-sub" disabled={saving} onClick={async()=>{
               if(!confirm('この候補の引継ぎを取りやめますか？ 現在の所有者・保守・請求は変えず、記録を残します。'))return
-              setSaving(true);setError('');try{setP(await onOwnershipAction(p,'cancel',null))}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setSaving(false)}
+              setSaving(true);setError('');try{setP(await onOwnershipAction(p,'cancel',null))}catch(e){setError(errorDetail(e)||formErrorText(e))}finally{setSaving(false)}
             }}>この候補を取り下げる</button>
           </>}
         </div>

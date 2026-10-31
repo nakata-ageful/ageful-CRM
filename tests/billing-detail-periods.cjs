@@ -96,7 +96,7 @@ console.log('PASS: service-period grouping, two rounds/prepayments, preserved ex
  nodes(tree,e=>e.type==='form')[0].props.onSubmit({preventDefault(){}});tree=render()
  await button(tree,'確認した予定を保存').props.onClick();await new Promise(r=>setImmediate(r));tree=render()
  assert.equal(closed,false,'Failed/unknown save must not close or advance to actual recording')
- assert.ok(nodes(tree,e=>e.props.role==='alert').some(e=>String(e.props.children).includes('保存結果が未確認です')))
+ assert.ok(nodes(tree,e=>typeof e.type==='function'&&e.type.name==='FormError').some(e=>String(e.props.message).includes('保存結果が未確認です')))
  nodes(tree,e=>e.type==='select'&&e.props.value==='10')[0].props.onChange({target:{value:'11'}});tree=render()
  assert.equal(nodes(tree,e=>e.type==='input'&&e.props.inputMode==='numeric')[0].props.value,'','Changing occurrence must not retain the old round/month amount')
  assert.ok(!button(tree,'確認した予定を保存'))

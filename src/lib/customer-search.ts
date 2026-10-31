@@ -4,7 +4,8 @@ function normalize(value:string):string {
   return value.normalize('NFKC').toLocaleLowerCase('ja').replace(/[\u30a1-\u30f6]/g,c=>String.fromCharCode(c.charCodeAt(0)-0x60)).replace(/\s+/g,'')
 }
 export function customerChoiceLabel(customer:CustomerChoice):string {
-  return `${customer.company_name?`${customer.company_name}（${customer.name}）`:customer.name} ／ 顧客ID ${customer.id}`
+  const company=customer.is_corporate!==false?customer.company_name?.trim():''
+  return `${company?`${company}（${customer.name}）`:customerDisplayName(customer)} ／ 顧客ID ${customer.id}`
 }
 export function searchCustomers(customers:readonly CustomerChoice[],query:string):CustomerChoice[] {
   const tokens=query.normalize('NFKC').trim().split(/\s+/).map(normalize).filter(Boolean)
@@ -13,7 +14,7 @@ export function searchCustomers(customers:readonly CustomerChoice[],query:string
 
 type SortableCustomer=CustomerChoice&{is_corporate:boolean}
 const kanaCollator=new Intl.Collator('ja',{usage:'sort',sensitivity:'base',numeric:true})
-export function customerDisplayName(c:CustomerChoice):string{return (c.is_corporate?c.company_name:null)?.trim()||c.name}
+export function customerDisplayName(c:Pick<CustomerChoice,'name'|'company_name'|'is_corporate'>):string{return (c.is_corporate!==false?c.company_name:null)?.trim()||c.name}
 export function customerSortKana(c:SortableCustomer):string{return normalize((c.is_corporate?c.company_name_kana:c.name_kana)??'')}
 /** Never mutate input, merge identities or infer a company's reading from its contact. */
 export function sortCustomersByKana<T extends SortableCustomer>(customers:readonly T[]):T[]{

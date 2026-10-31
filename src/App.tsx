@@ -1,3 +1,4 @@
+import {prospectCustomerDisplay} from './lib/prospect-customer-display'
 import {customerDisplayName} from './lib/customer-search'
 import { useCallback, useEffect, useState } from 'react'
 import { ToastProvider } from './components/Toast'
@@ -401,7 +402,7 @@ function MainApp() {
                 onViewCanonicalProject={navToProjectDetail}
                 canonicalProjectName={projectRows.find(p=>p.id===projectDetail.project.canonical_project_id)?.plant_name||projectRows.find(p=>p.id===projectDetail.project.canonical_project_id)?.project_name}
                 ownershipStatus={runtime?.ownershipWorkflowReady&&prospects.some(p=>p.ownership_project_id===projectDetail.project.id&&p.ownership_state==='open')?<div className="notice">
-                  引継ぎの見込み：{prospects.filter(p=>p.ownership_project_id===projectDetail.project.id&&p.ownership_state==='open').map(p=><button type="button" className="link-btn" key={p.id} onClick={()=>void navToProspectDetail(p.id)}>{p.candidate_customer_id?`${p.customer_name}（手続き中）`:'引継ぎ先未定'}</button>)}
+                  引継ぎの見込み：{prospects.filter(p=>p.ownership_project_id===projectDetail.project.id&&p.ownership_state==='open').map(p=><button type="button" className="link-btn" key={p.id} onClick={()=>void navToProspectDetail(p.id)}>{p.candidate_customer_id?`${prospectCustomerDisplay(p,customers).name}（手続き中）`:'引継ぎ先未定'}</button>)}
                 </div>:projectDetail.project.customer_pending?<div className="notice">顧客未定：{prospects.filter(p=>p.new_project_id===projectDetail.project.id).map(p=><button type="button" className="link-btn" key={p.id} onClick={()=>void navToProspectDetail(p.id)}>見込みを開いて顧客を設定</button>)}</div>:undefined}
                 onAddRoutine={runtime&&!projectReadOnly?addRoutineInvoice:undefined}
                 billingCycleSettings={runtime&&projectDetail.contract&&!projectReadOnly?<BillingCycleSettings key={`${projectDetail.project.id}:${JSON.stringify(runtime.cycleRules)}`} contract={projectDetail.contract} units={runtime.units} rules={runtime.cycleRules??[]}

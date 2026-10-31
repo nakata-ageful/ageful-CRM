@@ -1,3 +1,5 @@
+import {errorDetail,formErrorText} from '../lib/form-error'
+import {FormError} from './FormError'
 import {useState} from 'react'
 import type {Customer,CustomerInput,Project} from '../types'
 import type {RegistrationCustomer} from '../lib/customer-registration'
@@ -26,7 +28,7 @@ export function OwnershipWorkflowPanel({project,customers,onSave,onDirect,onCrea
     setBusy(true);onBusyChange?.(true)
     try{await onSave(mode==='unknown'?'unknown':candidateOnly?'candidate':'start',mode==='unknown'?null:target?Number(target):null,mode==='unknown'?date:'',reason.trim()||
       (mode==='unknown'?'所有終了を確認。新所有者の氏名は未確認':candidateOnly?'引継ぎ先の顧客を選択':'既存発電所の引継ぎ見込みを登録'))}
-    catch(e){setError(e instanceof Error?e.message:String(e))}finally{setBusy(false);onBusyChange?.(false)}
+    catch(e){setError(errorDetail(e)||formErrorText(e))}finally{setBusy(false);onBusyChange?.(false)}
   }
   return <div className="standard-editor ownership-transfer-shell ownership-workflow-panel">
     {!initialCustomer&&<div className="ownership-workflow-summary">
@@ -38,7 +40,7 @@ export function OwnershipWorkflowPanel({project,customers,onSave,onDirect,onCrea
       {onDirect&&<button type="button" className="btn btn-sub" disabled={busy||customerBusy} onClick={onDirect}>決まった所有者へ直接変更</button>}
       {project.customer_id!=null&&<button type="button" className={`btn ${mode==='unknown'?'btn-main':'btn-sub'}`} disabled={busy||customerBusy} onClick={()=>{setMode('unknown');setCreating(false);setError('')}}>所有者が変わったが名前が分からない</button>}
     </div>}
-    {error&&<p role="alert" className="form-error">{error}</p>}
+    <FormError message={error}/>
     <fieldset className="ownership-workflow-fields" disabled={busy||customerBusy} style={{border:0,padding:0,minWidth:0}}>
       {mode==='start'?<>
         <p>{initialCustomer?'この新規案件の顧客を設定します。請求・入金記録は変更しません。':candidateOnly?'顧客を選んだだけでは、所有者や請求先は変わりません。':'現在の所有者・保守・請求は変えず、同じ発電所の見込みを登録します。'}</p>

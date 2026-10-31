@@ -1,3 +1,6 @@
+import {errorDetail,formErrorText} from '../lib/form-error'
+import {FormError} from './FormError'
+import {customerDisplayName} from '../lib/customer-search'
 import {useRef,useState} from 'react'
 import {CustomerPicker} from './CustomerPicker'
 import type {CustomerChoice} from '../lib/customer-search'
@@ -33,21 +36,24 @@ export function BillingOccurrenceCreator({candidate,contract,units,recipients,on
   }
   function review(e:React.FormEvent){e.preventDefault();setError('');setConfirmed(null)
     try{
-      if(!/^\d+$/.test(amount)||!recipients.some(r=>r.id===Number(recipient))||!/^\d{4}$/.test(year)||Number(round)>detailPlanCount(contract))throw Error('請求先・予定額・対象の回を確認してください')
+      if(!recipients.some(r=>r.id===Number(recipient)))throw Error('「請求先」で顧客を選択してください')
+      if(!/^\d+$/.test(amount)||!Number.isSafeInteger(Number(amount)))throw Error('「予定額（税込）」に0円以上の整数を入力してください')
+      if(!/^\d{4}$/.test(year)||Number(year)<2000||Number(year)>2199)throw Error('「保守期間の開始年」に2000～2199年を入力してください')
+      if(!/^\d+$/.test(round)||Number(round)<1||Number(round)>detailPlanCount(contract))throw Error('「対象の回」を選び直してください')
       const item:MaintenanceScheduleItem={year:Number(year),round:Number(round),periodStart:start,periodEnd:end,date,recipientId:Number(recipient),amount:Number(amount),method:candidate.method}
-      if(!contract.maintenance_start_date)throw Error('「保守情報」で保守開始日を設定してください')
+      if(!contract.maintenance_start_date)throw Error('「保守情報」で「保守契約開始日」を設定してください')
       validateDetailPlan(item,units,contract.project_id,reason,contract.maintenance_start_date,cycleRules,contract);setConfirmed(item)
-    }catch(e){setError(e instanceof Error?e.message:String(e))}
+    }catch(e){setError(errorDetail(e)||formErrorText(e))}
   }
   async function save(){if(!confirmed||lock.current)return;lock.current=true;setBusy(true);setError('')
     try{validateDetailPlan(confirmed,units,contract.project_id,reason,contract.maintenance_start_date,cycleRules,contract);await onSave(confirmed,reason.trim());onClose()}
-    catch(e){setError(e instanceof Error?e.message:String(e))}finally{lock.current=false;setBusy(false)}
+    catch(e){setError(errorDetail(e)||formErrorText(e))}finally{lock.current=false;setBusy(false)}
   }
   return <section>
     <p>{purpose==='adjust'?'今回だけの日付・請求先・予定額を変更します。今後の基本設定や過去の記録は変わりません。':'保守期間と第何回かを指定して、1回分の予定を追加します。前払いの場合も、対象の保守期間を選んでください。過去の記録は上書きしません。'}</p>
     <p>請求予定額を表示しています。実際の請求額・入金額は、発行・入金確認のときに記録します。銀行手配や請求書の送信は行いません。</p>
     <p>対象の回・期間・予定日を変更した場合は、予定額も再確認して入力してください。</p>
-    {error&&<p role="alert">{error}</p>}
+    <FormError message={error}/>
     <form onSubmit={review}><fieldset disabled={busy} style={{border:0,padding:0}}>
       <label>保守期間の開始年<input type="number" min={2000} max={2199} required value={year} onChange={e=>years(e.target.value)}/></label>
       <label>対象の回<select value={round} onChange={e=>{changeCoverage(setRound,e.target.value);invoiceDate(year,e.target.value)}}>{Array.from({length:detailPlanCount(contract)},(_,i)=><option key={i} value={i+1}>第{i+1}回</option>)}</select></label>
@@ -57,7 +63,7 @@ export function BillingOccurrenceCreator({candidate,contract,units,recipients,on
       <label>{debit?'振替予定日':'請求予定日'}<input type="date" required value={date} onChange={e=>changeCoverage(setDate,e.target.value)}/></label>
       <label>予定額（税込）<input inputMode="numeric" required value={amount} onChange={e=>change(setAmount,e.target.value)}/></label>
       <label>確認内容・備考<textarea required value={reason} onChange={e=>change(setReason,e.target.value)} placeholder="対象期間・請求先・予定額を確認した内容"/></label>
-      {confirmed&&<div className="billing-plan-confirmation" role="status"><strong>{purpose==='adjust'?'今回の予定：1件':'追加する予定：1件'}</strong><p>{confirmed.periodStart} ～ {confirmed.periodEnd} ／ 第{confirmed.round}回<br/>請求先：{recipients.find(r=>r.id===confirmed.recipientId)?.name}<br/>{debit?'振替':'請求'}予定日：{confirmed.date} ／ 予定額：{fmtYen(confirmed.amount!)}</p><p>この予定を保存した後、この画面から{debit?'振替結果':'請求日・入金日'}を記録できます。</p></div>}
+      {confirmed&&<div className="billing-plan-confirmation" role="status"><strong>{purpose==='adjust'?'今回の予定：1件':'追加する予定：1件'}</strong><p>{confirmed.periodStart} ～ {confirmed.periodEnd} ／ 第{confirmed.round}回<br/>請求先：{(()=>{const payer=recipients.find(r=>r.id===confirmed.recipientId);return payer?customerDisplayName(payer):'請求先未設定'})()}<br/>{debit?'振替':'請求'}予定日：{confirmed.date} ／ 予定額：{fmtYen(confirmed.amount!)}</p><p>この予定を保存した後、この画面から{debit?'振替結果':'請求日・入金日'}を記録できます。</p></div>}
       <div className="editor-footer"><button type="button" className="btn btn-sub" onClick={onClose}>キャンセル</button>
         {confirmed?<button type="button" className="btn btn-main" onClick={()=>void save()}>{busy?'保存中…':'確認した予定を保存'}</button>:<button type="submit" className="btn btn-main">{purpose==='adjust'?'変更内容を確認':'追加内容を確認'}</button>}
       </div>

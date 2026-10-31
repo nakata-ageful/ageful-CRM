@@ -1,3 +1,4 @@
+import {FormError} from './FormError'
 import {useEffect,useRef,useState} from 'react'
 import type {Customer,Project} from '../types'
 import {Modal} from './Modal'
@@ -44,7 +45,7 @@ export function MetiCertificateImport({project,customer,onClose,onSaved}:{projec
       <div className="meti-file-row"><label className="meti-file">認定書PDF<input type="file" accept="application/pdf,.pdf" disabled={busy||saving||!!pending} onChange={e=>void read(e.target.files?.[0])}/></label>{pdfUrl&&<a className="btn btn-sub btn-sm" href={pdfUrl} title={fileName} target="_blank" rel="noreferrer">元のPDFを開く</a>}</div>
       <small>PDFはこの端末内で読み取ります。チェックして「反映する」を押すまで登録内容は変わりません。</small>
       {busy&&<p role="status">{progress}</p>}
-      {error&&<p role="alert" className="meti-error">{error}</p>}
+      <FormError message={error}/>
       {data&&<>
         <div className="meti-identity"><span>PDFの事業者名</span><b>{data.businessName||'読み取れませんでした'}</b>{mismatch&&<strong>登録中の顧客名・設備IDと違いがあります。PDFが正しいか確認してください。</strong>}</div>
         <p className="meti-instruction">反映したい項目にチェックしてください。</p>

@@ -1,3 +1,4 @@
+import {customerDisplayName} from '../lib/customer-search'
 import { Fragment, useState } from 'react'
 import type { BillingDetail, BillingLineItem, PaymentEntry, MaintenanceResponse, PeriodicMaintenance } from '../types'
 import { updateAnnualRecord, createAnnualRecord, deleteAnnualRecord, updateContract } from '../lib/actions'
@@ -316,7 +317,7 @@ export function BillingDetailView({ detail, onBack, onReload, onViewProject, emb
     toast('保守情報を保存しました')
   }
 
-  const custName = customer?.company_name ?? customer?.name ?? '現在の所有者：未確認'
+  const custName = customer?customerDisplayName(customer):'現在の所有者：未確認'
 
   // Explicit read-only new-ledger input: never show legacy write controls alongside it.
   if (billingHistory) return <div>

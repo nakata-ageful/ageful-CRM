@@ -1,3 +1,5 @@
+import {errorDetail,formErrorText} from '../lib/form-error'
+import {FormError} from './FormError'
 import { useRef,useState } from 'react'
 import { isBillingDate,type BillingUnit } from '../lib/billing-unit'
 import type { InvoiceWriteRequest } from '../lib/invoice-write-session'
@@ -26,12 +28,12 @@ export function ManualDebitEditor({unit:initialUnit,recipientName,onSave,onClose
         value={received_on:date,amount,line_items:lines}
       }
       await onSave({unitId:id,revision:unit.revision,mode,value,reason:reason.trim()});onClose()
-    }catch(e){setError(e instanceof Error?e.message:String(e))}finally{lock.current=false;setBusy(false)}
+    }catch(e){setError(errorDetail(e)||formErrorText(e))}finally{lock.current=false;setBusy(false)}
   }
   return <section className="card"><h3>{debitOccurrenceLabel(unit.scheduledDate)}：{correcting?'振替記録を訂正':'振替結果を記録'}</h3>
     <p>銀行の処理は行いません。確認した結果を記録してください。</p>
     <p>請求先：{unit.recipientId===null?'要確認':recipientName(unit.recipientId)} ／ 振替予定額：{unit.plannedAmount==null?'要確認':fmtYen(unit.plannedAmount)}</p>
-    {error&&<p role="alert">{error}</p>}<form onSubmit={submit}><fieldset disabled={busy} style={{border:0}}>
+    <FormError message={error}/><form onSubmit={submit}><fieldset disabled={busy} style={{border:0}}>
       {correcting?<p>訂正前の内容と理由を履歴に残します。請求先は変更しません。</p>:<label>確認結果<select value={mode} onChange={e=>setMode(e.target.value as typeof mode)}><option value="debit_received">入金を確認した</option><option value="debit_invoice_switch">振替不能を確認し、請求書へ切替</option></select></label>}
       {mode!=='debit_invoice_switch'?<><label>入金日<input required type="date" value={date} onChange={e=>setDate(e.target.value)}/></label>
         {items.map((item,index)=><div key={index} className="editor-line-item"><label>明細名<input required value={item.name} onChange={e=>setItems(items.map((v,i)=>i===index?{...v,name:e.target.value}:v))}/></label>

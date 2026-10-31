@@ -1,3 +1,5 @@
+import {errorDetail,formErrorText} from '../lib/form-error'
+import {FormError} from '../components/FormError'
 import { useRef, useState } from 'react'
 import type { ProjectRow, Customer, CustomerInput } from '../types'
 import type { ProjectInput } from '../lib/actions'
@@ -128,6 +130,7 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
   const [projectForm, setProjectForm] = useState<Omit<ProjectInput, 'customer_id'>>(emptyProjectForm)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [actionError,setActionError]=useState<unknown>(null)
 
   const filtered = activeProjects.filter(p => projectMatchesSearch(p, search))
 
@@ -191,7 +194,7 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
       onReload()
       toast('案件を追加しました')
     } catch (e) {
-      setError(String(e))
+      setError(errorDetail(e)||formErrorText(e))
     } finally {
       setSaving(false)
     }
@@ -204,6 +207,7 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
 
   return (
     <>
+      <FormError message={actionError}/>
       <div className="toolbar">
         <input
           className="search-input"
@@ -238,7 +242,7 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
               <tr><td colSpan={8} className="empty-cell">該当する案件がありません</td></tr>
             )}
             {sorted.map(p => {
-              const customer = p.company_name || p.customer_name
+              const customer = p.customer_name
               return (
               <tr key={p.id} className="clickable-row" onClick={() => onViewDetail(p.id)}>
                 <td>
@@ -258,9 +262,8 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
                     onClick={async (e) => {
                       e.stopPropagation()
                       if (!confirm(`「${p.project_name}」を削除しますか？\n関連する契約・請求データも削除されます。`)) return
-                      await deleteProject(p.id)
-                      onReload()
-                      toast('案件を削除しました')
+                      setActionError(null)
+                      try{await deleteProject(p.id);onReload();toast('案件を削除しました')}catch(e){setActionError(e)}
                     }}
                   >🗑</button>
                 </td>
@@ -273,7 +276,7 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
 
       {modal && (
         <Modal title="新規案件登録" onClose={() => setModal(false)} width={680}>
-          {error && <div className="form-error">{error}</div>}
+          <FormError message={error}/>
 
           <div className="form-section-title">顧客情報</div>
           <div className="radio-group">

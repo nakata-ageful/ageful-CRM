@@ -1,3 +1,5 @@
+import {errorDetail,formErrorText} from '../lib/form-error'
+import {FormError} from './FormError'
 import {useEffect,useState} from 'react'
 import {CustomerPicker} from './CustomerPicker'
 import type {BillingRow,Customer} from '../types'
@@ -16,19 +18,20 @@ export function FutureScheduleEditor({row,customers,units,events,onSave,onPeriod
  const [periodReason,setPeriodReason]=useState(''),[periodConfirmed,setPeriodConfirmed]=useState(false)
  useEffect(()=>setPeriodConfirmed(false),[year,periodStart,periodEnd,periodReason,individual,units])
  const [recipient,setRecipient]=useState(''),[items,setItems]=useState<Item[]>([]),[notice,setNotice]=useState(''),[reason,setReason]=useState(''),[reviewed,setReviewed]=useState(false),[busy,setBusy]=useState(false)
+ const [error,setError]=useState('')
  const own=units.filter(u=>u.projectId===row.project_id)
  const [excluded,setExcluded]=useState<{date:string;round:number;reason:string}[]>([])
- function preview(){try{
+ function preview(){setError('');try{
   if(!recipient)throw Error('今回追加する予定の請求先を選択してください')
   if(!row.contract)throw Error('契約が未設定です')
   const candidates=maintenanceSchedule(row.contract,year,Number(recipient),own,events,individual?{periodStart,periodEnd}:undefined,cycleRules)
   setExcluded(candidates.filter(c=>c.exclusion).map(c=>({date:`${c.periodStart} ～ ${c.periodEnd}`,round:c.round,reason:c.exclusion!})))
   setItems(candidates.filter(c=>!c.exclusion).map(c=>({...c,include:false})))
   setNotice('追加したい回にチェックし、予定日・請求先・金額を確認してください。');setReviewed(false)
- }catch(e){setNotice(e instanceof Error?e.message:String(e));setItems([]);setExcluded([])}}
+ }catch(e){setNotice('');setError(errorDetail(e)||formErrorText(e));setItems([]);setExcluded([])}}
  function change(index:number,patch:Partial<Item>){setItems(items.map((i,n)=>n===index?{...i,...patch}:i));setReviewed(false)}
- async function save(){setBusy(true);try{await onSave({projectId:row.project_id,contract:row.contract,versions:Object.fromEntries(own.map(u=>[u.id,u.revision])),last:Math.max(0,...events.filter(e=>e.project_id===row.project_id).map(e=>e.id)),items:selectedMaintenanceScheduleItems(items),reason});setItems([]);setReviewed(false);setNotice('確認した請求予定を追加しました。')}catch(e){setNotice(e instanceof Error?e.message:String(e))}finally{setBusy(false)}}
- async function savePeriod(){setBusy(true);try{validateIndividualPeriod({periodStart,periodEnd},year,row.project_id,own.filter(u=>u.serviceYear!==year),row.contract?.maintenance_start_date);if(!periodConfirmed||!periodReason.trim()||!onPeriodSave)throw Error('保存済み記録への変更を確認してください');await onPeriodSave({projectId:row.project_id,contract:row.contract,versions:Object.fromEntries(own.map(u=>[u.id,u.revision])),year,periodStart,periodEnd,reason:periodReason});setPeriodConfirmed(false);setItems([]);setNotice('保存済み記録の保守期間のみ更新しました。金額・請求先・入金日は変更していません。')}catch(e){setNotice(e instanceof Error?e.message:String(e))}finally{setBusy(false)}}
+ async function save(){setError('');setBusy(true);try{await onSave({projectId:row.project_id,contract:row.contract,versions:Object.fromEntries(own.map(u=>[u.id,u.revision])),last:Math.max(0,...events.filter(e=>e.project_id===row.project_id).map(e=>e.id)),items:selectedMaintenanceScheduleItems(items),reason});setItems([]);setReviewed(false);setNotice('確認した請求予定を追加しました。')}catch(e){setNotice('');setError(errorDetail(e)||formErrorText(e))}finally{setBusy(false)}}
+ async function savePeriod(){setError('');setBusy(true);try{validateIndividualPeriod({periodStart,periodEnd},year,row.project_id,own.filter(u=>u.serviceYear!==year),row.contract?.maintenance_start_date);if(!periodConfirmed||!periodReason.trim()||!onPeriodSave)throw Error('保存済み記録への変更を確認してください');await onPeriodSave({projectId:row.project_id,contract:row.contract,versions:Object.fromEntries(own.map(u=>[u.id,u.revision])),year,periodStart,periodEnd,reason:periodReason});setPeriodConfirmed(false);setItems([]);setNotice('保存済み記録の保守期間のみ更新しました。金額・請求先・入金日は変更していません。')}catch(e){setNotice('');setError(errorDetail(e)||formErrorText(e))}finally{setBusy(false)}}
  const EditorBody=expanded?'div':'details'
  return <section className="card" style={{padding:20,marginTop:16}}><EditorBody>{!expanded&&<summary>今後の請求予定を追加</summary>}
   <p>通常の予定は自動表示されます。この画面は、保守期間や日付を個別に決めて追加するときに使います。選んだ回だけ保存し、請求書の送信や銀行への振替手配は行いません。</p>
@@ -40,7 +43,7 @@ export function FutureScheduleEditor({row,customers,units,events,onSave,onPeriod
   {individual&&<div><label>個別の保守開始日 <input type="date" value={periodStart} onChange={e=>{setPeriodStart(e.target.value);setYear(Number(e.target.value.slice(0,4)));setItems([]);setReviewed(false)}}/></label><label>個別の保守終了日 <input type="date" value={periodEnd} onChange={e=>{setPeriodEnd(e.target.value);setItems([]);setReviewed(false)}}/></label><p>この追加分だけの個別期間です。翌年以降の標準期間は「請求情報」の繰り返し設定で変更できます。予定の追加では過去の請求期間を変更しません。</p></div>}
   <CustomerPicker label="追加分の請求先" value={recipient} onChange={value=>{setRecipient(value);setItems([]);setReviewed(false)}} customers={customers}/>{' '}<button onClick={preview}>追加できる予定を確認</button>
   {individual&&onPeriodSave&&own.some(u=>u.serviceYear===year)&&<section><p>{year}年の保存済み{own.filter(u=>u.serviceYear===year).length}回すべてに、この保守期間を指定します。発行・入金済みも含みますが、金額・請求先・入金日・元記録は変更しません。</p><label>期間変更の確認理由 <input value={periodReason} onChange={e=>setPeriodReason(e.target.value)}/></label><label><input type="checkbox" checked={periodConfirmed} onChange={e=>setPeriodConfirmed(e.target.checked)}/>上記の保存済み記録に適用することを確認しました</label><button disabled={!periodConfirmed||!periodReason.trim()||!isBillingDate(periodStart)||!isBillingDate(periodEnd)} onClick={()=>void savePeriod()}>保存済み記録の保守期間だけを保存</button></section>}
-  {notice&&<p role="status">{notice}</p>}
+  <FormError message={error}/>{notice&&<p role="status">{notice}</p>}
   {!!excluded.length&&<details><summary>追加できない予定と理由（{excluded.length}件）</summary>{excluded.map((r,n)=><p key={n}>{r.date} ／ 第{r.round}回：{r.reason}</p>)}</details>}
   {items.map((i,n)=><div key={`${i.year}:${i.round}`} style={{padding:10,borderBottom:'1px solid #ddd'}}>
    <label><input type="checkbox" checked={i.include} onChange={e=>change(n,{include:e.target.checked})}/>第{i.round}回 ／ {i.method==='invoice'?'請求書':'口座振替'}</label>

@@ -1,3 +1,5 @@
+import {FormError} from '../components/FormError'
+import {customerDisplayName} from '../lib/customer-search'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { ProjectDetail, AnnualRecordInput, PeriodicMaintenanceInput, MaintenanceResponseInput, MaintenancePlanLevel, BillingDetail as BillingDetailData } from '../types'
 import { BillingDetailView } from './BillingDetail'
@@ -815,7 +817,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
           className="link-btn"
           onClick={() => onViewCustomer(customer.id)}
         >
-          {customer.company_name ?? customer.name}
+          {customerDisplayName(customer)}
         </button>:<span>{project.customer_pending?'顧客未定（新規案件）':`現在の所有者：未確認${project.old_owner?` ／ 前の所有者：${project.old_owner}`:''}`}</span>}
         <span style={{ fontSize: 13, color: '#64748b' }}>発電所：</span>
         <b style={{ fontSize: 'inherit' }}>{project.plant_name || project.project_name}</b>
@@ -1389,7 +1391,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       {/* 保守対応モーダル */}
       {mrModal&&!readOnly && (
         <Modal title="保守対応記録を追加" onClose={() => setMrModal(false)}>
-          {err && <div className="form-error">{err}</div>}
+          <FormError message={err}/>
           <div className="form-grid">
             <label className="form-label">
               問合日
@@ -1449,7 +1451,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       {/* 定期保守モーダル */}
       {pmModal&&!readOnly && (
         <Modal title={pmEditId != null ? '定期保守記録を編集' : '定期保守記録を追加'} onClose={() => { setPmModal(false); setPmEditId(null) }}>
-          {err && <div className="form-error">{err}</div>}
+          <FormError message={err}/>
           <div className="form-grid">
             <label className="form-label required">
               実施日
@@ -1484,7 +1486,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       {/* 年次記録モーダル */}
       {arModal&&!readOnly && (
         <Modal title={`${arForm.year}年度 年次記録${arForm.id != null ? '（編集）' : '（追加）'}`} onClose={() => setArModal(false)}>
-          {err && <div className="form-error">{err}</div>}
+          <FormError message={err}/>
           <div className="form-grid">
             <label className="form-label">
               年度
@@ -1525,7 +1527,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       {/* 契約編集モーダル */}
       {contractModal&&!readOnly && (
         <Modal title="契約情報を編集" onClose={() => setContractModal(false)}>
-          {err && <div className="form-error">{err}</div>}
+          <FormError message={err}/>
           <div className="form-grid">
             <p style={{ gridColumn: '1/-1', margin: '0 0 4px', fontWeight: 600, fontSize: 13, color: '#475569' }}>── 請求情報</p>
             <label className="form-label">
@@ -1711,7 +1713,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       {/* 案件基本情報編集モーダル */}
       {projModal&&!readOnly && (
         <Modal title="案件情報を編集" onClose={() => setProjModal(false)}>
-          {err && <div className="form-error">{err}</div>}
+          <FormError message={err}/>
           <div className="form-grid">
             <label className="form-label required" style={{ gridColumn: '1/-1' }}>
               発電所名
@@ -1876,7 +1878,7 @@ export function ProjectDetailView({ detail, onBack, onReload, onViewCustomer, on
       {/* ── 中項目ごとの編集モーダル（ステップ C-2） ── */}
       {editSection&&!readOnly && (
         <Modal title={SECTION_TITLES[editSection]} closeDisabled={saving} onClose={() => {setEditSection(null);setScheduleReview(null);setScheduleOutcome(null);if(scheduleFailure){setScheduleFailure('');onReload()}}}>
-          {err && <div className="form-error">{err}</div>}
+          <FormError message={err}/>
           {scheduleFailure?<section className="schedule-change-review">{scheduleOutcome?.requests.map((q,i)=>{const c=[...(scheduleReview?.changes??[]),...(scheduleReview?.editable??[])].find(c=>Number(c.unit.id)===q.unitId),nextDate=(q.value as {scheduled_date?:string}).scheduled_date;return <p key={q.unitId}><strong>{scheduleOutcome.settingsSaved?(i<scheduleOutcome.completed?'保存確認済み':i===scheduleOutcome.completed?'保存結果要確認':'未着手'):'未着手'}</strong>：{c?`${c.unit.serviceYear}年・${c.unit.roundLabel} ／ ${c.unit.scheduledDate||'未登録'} → ${nextDate??c.date}`:`請求記録ID ${q.unitId}`}</p>})}<button type="button" className="btn btn-sub" onClick={()=>{setEditSection(null);setScheduleReview(null);setScheduleFailure('');setScheduleOutcome(null);onReload()}}>閉じて最新の情報を確認</button></section>:scheduleReview?<BillingScheduleChangeReview review={scheduleReview} name={project.plant_name||project.project_name} recipientName={id=>billingHistory?.recipientName(id)??`顧客ID ${id}`} busy={saving} onBack={()=>{setScheduleReview(null);setErr('')}} onSave={requests=>void handleSaveSection(requests)}/>:<>
           <div className="form-grid">
 

@@ -1,3 +1,4 @@
+import {customerDisplayName} from './customer-search'
 import { billingRuntimePreview, hasSupabaseEnv, supabase } from './supabase'
 import {
   customerStore, projectStore, contractStore, annualRecordStore,
@@ -139,7 +140,7 @@ export async function getCustomerDetail(customerId: number): Promise<CustomerDet
         subcontractor: contract?.subcontractor ?? null,
         maintenance_start_date: contract?.maintenance_start_date ?? null,
         created_at: p.created_at,
-        customer_name: customer.company_name ?? customer.name,
+        customer_name: customerDisplayName(customer),
         company_name: customer.company_name,
       }
     })
@@ -172,7 +173,7 @@ export async function getCustomerDetail(customerId: number): Promise<CustomerDet
       subcontractor: (con?.subcontractor as string) ?? null,
       maintenance_start_date: (con?.maintenance_start_date as string) ?? null,
       created_at: row.created_at as string,
-      customer_name: (customer.company_name as string) ?? (customer.name as string),
+      customer_name: customerDisplayName(customer as Customer),
       company_name: (customer.company_name as string) ?? null,
     }
   })
@@ -206,12 +207,12 @@ export async function getProjects(): Promise<ProjectRow[]> {
         maintenance_start_date: contract?.maintenance_start_date ?? null,
         created_at: p.created_at,
         updated_at: (p as { updated_at?: string | null }).updated_at ?? p.created_at,
-        customer_name: c?.company_name ?? c?.name ?? (p.customer_pending?'顧客未定（新規案件）':'所有者未確認'),
+        customer_name: (c?customerDisplayName(c):null) ?? (p.customer_pending?'顧客未定（新規案件）':'所有者未確認'),
         company_name: c?.company_name ?? null,
         search_text: buildProjectSearchText(
           p as unknown as Record<string, unknown>,
           (contract ?? null) as unknown as Record<string, unknown> | null,
-          c?.company_name ?? c?.name ?? null,
+          (c?customerDisplayName(c):null) ?? null,
           c?.company_name ?? null,
         ),
       }
@@ -221,7 +222,7 @@ export async function getProjects(): Promise<ProjectRow[]> {
   const client = db()
   const { data, error } = await client
     .from('projects')
-    .select('*, customers:customers!projects_customer_id_fkey(name, company_name), contracts(id, archived_at, subcontractor, maintenance_start_date, sale_contract_date, equipment_contract_date, land_contract_date, ownership_transfer_date, sales_to_neosys, neosys_to_referrer, equipment_contract_notes, land_contract_notes)')
+    .select('*, customers:customers!projects_customer_id_fkey(name, company_name, is_corporate), contracts(id, archived_at, subcontractor, maintenance_start_date, sale_contract_date, equipment_contract_date, land_contract_date, ownership_transfer_date, sales_to_neosys, neosys_to_referrer, equipment_contract_notes, land_contract_notes)')
     .is('archived_at', null)
     .order('created_at', { ascending: false })
     // TODO: 大規模データセットに対しては適切なページネーションを実装すべき
@@ -230,7 +231,7 @@ export async function getProjects(): Promise<ProjectRow[]> {
   return (data ?? []).map((row: Record<string, unknown>) => {
     const cust = row.customers as Record<string, unknown> | null
     const con = orderedContracts((Array.isArray(row.contracts) ? row.contracts : row.contracts ? [row.contracts] : []) as { id: number; archived_at?: string | null; [key: string]: unknown }[])[0] ?? null
-    const customerName = (cust?.company_name as string) ?? (cust?.name as string) ?? (row.customer_pending?'顧客未定（新規案件）':'所有者未確認')
+    const customerName = (cust?customerDisplayName(cust as unknown as Customer):null) ?? (row.customer_pending?'顧客未定（新規案件）':'所有者未確認')
     const companyName = (cust?.company_name as string) ?? null
     // ネストした customers / contracts は検索テキストから除外して project 本体のみ渡す
     const { customers: _c, contracts: _ct, ...projOnly } = row
@@ -313,7 +314,7 @@ export async function getMaintenanceResponses(): Promise<MaintenanceResponse[]> 
   const client = db()
   const { data, error } = await client
     .from('maintenance_responses')
-    .select('*, projects!inner(project_name, plant_name, customers:customers!projects_customer_id_fkey(name, company_name))')
+    .select('*, projects!inner(project_name, plant_name, customers:customers!projects_customer_id_fkey(name, company_name, is_corporate))')
     .is('projects.archived_at', null)
     .order('response_no', { ascending: false, nullsFirst: false })
     // TODO: 大規模データセットに対しては適切なページネーションを実装すべき
@@ -326,7 +327,7 @@ export async function getMaintenanceResponses(): Promise<MaintenanceResponse[]> 
       ...(row as MaintenanceResponse),
       project_name: (proj?.project_name as string) ?? '不明',
       plant_name: (proj?.plant_name as string) ?? null,
-      customer_name: (cust?.company_name as string) ?? (cust?.name as string) ?? '不明',
+      customer_name: (cust?customerDisplayName(cust as unknown as Customer):null) ?? '不明',
     }
   })
 }
@@ -339,7 +340,7 @@ export async function getMaintenanceResponseById(id: number): Promise<Maintenanc
   const client = db()
   const { data } = await client
     .from('maintenance_responses')
-    .select('*, projects!inner(project_name, plant_name, customer_id, panel_maker, panel_model, pcs_maker, pcs_model, monitoring_system, monitoring_model, customers:customers!projects_customer_id_fkey(name, company_name))')
+    .select('*, projects!inner(project_name, plant_name, customer_id, panel_maker, panel_model, pcs_maker, pcs_model, monitoring_system, monitoring_model, customers:customers!projects_customer_id_fkey(name, company_name, is_corporate))')
     .is('projects.archived_at', null)
     .eq('id', id)
     .single()
@@ -352,7 +353,7 @@ export async function getMaintenanceResponseById(id: number): Promise<Maintenanc
     project_name: (proj?.project_name as string) ?? '不明',
     plant_name: (proj?.plant_name as string) ?? null,
     customer_id: (proj?.customer_id as number) ?? null,
-    customer_name: (cust?.company_name as string) ?? (cust?.name as string) ?? '不明',
+    customer_name: (cust?customerDisplayName(cust as unknown as Customer):null) ?? '不明',
     panel_maker: (proj?.panel_maker as string) ?? null,
     panel_model: (proj?.panel_model as string) ?? null,
     pcs_maker: (proj?.pcs_maker as string) ?? null,
@@ -373,14 +374,14 @@ export async function getPeriodicMaintenance(): Promise<PeriodicMaintenance[]> {
         ...m,
         project_name: proj?.project_name ?? '不明',
         plant_name: proj?.plant_name ?? null,
-        customer_name: cust?.company_name ?? cust?.name ?? '不明',
+        customer_name: (cust?customerDisplayName(cust):null) ?? '不明',
       }
     })
   }
   const client = db()
   const { data, error } = await client
     .from('periodic_maintenance')
-    .select('*, projects!inner(project_name, plant_name, customers:customers!projects_customer_id_fkey(name, company_name))')
+    .select('*, projects!inner(project_name, plant_name, customers:customers!projects_customer_id_fkey(name, company_name, is_corporate))')
     .is('projects.archived_at', null)
     .order('record_date', { ascending: false, nullsFirst: false })
     // TODO: 大規模データセットに対しては適切なページネーションを実装すべき
@@ -393,7 +394,7 @@ export async function getPeriodicMaintenance(): Promise<PeriodicMaintenance[]> {
       ...(row as PeriodicMaintenance),
       project_name: (proj?.project_name as string) ?? '不明',
       plant_name: (proj?.plant_name as string) ?? null,
-      customer_name: (cust?.company_name as string) ?? (cust?.name as string) ?? '不明',
+      customer_name: (cust?customerDisplayName(cust as unknown as Customer):null) ?? '不明',
     }
   })
 }
@@ -419,7 +420,7 @@ export async function getBillingRows(): Promise<BillingRow[]> {
       return {
         project_id: p.id,
         project_name: p.project_name,
-        customer_name: c?.company_name ?? c?.name ?? '所有者未確認',
+        customer_name: (c?customerDisplayName(c):null) ?? '所有者未確認',
         company_name: c?.company_name ?? null,
         contract: contract ?? null,
         contract_count: activeContracts.length,
@@ -434,7 +435,7 @@ export async function getBillingRows(): Promise<BillingRow[]> {
   const currentYear = new Date().getFullYear()
   const { data: projData, error } = await client
     .from('projects')
-    .select('id, project_name, customer_id, customers:customers!projects_customer_id_fkey(name, company_name), contracts(*, annual_records(*))')
+    .select('id, project_name, customer_id, customers:customers!projects_customer_id_fkey(name, company_name, is_corporate), contracts(*, annual_records(*))')
     .is('archived_at', null)
     .order('created_at', { ascending: false })
     // TODO: 大規模データセットに対しては適切なページネーションを実装すべき
@@ -450,7 +451,7 @@ export async function getBillingRows(): Promise<BillingRow[]> {
     return {
       project_id: row.id as number,
       project_name: row.project_name as string,
-      customer_name: (cust?.company_name as string) ?? (cust?.name as string) ?? '所有者未確認',
+      customer_name: (cust?customerDisplayName(cust as unknown as Customer):null) ?? '所有者未確認',
       company_name: (cust?.company_name as string) ?? null,
       contract: con as import('../types').Contract | null,
       contract_count: conArr?.length ?? 0,

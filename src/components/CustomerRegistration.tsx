@@ -1,3 +1,5 @@
+import {errorDetail,formErrorText} from '../lib/form-error'
+import {FormError} from './FormError'
 import {useRef,useState} from 'react'
 import type {CustomerInput} from '../types'
 import {customerChoiceLabel} from '../lib/customer-search'
@@ -23,7 +25,7 @@ export function CustomerRegistration({customers,currentOwnerId,onCreate,onReload
     e.preventDefault();if(lock.current||uncertain)return
     let input:CustomerInput
     try{input=validateCustomerRegistration(form);if(matches.length&&!separate)throw Error('既存の顧客を確認してください。別の顧客なら、下の確認欄にチェックしてください')}
-    catch(e){setError(e instanceof Error?e.message:String(e));return}
+    catch(e){setError(errorDetail(e)||formErrorText(e));return}
     start()
     try{
       // Keep the successful ID even if a later UI callback fails. No refresh is
@@ -42,7 +44,7 @@ export function CustomerRegistration({customers,currentOwnerId,onCreate,onReload
   }
   return <section className="ownership-new-customer" aria-label="新規顧客登録">
     <h4>新規顧客登録</h4><p>{initialCustomer?'顧客を登録した後、「顧客を設定」でこの案件に紐づけます。設定を中止しても顧客は残ります。':'ここでは顧客だけ登録します。所有者変更は最後の確認で保存するまで行いません。変更を中止しても顧客は残ります。'}</p>
-    {error&&<p className="form-error" role="alert">{error}</p>}
+    <FormError message={error}/>
     {uncertain&&<div className="ownership-customer-recovery"><p role="alert">登録結果が未確認です。再登録せず、まず最新の顧客一覧を確認してください。該当する人がいれば、その顧客を選択します。ページを再読み込みする前に「登録結果を確認」を押してください。</p>
       <button type="button" className="btn btn-sub" disabled={busy} onClick={()=>void check()}>登録結果を確認</button>
       {checkedEmpty&&<label><input type="checkbox" disabled={busy} onChange={e=>{if(e.target.checked){setUncertain(false);setCheckedEmpty(false);onPendingChange?.(null)}}}/> 最新の一覧に登録されていないことを確認したので、再登録する</label>}

@@ -1,3 +1,5 @@
+import {errorDetail,formErrorText} from '../lib/form-error'
+import {FormError} from './FormError'
 import {useRef,useState} from 'react'
 import {CustomerPicker} from './CustomerPicker'
 import type {CustomerChoice} from '../lib/customer-search'
@@ -39,7 +41,7 @@ export function RoutineInvoiceEditor({context,recipients,onAdd,onSave,onClose,on
         scheduled_date:unit.scheduledDate,issued_on:date,received_on:null,payment_due_on:due||null,
         frozen_amount:amount,frozen_line_items:lines},reason:null})
       onClose()
-    }catch(e){if(e&&typeof e==='object'&&'code'in e&&e.code==='PLAN_CORRESPONDENCE')setBlocked(true);setError(e instanceof Error?e.message:String(e))}finally{lock.current=false;setBusy(false);onBusyChange?.(false)}
+    }catch(e){if(e&&typeof e==='object'&&'code'in e&&e.code==='PLAN_CORRESPONDENCE')setBlocked(true);setError(errorDetail(e)||formErrorText(e))}finally{lock.current=false;setBusy(false);onBusyChange?.(false)}
   }
   return <section>
     <p>別途発行した請求書の内容を記録します。このアプリから請求書の作成・送信は行いません。</p>
@@ -48,7 +50,7 @@ export function RoutineInvoiceEditor({context,recipients,onAdd,onSave,onClose,on
     <p>請求予定額：{fmtYen(item.amount!)}。実際の請求明細を入力してください。</p>
     <p>期間・予定日を変更する場合は、キャンセルして「請求詳細」で予定を調整してください。</p>
     {prepared&&<p role="status">請求予定は保存済みです。発行の記録が未完了の場合は、この画面で再試行してください。閉じても未発行の予定は残ります。</p>}
-    {error&&<><p role="alert">{error}</p><p>「保存結果が未確認」と表示された場合は、入力を変えず、いったんキャンセルで閉じて画面上部の「保存結果を再確認」を押してください。確認後は一覧に戻り、その記録の状態を確認してください。</p></>}
+    {error&&<><FormError message={error}/><p>「保存結果が未確認」と表示された場合は、入力を変えず、いったんキャンセルで閉じて画面上部の「保存結果を再確認」を押してください。確認後は一覧に戻り、その記録の状態を確認してください。</p></>}
     <form onSubmit={save}><fieldset disabled={busy} style={{border:0,padding:0}}>
       <CustomerPicker label="請求先" value={payer} customers={recipients} onChange={setPayer} disabled={!!prepared}/>
       <label>請求日<input type="date" required value={date} onChange={e=>setDate(e.target.value)}/></label>

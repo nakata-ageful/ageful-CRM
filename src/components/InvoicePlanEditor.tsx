@@ -1,3 +1,5 @@
+import {errorDetail,formErrorText} from '../lib/form-error'
+import {FormError} from './FormError'
 import { useRef,useState } from 'react'
 import {CustomerPicker} from './CustomerPicker'
 import type {CustomerChoice} from '../lib/customer-search'
@@ -21,11 +23,11 @@ export function InvoicePlanEditor({unit:initialUnit,recipients,onSave,onClose}:{
       await onSave({unitId:id,revision:unit.revision,mode:'plan',value:{recipient_customer_id:recipient,scheduled_date:date||null,
         planned_amount:amount===''?null:Number(amount)},reason:null})
       onClose()
-    }catch(e){setError(e instanceof Error?e.message:String(e))}finally{lock.current=false;setBusy(false)}
+    }catch(e){setError(errorDetail(e)||formErrorText(e))}finally{lock.current=false;setBusy(false)}
   }
   return <section className="card"><h3>{unit.serviceYear}年 {unit.roundLabel}：予定を編集</h3>
     <p>今回だけの請求先・日付・予定額を変更します。保存しても未発行の予定のままです。</p>
-    {error&&<p role="alert">{error}</p>}<form onSubmit={save}><fieldset disabled={busy} style={{border:0}}>
+    <FormError message={error}/><form onSubmit={save}><fieldset disabled={busy} style={{border:0}}>
       <CustomerPicker label="請求先" value={payer} onChange={setPayer} customers={recipients} emptyLabel="請求先要確認"/>
       <label>請求予定日<input type="date" value={date} onChange={e=>setDate(e.target.value)}/></label>
       <label>予定額（税込）<input inputMode="numeric" value={amount} onChange={e=>setAmount(e.target.value)}/></label>

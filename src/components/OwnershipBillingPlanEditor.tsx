@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {CustomerPicker} from './CustomerPicker'
-import type {CustomerChoice} from '../lib/customer-search'
+import {customerDisplayName,type CustomerChoice} from '../lib/customer-search'
 import './OwnershipBillingPlanEditor.css'
 import { prepareOwnershipBillingPlan, type TransferBillingChoice, type TransferBillingUnit } from '../lib/ownership-billing-plan'
 
@@ -31,7 +31,7 @@ export function OwnershipBillingPlanEditor({projectId,oldOwner,newOwner,units:in
     finally{saving.current=false;setBusy(false)}
   }
   const options=recipientOptions??[oldOwner,newOwner]
-  const ownerName=(id:number)=>options.find(o=>o.id===id)?.name??`請求先ID ${id}`
+  const ownerName=(id:number)=>{const owner=options.find(o=>o.id===id);return owner?customerDisplayName(owner):`請求先ID ${id}`}
   function patch(index:number,key:string,value:string){
     setDrafts(drafts.map((d,i)=>i===index?{...d,[key]:value}:d));setResult(null);setError('')
   }
@@ -51,7 +51,7 @@ export function OwnershipBillingPlanEditor({projectId,oldOwner,newOwner,units:in
   }
   return <section className="card ownership-billing-editor">
     <div className="ownership-billing-title"><div><span>{saveScope==='ownership'?'STEP 2':'請求予定'}</span><h2>{saveScope==='ownership'?'所有者変更後の請求予定':'保存済みの請求予定を変更'}</h2></div><b>{drafts.length}回を確認</b></div>
-    {saveScope==='ownership'&&<div className="ownership-billing-owners"><span>現在の所有者<br/><strong>{oldOwner.name}</strong></span><span aria-hidden="true">→</span><span>変更後の所有者<br/><strong>{newOwner.name}</strong></span></div>}
+    {saveScope==='ownership'&&<div className="ownership-billing-owners"><span>現在の所有者<br/><strong>{customerDisplayName(oldOwner)}</strong></span><span aria-hidden="true">→</span><span>変更後の所有者<br/><strong>{customerDisplayName(newOwner)}</strong></span></div>}
     <p>保存済みの未発行予定を表示しています。変更したい回だけ、請求先や方法を選び直してください。</p>
     <div className="ownership-billing-notice">発行済み・入金済みなど {units.filter(u=>u.lifecycle!=='planned').length} 件は変更対象外です。自動の日割り計算・請求追加・銀行への振替手配は行いません。</div>
     {error&&<p role="alert" style={{color:'#b91c1c'}}>{error}</p>}

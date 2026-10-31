@@ -1,3 +1,4 @@
+import {customerDisplayName} from './lib/customer-search'
 import { useCallback, useEffect, useState } from 'react'
 import { ToastProvider } from './components/Toast'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -187,7 +188,7 @@ function MainApp() {
     units:runtime.units,recipients:customers,plannedAmount:()=>null,
     cutoverOn:runtime.cutoverOn,managementEvents:runtime.managementEvents,cycleRules:runtime.cycleRules,
     cycleRulesReady:runtime.cycleRulesReady,recordRemovalReady:runtime.recordRemovalReady,ownershipChangedProjects:[...runtime.transfers,...(runtime.ownershipWorkflowEvents??[]).filter(e=>e.action==='unknown')].map(t=>Number(t.project_id)),
-    recipientName:id=>customers.find(c=>c.id===id)?.name??`請求先ID ${id}（名前未取得）`,
+    recipientName:id=>{const recipient=customers.find(c=>c.id===id);return recipient?customerDisplayName(recipient):`請求先ID ${id}（名前未取得）`},
     projectName:id=>projectRows.find(p=>p.id===id)?.project_name??`発電所ID ${id}`,
   }:undefined
   async function reloadRuntime(){

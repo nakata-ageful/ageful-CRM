@@ -2,6 +2,7 @@ import {useState} from 'react'
 import type {Customer,CustomerInput,Project} from '../types'
 import type {RegistrationCustomer} from '../lib/customer-registration'
 import {CustomerPicker} from './CustomerPicker'
+import {customerDisplayName} from '../lib/customer-search'
 import {CustomerRegistration} from './CustomerRegistration'
 import './OwnershipTransferEditor.css'
 
@@ -15,6 +16,7 @@ export function OwnershipWorkflowPanel({project,customers,onSave,onDirect,onCrea
   const [date,setDate]=useState(''),[reason,setReason]=useState(''),[confirmed,setConfirmed]=useState(false)
   const [busy,setBusy]=useState(false),[customerBusy,setCustomerBusy]=useState(false),[error,setError]=useState('')
   const [added,setAdded]=useState<RegistrationCustomer[]>([])
+  const currentOwner=customers.find(c=>c.id===project.customer_id)
   const choices=[...customers.filter(c=>!added.some(a=>a.id===c.id)),...added].filter(c=>c.id!==project.customer_id)
   async function save(){
     if(busy||customerBusy)return
@@ -29,7 +31,7 @@ export function OwnershipWorkflowPanel({project,customers,onSave,onDirect,onCrea
   return <div className="standard-editor ownership-transfer-shell ownership-workflow-panel">
     {!initialCustomer&&<div className="ownership-workflow-summary">
       <h3>{candidateOnly?'引継ぎ先を設定':project.plant_name||project.project_name}</h3>
-      <p>現在の所有者：{customers.find(c=>c.id===project.customer_id)?.name??'未確認'}</p>
+      <p>現在の所有者：{currentOwner?customerDisplayName(currentOwner):'未確認'}</p>
     </div>}
     {!candidateOnly&&<div className="ownership-workflow-options">
       <button type="button" className={`btn ${mode==='start'?'btn-main':'btn-sub'}`} disabled={busy||customerBusy} onClick={()=>{setMode('start');setError('')}}>見込み管理へ戻す</button>

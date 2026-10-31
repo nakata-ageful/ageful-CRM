@@ -1,4 +1,4 @@
-export type CustomerChoice = {id:number;name:string;company_name?:string|null;name_kana?:string|null;company_name_kana?:string|null}
+export type CustomerChoice = {id:number;name:string;is_corporate?:boolean;company_name?:string|null;name_kana?:string|null;company_name_kana?:string|null}
 
 function normalize(value:string):string {
   return value.normalize('NFKC').toLocaleLowerCase('ja').replace(/[\u30a1-\u30f6]/g,c=>String.fromCharCode(c.charCodeAt(0)-0x60)).replace(/\s+/g,'')
@@ -13,7 +13,7 @@ export function searchCustomers(customers:readonly CustomerChoice[],query:string
 
 type SortableCustomer=CustomerChoice&{is_corporate:boolean}
 const kanaCollator=new Intl.Collator('ja',{usage:'sort',sensitivity:'base',numeric:true})
-export function customerDisplayName(c:SortableCustomer):string{return (c.is_corporate?c.company_name:null)?.trim()||c.name}
+export function customerDisplayName(c:CustomerChoice):string{return (c.is_corporate?c.company_name:null)?.trim()||c.name}
 export function customerSortKana(c:SortableCustomer):string{return normalize((c.is_corporate?c.company_name_kana:c.name_kana)??'')}
 /** Never mutate input, merge identities or infer a company's reading from its contact. */
 export function sortCustomersByKana<T extends SortableCustomer>(customers:readonly T[]):T[]{

@@ -33,11 +33,11 @@ export function PowerContractImport({project,customer,onClose,onSaved}:{project:
  const fields=powerFields.filter(f=>data?.provider!=='kyushu'||!['grid_certified_at','power_supply_start_date'].includes(f.key))
  return <Modal title="電力会社の契約書PDFを読み込む" width={920} onClose={onClose} closeDisabled={saving}><div className="meti-import">
   <div className="meti-import-heading"><b>{project.plant_name||project.project_name}</b><span>顧客：{customerName}</span></div>
-  <div className="meti-file-row"><label className="meti-file">関西電力・九州電力の契約書<input type="file" accept="application/pdf,.pdf" disabled={busy||saving||!!pending} onChange={e=>void read(e.target.files?.[0])}/></label>{pdfUrl&&<a className="btn btn-sub btn-sm" href={pdfUrl} target="_blank" rel="noreferrer">元のPDFを開く</a>}</div>
+  <div className="meti-file-row"><label className="meti-file">電力会社の契約書<input type="file" accept="application/pdf,.pdf" disabled={busy||saving||!!pending} onChange={e=>void read(e.target.files?.[0])}/></label>{pdfUrl&&<a className="btn btn-sub btn-sm" href={pdfUrl} target="_blank" rel="noreferrer">元のPDFを開く</a>}</div>
   <small>端末内で読み取ります。チェックして「反映する」を押すまで登録内容は変わりません。</small>
   {busy&&<p role="status">{progress}</p>}<FormError message={error}/>
   {data&&<>
-   <div className="meti-identity"><b>{data.provider==='kansai'?'関西電力':'九州電力'}</b><span>PDFの契約名義：{data.businessName||'読み取れませんでした'}</span>{mismatch&&<strong>顧客名・設備IDに違いがあります。この発電所の書類か確認してください。所有者は変更しません。</strong>}{data.ocr&&<strong>画像から読み取っています。数字や名前を元のPDFと照合してください。</strong>}</div>
+   <div className="meti-identity"><b>契約書の読み取り結果</b><span>PDFの契約名義：{data.businessName||'読み取れませんでした'}</span>{mismatch&&<strong>顧客名・設備IDに違いがあります。この発電所の書類か確認してください。所有者は変更しません。</strong>}{data.ocr&&<strong>画像から読み取っています。数字や名前を元のPDFと照合してください。</strong>}</div>
    <p className="meti-instruction">内容を確認して、反映する項目にチェックしてください。</p>
    <div className="meti-comparison" aria-label="現在の登録内容と契約書の比較">
     <div className="meti-compare-head"><span>反映する項目</span><span>現在の登録内容</span><span>PDFから読み取った内容</span></div>

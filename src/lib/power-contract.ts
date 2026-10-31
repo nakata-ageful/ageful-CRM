@@ -35,9 +35,9 @@ export function parsePowerContract(input:CertificateText[],ocr=false):PowerContr
  function rowsFor(page:number){const rows:Row[]=[];for(const i of items.filter(i=>i.page===page).sort((a,b)=>b.y-a.y||a.x-b.x)){let r=rows.find(r=>Math.abs(r.y-i.y)<7);if(!r){r={text:'',y:i.y,items:[]};rows.push(r)}r.items.push(i)}for(const r of rows){r.items.sort((a,b)=>a.x-b.x);r.text=r.items.map(i=>i.text).join('')}return rows.sort((a,b)=>b.y-a.y)}
  const pages=[...new Set(items.map(i=>i.page))].map(page=>({page,rows:rowsFor(page)}))
  const contracts=pages.filter(p=>p.rows.some(r=>r.text.includes('電力受給契約内容のお知らせ')||r.text.includes('電力受給契約のご案内')))
- if(contracts.length!==1)throw Error('関西電力または九州電力の契約書を1件ずつ選んでください。書式を読み取れない場合は、鮮明なPDFをご用意ください。')
+ if(contracts.length!==1)throw Error('契約書を読み取れませんでした。電力会社の契約書を1件ずつ選んでください。書式によっては追加対応が必要です。')
  const rows=contracts[0].rows,text=rows.map(r=>r.text).join('\n'),k=text.includes('関西電力'),q=text.includes('九州電力')
- if(k===q)throw Error('電力会社を特定できませんでした。関西電力・九州電力の契約書を1件ずつ選んでください。')
+ if(k===q)throw Error('電力会社を特定できませんでした。契約書を1件ずつ選んでください。書式によっては追加対応が必要です。')
  const provider=k?'kansai':'kyushu'
  const row=(label:string)=>{const found=rows.filter(r=>r.text.startsWith(label));return found.length===1?found[0]:undefined}
  const right=(label:string)=>row(label)?.text.slice(label.length)??''

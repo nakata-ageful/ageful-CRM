@@ -97,13 +97,14 @@ export function createPowerOcr(signal:AbortSignal,onProgress:(s:string)=>void){
     // headings and the same contract/provider are present. Do not combine
     // competing OCR passes or infer cells from hard-coded page coordinates.
     const tableLabels=['受給開始日','固定買取終了年月','購入料金単価','受電地点特定番号','最大受電電力']
+    const completeTable=(text:string)=>tableLabels.every(label=>text.includes(label))||text.includes('太陽光発電からの電力受給契約のご案内')&&['受給開始日','取引開始指示数','購入料金単価','受給最大電力'].every(label=>text.includes(label))&&['お客様番号','お客さま番号'].some(label=>text.includes(label))
     const textOf=(ls:OcrLine[])=>compact(ls.flatMap(l=>l.words.map(w=>w.text)).join(''))
-    if(!tableLabels.every(label=>textOf(lines).includes(label))){
+    if(!completeTable(textOf(lines))){
      onProgress('契約書の表を読み取り直しています…')
      await job('setParameters',{params:{tessedit_pageseg_mode:'6'}})
      const table=await job('recognize',{image,options:{},output:{text:false,blocks:true}})
      const tableLines=(table.blocks??[]).flatMap(b=>b.paragraphs.flatMap(p=>p.lines)),text=textOf(tableLines)
-     if(text.includes('九州電力')&&!text.includes('関西電力')&&text.includes('電力受給契約のご案内')&&tableLabels.every(label=>text.includes(label)))lines=tableLines
+     if(text.includes('九州電力')&&!text.includes('関西電力')&&text.includes('電力受給契約のご案内')&&completeTable(text))lines=tableLines
     }
     const startLines=lines.filter(l=>compact(l.words.map(w=>w.text).join('')).startsWith('受給開始日'))
     const thirdLines=lines.filter(l=>compact(l.words.map(w=>w.text).join('')).startsWith('取引開始指示数'))

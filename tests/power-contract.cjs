@@ -55,3 +55,24 @@ console.log('PASS: FIT rule and month rollover, tax conversion without rounding,
  for(const [label,key]of [['受給開始日','changeDate'],['固定買取終了年月','fitMonth'],['購入料金単価(注1)','fitPrice']])assert.equal(a.parsePowerContract(items.filter(i=>i.text!==label),true)[key],'')
  console.log('PASS: three-column form, both complete ID families, customer/point separation, no adjacent-cell or malformed-ID guessing')
 }
+// Older utility form: customer number is not the 22-digit receiving point ID.
+{
+ const items=[],line=(text,x,y)=>items.push({text,x,y,width:80,page:1})
+ line('九州電力株式会社',360,800);line('合成事業者さま',50,790);line('太陽光発電からの電力受給契約のご案内',50,760)
+ line('受給地点(設備住所)',50,720);line('合成県合成市1-2',160,698)
+ line('受給最大電力(発電設備出力)',50,670);line('45.900kW',160,648)
+ line('お客さま番号',50,620);line('04-123-456-78-0000123 (51)',160,598)
+ line('受給開始日',50,570);line('取引開始指示数',220,570);line('購入料金単価',370,570)
+ line('平成27年1月14日',50,548);line('00070',220,548);line('38.88円',370,548)
+ line('連絡先',50,490);line('合成営業所',50,468);line('0120-000-000',50,446)
+ const old=a.parsePowerContract(items,true)
+ assert.equal(old.fitPrice,'','Do not assume 10% tax for an old contract');assert.match(old.notes,/38.88円（税区分未確認）/);assert.equal(old.customerNumber,'04-123-456-78-0000123(51)');assert.equal(old.pointId,'');assert.equal(old.changeDate,'2015-01-14');assert.equal(old.fitMonth,'','Missing FIT end is not inferred');assert.match(old.notes,/45.900kW/)
+ const customerReq=a.powerContractRequest({...p,customer_number:'000-old'},old,new Set(['customer_number']))
+ assert.equal(customerReq.before.customer_number,'000-old');assert.equal(customerReq.patch.customer_number,old.customerNumber);assert.deepEqual(Object.keys(customerReq.patch),['customer_number'])
+ assert.equal(a.parsePowerContract([...items,{text:'お客様番号99-12345',x:50,y:430,width:100,page:1}]).customerNumber,'','Ambiguous labels never choose one')
+ assert.equal(a.parsePowerContract(items.filter(i=>!i.text.includes('客さま番号')&&!i.text.includes('04-123'))).customerNumber,'','Unlabelled numbers never become customer number')
+ for(const value of ['06-1111-2222-3333-4444-5555','<script>','12\n34','A'.repeat(65),''])assert.throws(()=>a.powerContractRequest(p,{...old,customerNumber:value},new Set(['customer_number'])),/お客様番号/)
+ const inline=a.parsePowerContract([...f,{text:'お客様番号:001-234-567',x:50,y:200,width:300,page:1}]);assert.equal(inline.customerNumber,'001-234-567')
+ for(const [input,want]of [['平成31年4月30日','2019-04-30'],['令和元年5月1日','2019-05-01'],['平成31年5月1日',''],['平成27年2月30日','']])assert.equal(a.parsePowerContract(items.map(i=>i.text==='平成27年1月14日'?{...i,text:input}:i)).changeDate,want)
+ console.log('PASS: labelled customer numbers, leading zeros and suffix preserved, old utility form/era dates, no point-ID guessing, ambiguous/missing labels blank, explicit selected-field patch only')
+}

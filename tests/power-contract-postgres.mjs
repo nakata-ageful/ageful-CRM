@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import{readFileSync}from'node:fs'
 import{PGlite}from'@electric-sql/pglite'
-const db=new PGlite(),sql=readFileSync('database/migrations/20261031020013_power_contract_import.sql','utf8')
+const db=new PGlite(),sql=readFileSync('database/migrations/20261031020013_power_contract_import.sql','utf8')+'\n'+readFileSync('database/migrations/20261107050849_power_contract_customer_number.sql','utf8')
 const snapshot=async t=>(await db.query(`select to_jsonb(x) v from ${t} x order by to_jsonb(x)::text`)).rows.map(r=>r.v)
 const run=req=>db.transaction(async tx=>{await tx.exec('set local role authenticated');return(await tx.query('select power_contract_apply($1::jsonb) v',[JSON.stringify(req)])).rows[0].v})
 try{
@@ -19,6 +19,13 @@ try{
  const tables=['customers','projects','contracts','annual_records','maintenance_responses','periodic_maintenance','prospects'],baseline=Object.fromEntries(await Promise.all(tables.map(async t=>[t,await snapshot(t)])))
  await assert.rejects(db.exec(sql),/Wrong project/);await db.exec('rollback');await db.exec("update ageful_migration_target set project_ref='ufawaiddntqqbjhycbxn'");await db.exec(sql)
  for(const t of tables)assert.deepEqual(await snapshot(t),baseline[t],'Migration must not change business data')
+ const numberReq={projectId:1,customerId:1,before:{customer_number:null},patch:{customer_number:'04-123-456-78-0000123(51)'}}
+ assert.equal((await run(numberReq)).applied,true)
+ assert.equal((await snapshot('projects')).find(r=>r.id===1).customer_number,numberReq.patch.customer_number,'Preserve zeros and suffix as text')
+ const numberSaved=await snapshot('projects');await run(numberReq);assert.deepEqual(await snapshot('projects'),numberSaved,'Customer-number retry is a no-op')
+ await assert.rejects(run({...numberReq,patch:{customer_number:'9999'}}),/更新されています/)
+ for(const value of ['06-1111-2222-3333-4444-5555','<script>','12\n34','A'.repeat(65),'',null,123])await assert.rejects(run({...numberReq,before:{customer_number:numberReq.patch.customer_number},patch:{customer_number:value}}),/お客様番号|形式|反映できない/)
+ assert.deepEqual(await snapshot('projects'),numberSaved,'Invalid number writes nothing')
  const req={projectId:1,customerId:1,before:{fit_period:20,fit_end_date:null,power_company_notes:'元の備考'},patch:{fit_period:18,fit_end_date:'2040-01-01',power_company_notes:'元の備考\n電力会社情報'}}
  assert.equal((await run(req)).applied,true);const saved=await snapshot('projects');assert.equal(saved.find(r=>r.id===1).fit_period,18)
  await run(req);assert.deepEqual(await snapshot('projects'),saved,'Identical retry is a no-op')

@@ -98,6 +98,8 @@ const SORT_OPTIONS = [
   { key: 'created_asc',  label: '登録が古い順（登録順）' },
   { key: 'handover_desc', label: '引渡日が新しい順' },
   { key: 'handover_asc',  label: '引渡日が古い順' },
+  { key: 'power_supply_start_desc', label: '受給開始日が新しい順' },
+  { key: 'power_supply_start_asc', label: '受給開始日が古い順' },
   { key: 'name_asc',    label: '発電所名順（あいうえお）' },
   { key: 'project_no_asc', label: '案件番号順' },
 ] as const
@@ -146,6 +148,13 @@ export function Projects({ projects, customers, onReload, onViewDetail }: Props)
         if (el !== 0) return el
         const cmp = (a.handover_date ?? '').localeCompare(b.handover_date ?? '')
         return effectiveSortKey === 'handover_asc' ? cmp : -cmp
+      }
+      case 'power_supply_start_desc':
+      case 'power_supply_start_asc': {
+        const el = emptyLast(a.power_supply_start_date) - emptyLast(b.power_supply_start_date)
+        if (el !== 0) return el
+        const cmp = (a.power_supply_start_date ?? '').localeCompare(b.power_supply_start_date ?? '')
+        return effectiveSortKey === 'power_supply_start_asc' ? cmp : -cmp
       }
       case 'name_asc':
         return (a.plant_name || a.project_name).localeCompare(b.plant_name || b.project_name, 'ja')

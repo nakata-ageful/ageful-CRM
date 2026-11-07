@@ -259,6 +259,7 @@ export type DashboardStats = {
 }
 
 export type ProjectRow = {
+  power_supply_start_date: string | null
   archived_at?: string | null
   archive_reason?: string | null
   canonical_project_id?: number | null

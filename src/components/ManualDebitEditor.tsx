@@ -35,7 +35,7 @@ export function ManualDebitEditor({unit:initialUnit,recipientName,onSave,onClose
     <p>請求先：{unit.recipientId===null?'要確認':recipientName(unit.recipientId)} ／ 振替予定額：{unit.plannedAmount==null?'要確認':fmtYen(unit.plannedAmount)}</p>
     <FormError message={error}/><form onSubmit={submit}><fieldset disabled={busy} style={{border:0}}>
       {correcting?<p>訂正前の内容と理由を履歴に残します。請求先は変更しません。</p>:<label>確認結果<select value={mode} onChange={e=>setMode(e.target.value as typeof mode)}><option value="debit_received">入金を確認した</option><option value="debit_invoice_switch">振替不能を確認し、請求書へ切替</option></select></label>}
-      {mode!=='debit_invoice_switch'?<><label>入金日<input required type="date" value={date} onChange={e=>setDate(e.target.value)}/></label>
+      {mode!=='debit_invoice_switch'?<><label>入金日<input required type="date" max="9999-12-31" value={date} onChange={e=>setDate(e.target.value)}/></label>
         {items.map((item,index)=><div key={index} className="editor-line-item"><label>明細名<input required value={item.name} onChange={e=>setItems(items.map((v,i)=>i===index?{...v,name:e.target.value}:v))}/></label>
           <label>実際の入金額（税込）<input required inputMode="numeric" value={item.amount} onChange={e=>setItems(items.map((v,i)=>i===index?{...v,amount:e.target.value}:v))}/></label>
           {items.length>1&&<button type="button" onClick={()=>setItems(items.filter((_,i)=>i!==index))}>明細を削除</button>}</div>)}

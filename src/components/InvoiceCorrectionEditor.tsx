@@ -30,12 +30,12 @@ export function InvoiceCorrectionEditor({unit:initial,recipients,onSave,onClose}
       <CustomerPicker label="請求先" value={recipient} onChange={setRecipient} customers={recipients}/>
       <div className="invoice-correction-dates">
         <div role="group" aria-label="請求の日付">
-          <label>請求予定日<input type="date" value={scheduled} onChange={e=>setScheduled(e.target.value)}/></label>
-          <label>請求日<input type="date" value={issued} onChange={e=>setIssued(e.target.value)}/></label>
+          <label>請求予定日<input type="date" max="9999-12-31" value={scheduled} onChange={e=>setScheduled(e.target.value)}/></label>
+          <label>請求日<input type="date" max="9999-12-31" value={issued} onChange={e=>setIssued(e.target.value)}/></label>
         </div>
         <div role="group" aria-label="入金の日付">
-          <label>入金予定日<input type="date" value={due} onChange={e=>setDue(e.target.value)}/></label>
-          <label>入金日<input type="date" value={received} onChange={e=>setReceived(e.target.value)}/></label>
+          <label>入金予定日<input type="date" max="9999-12-31" value={due} onChange={e=>setDue(e.target.value)}/></label>
+          <label>入金日<input type="date" max="9999-12-31" value={received} onChange={e=>setReceived(e.target.value)}/></label>
         </div>
       </div>
       {items.map((i,n)=><div key={n} className="editor-line-item"><label>明細名<input value={i.name} onChange={e=>setItems(items.map((v,k)=>k===n?{...v,name:e.target.value}:v))}/></label><label>金額（税込）<input inputMode="numeric" value={i.amount} onChange={e=>setItems(items.map((v,k)=>k===n?{...v,amount:e.target.value}:v))}/></label><button type="button" onClick={()=>setItems(items.filter((_,k)=>k!==n))}>明細を削除</button></div>)}

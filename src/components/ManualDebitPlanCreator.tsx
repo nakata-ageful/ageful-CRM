@@ -24,7 +24,7 @@ export function ManualDebitPlanCreator({onSave,recipients=[{id:1,name:'顧客A'}
  <CustomerPicker label="請求先" value={recipient} onChange={setRecipient} customers={recipients}/>
  <label>対象年<input value={year} onChange={e=>setYear(e.target.value)} inputMode="numeric" required/></label>
  <label>対象月<input value={month} onChange={e=>setMonth(e.target.value)} inputMode="numeric" required/></label>
- <label>振替予定日<input type="date" value={date} onChange={e=>setDate(e.target.value)} required/></label>
+ <label>振替予定日<input type="date" max="9999-12-31" value={date} onChange={e=>setDate(e.target.value)} required/></label>
  <label>予定額（税込・空欄は要確認）<input value={amount} onChange={e=>setAmount(e.target.value)} inputMode="numeric"/></label>
  <label>備考<textarea value={note} onChange={e=>setNote(e.target.value)}/></label>
  <label>追加の確認内容・理由<textarea value={reason} onChange={e=>setReason(e.target.value)} required/></label>

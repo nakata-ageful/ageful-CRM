@@ -105,7 +105,7 @@ function InvoiceDbPreview() {
   }
   const dateInput = (label: string, v: string, set: (v: string) => void, required = false) =>
     <label className="form-group"><span className="form-label">{label}</span>
-      <input className="form-input" type="date" value={v} onInput={e => set(e.currentTarget.value)} onChange={e => set(e.target.value)} required={required} /></label>
+      <input className="form-input" type="date" max="9999-12-31" value={v} onInput={e => set(e.currentTarget.value)} onChange={e => set(e.target.value)} required={required} /></label>
 
   return <main style={{ maxWidth: 1100, margin: '24px auto', padding: '0 20px', display: 'grid', gap: 18 }}>
     <div className="notice">架空データ専用の確認画面です。本番の請求や顧客は変更しません。保存先はこの画面内の検証用DBで、再読み込みすると初期状態に戻ります。</div>

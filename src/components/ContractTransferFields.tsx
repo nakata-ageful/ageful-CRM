@@ -36,7 +36,7 @@ export function ContractTransferFields({contract,choices,onChange,disabled=false
             :options?<select aria-label={inputLabel} className="form-input" value={String(value??'')} onChange={e=>change(e.target.value)}><option value="">選択してください</option>{options.map(option=><option key={option}>{option}</option>)}</select>
             :kind==='strings'?<label>1行に1予定日（請求書：6月15日／口座振替：25日）<textarea className="form-input" value={Array.isArray(value)?value.join('\n'):''} onChange={e=>change(e.target.value.split('\n'))}/></label>
             :kind==='number'?<input aria-label={inputLabel} className="form-input" type="number" min="0" step="1" value={typeof value==='number'&&Number.isFinite(value)?value:''} onChange={e=>change(e.target.value===''?NaN:Number(e.target.value))}/>
-            :kind==='date'?<input aria-label={inputLabel} className="form-input" type="date" value={String(value??'')} onChange={e=>change(e.target.value)}/>
+            :kind==='date'?<input aria-label={inputLabel} className="form-input" type="date" max="9999-12-31" value={String(value??'')} onChange={e=>change(e.target.value)}/>
             :<textarea aria-label={inputLabel} className="form-input" value={String(value??'')} onChange={e=>change(e.target.value)}/>)}
           </>}
         </details>

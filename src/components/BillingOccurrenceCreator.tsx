@@ -57,10 +57,10 @@ export function BillingOccurrenceCreator({candidate,contract,units,recipients,on
     <form onSubmit={review}><fieldset disabled={busy} style={{border:0,padding:0}}>
       <label>保守期間の開始年<input type="number" min={2000} max={2199} required value={year} onChange={e=>years(e.target.value)}/></label>
       <label>対象の回<select value={round} onChange={e=>{changeCoverage(setRound,e.target.value);invoiceDate(year,e.target.value)}}>{Array.from({length:detailPlanCount(contract)},(_,i)=><option key={i} value={i+1}>第{i+1}回</option>)}</select></label>
-      <label>保守期間の開始日<input type="date" required value={start} onChange={e=>{changeCoverage(setStart,e.target.value);setYear(e.target.value.slice(0,4))}}/></label>
-      <label>保守期間の終了日<input type="date" required value={end} onChange={e=>changeCoverage(setEnd,e.target.value)}/></label>
+      <label>保守期間の開始日<input type="date" max="9999-12-31" required value={start} onChange={e=>{changeCoverage(setStart,e.target.value);setYear(e.target.value.slice(0,4))}}/></label>
+      <label>保守期間の終了日<input type="date" max="9999-12-31" required value={end} onChange={e=>changeCoverage(setEnd,e.target.value)}/></label>
       <CustomerPicker label="請求先" value={recipient} onChange={value=>change(setRecipient,value)} customers={recipients}/>
-      <label>{debit?'振替予定日':'請求予定日'}<input type="date" required value={date} onChange={e=>changeCoverage(setDate,e.target.value)}/></label>
+      <label>{debit?'振替予定日':'請求予定日'}<input type="date" max="9999-12-31" required value={date} onChange={e=>changeCoverage(setDate,e.target.value)}/></label>
       <label>予定額（税込）<input inputMode="numeric" required value={amount} onChange={e=>change(setAmount,e.target.value)}/></label>
       <label>確認内容・備考<textarea required value={reason} onChange={e=>change(setReason,e.target.value)} placeholder="対象期間・請求先・予定額を確認した内容"/></label>
       {confirmed&&<div className="billing-plan-confirmation" role="status"><strong>{purpose==='adjust'?'今回の予定：1件':'追加する予定：1件'}</strong><p>{confirmed.periodStart} ～ {confirmed.periodEnd} ／ 第{confirmed.round}回<br/>請求先：{(()=>{const payer=recipients.find(r=>r.id===confirmed.recipientId);return payer?customerDisplayName(payer):'請求先未設定'})()}<br/>{debit?'振替':'請求'}予定日：{confirmed.date} ／ 予定額：{fmtYen(confirmed.amount!)}</p><p>この予定を保存した後、この画面から{debit?'振替結果':'請求日・入金日'}を記録できます。</p></div>}

@@ -53,8 +53,8 @@ export function RoutineInvoiceEditor({context,recipients,onAdd,onSave,onClose,on
     {error&&<><FormError message={error}/><p>「保存結果が未確認」と表示された場合は、入力を変えず、いったんキャンセルで閉じて画面上部の「保存結果を再確認」を押してください。確認後は一覧に戻り、その記録の状態を確認してください。</p></>}
     <form onSubmit={save}><fieldset disabled={busy} style={{border:0,padding:0}}>
       <CustomerPicker label="請求先" value={payer} customers={recipients} onChange={setPayer} disabled={!!prepared}/>
-      <label>請求日<input type="date" required value={date} onChange={e=>setDate(e.target.value)}/></label>
-      <label>入金予定日<input type="date" value={due} onChange={e=>setDue(e.target.value)}/></label>
+      <label>請求日<input type="date" max="9999-12-31" required value={date} onChange={e=>setDate(e.target.value)}/></label>
+      <label>入金予定日<input type="date" max="9999-12-31" value={due} onChange={e=>setDue(e.target.value)}/></label>
       {items.map((line,index)=><div className="editor-line-item" key={index}>
         <label>明細名<input required value={line.name} onChange={e=>setItems(items.map((v,i)=>i===index?{...v,name:e.target.value}:v))}/></label>
         <label>金額（税込）<input required inputMode="numeric" value={line.amount} onChange={e=>setItems(items.map((v,i)=>i===index?{...v,amount:e.target.value}:v))}/></label>

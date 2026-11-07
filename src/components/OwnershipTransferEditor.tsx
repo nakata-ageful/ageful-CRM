@@ -74,7 +74,7 @@ export function OwnershipTransferEditor({project:initialProject,contract:initial
         <div><CustomerPicker label="新しい所有者" value={target} disabled={creating||customerBusy} onChange={value=>{setTarget(value);setCustomerNotice('')}} customers={allCustomers.filter(c=>c.id!==project.customer_id)} emptyLabel="顧客を選択してください"/>
           {onCreateCustomer&&onReloadCustomers&&<button type="button" className="btn btn-sub btn-sm ownership-new-customer-trigger" disabled={customerBusy} aria-expanded={creating} onClick={()=>setCreating(!creating)}>{creating?'登録欄を閉じる':'＋ 新規顧客を登録'}</button>}
         </div>
-        <label>変更日<input className="form-input" type="date" value={date} onChange={e=>setDate(e.target.value)}/></label>
+        <label>変更日<input className="form-input" type="date" max="9999-12-31" value={date} onChange={e=>setDate(e.target.value)}/></label>
       </div>
         {customerNotice&&<p role="status">{customerNotice}</p>}
         {onCreateCustomer&&onReloadCustomers&&<div hidden={!creating}><CustomerRegistration key={registrationSession} customers={allCustomers} currentOwnerId={oldOwner.id} onCreate={onCreateCustomer} onReload={onReloadCustomers} pendingInput={pendingCustomerInput} onPendingChange={onPendingCustomerChange} onSelect={selectCustomer} onCancel={()=>setCreating(false)} onBusyChange={value=>{setCustomerBusy(value);onBusyChange?.(value)}}/></div>}
@@ -89,13 +89,13 @@ export function OwnershipTransferEditor({project:initialProject,contract:initial
           <label>第何回<input className="form-input" type="number" min="1" max="96" value={nextRound} onChange={e=>setNextRound(Number(e.target.value))}/></label>
           <label>請求先<select className="form-input" value={nextRecipient} onChange={e=>setNextRecipient(e.target.value as 'old'|'new')}><option value="old">{customerDisplayName(oldOwner)}</option><option value="new">{customerDisplayName(newOwner)}</option></select></label>
           <label>方法<select className="form-input" value={nextMethod} onChange={e=>setNextMethod(e.target.value as 'invoice'|'direct_debit')}><option value="invoice">請求書</option><option value="direct_debit">口座振替</option></select></label>
-          <label>請求・振替予定日<input className="form-input" type="date" value={nextDate} onChange={e=>setNextDate(e.target.value)}/></label>
+          <label>請求・振替予定日<input className="form-input" type="date" max="9999-12-31" value={nextDate} onChange={e=>setNextDate(e.target.value)}/></label>
           <label>予定額（税込）<input className="form-input" type="number" min="0" step="1" value={nextAmount} onChange={e=>setNextAmount(e.target.value)}/></label>
           </div>
           <div className="ownership-occurrence-period">
             <label className="ownership-transfer-check"><input type="checkbox" checked={individualPeriod} aria-expanded={individualPeriod} aria-controls="ownership-occurrence-period-dates" onChange={e=>setIndividualPeriod(e.target.checked)}/><span>この回の保守期間を個別指定する</span></label>
-            {individualPeriod&&<div id="ownership-occurrence-period-dates" className="ownership-occurrence-grid"><label>保守期間の開始日<input className="form-input" type="date" value={periodStart} onChange={e=>setPeriodStart(e.target.value)}/></label>
-            <label>保守期間の終了日<input className="form-input" type="date" value={periodEnd} onChange={e=>setPeriodEnd(e.target.value)}/></label></div>}
+            {individualPeriod&&<div id="ownership-occurrence-period-dates" className="ownership-occurrence-grid"><label>保守期間の開始日<input className="form-input" type="date" max="9999-12-31" value={periodStart} onChange={e=>setPeriodStart(e.target.value)}/></label>
+            <label>保守期間の終了日<input className="form-input" type="date" max="9999-12-31" value={periodEnd} onChange={e=>setPeriodEnd(e.target.value)}/></label></div>}
           </div>
         </div>}
       </section>}

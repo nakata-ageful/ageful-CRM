@@ -29,7 +29,7 @@ export function InvoicePlanEditor({unit:initialUnit,recipients,onSave,onClose}:{
     <p>今回だけの請求先・日付・予定額を変更します。保存しても未発行の予定のままです。</p>
     <FormError message={error}/><form onSubmit={save}><fieldset disabled={busy} style={{border:0}}>
       <CustomerPicker label="請求先" value={payer} onChange={setPayer} customers={recipients} emptyLabel="請求先要確認"/>
-      <label>請求予定日<input type="date" value={date} onChange={e=>setDate(e.target.value)}/></label>
+      <label>請求予定日<input type="date" max="9999-12-31" value={date} onChange={e=>setDate(e.target.value)}/></label>
       <label>予定額（税込）<input inputMode="numeric" value={amount} onChange={e=>setAmount(e.target.value)}/></label>
       <p>金額の空欄は「金額要確認」です。今回の予定額は、今後の基本設定を変更しても自動では変わりません。</p>
       <div className="editor-footer"><button className="btn btn-sub" type="button" onClick={onClose}>キャンセル</button><button className="btn btn-main" type="submit">{busy?'保存中…':'予定を保存'}</button></div>

@@ -21,7 +21,7 @@ export function ManagementLifecycleEditor({projectId,events,units,onSave,expande
    <fieldset disabled={busy} onChange={()=>setReviewed(false)} style={{border:0,padding:0}}>
     <label>対象<select className="form-input" value={scope} onChange={e=>setScope(e.target.value as ManagementRequest['scope'])}><option value="maintenance">保守だけ</option><option value="all">すべての取引</option></select></label>
     <label>操作<select className="form-input" value={action} onChange={e=>setAction(e.target.value as ManagementRequest['action'])}><option value="end">終了する</option><option value="resume">再開する</option></select></label>
-    <label>{action==='end'?'終了日（この日まで管理）':'再開日（この日から管理）'}<input className="form-input" type="date" value={date} onChange={e=>setDate(e.target.value)}/></label>
+    <label>{action==='end'?'終了日（この日まで管理）':'再開日（この日から管理）'}<input className="form-input" type="date" max="9999-12-31" value={date} onChange={e=>setDate(e.target.value)}/></label>
     <p>終了の翌日から新しい予定の候補を停止します。保守だけの終了では土地代などは対象外にしません。全取引を再開しても、別に終了した保守は自動再開しません。</p>
     {action==='resume'&&<p>当初の保守開始日は書き換えず、再開日を履歴に残します。取りやめた予定の復活、空白期間の請求、日割り計算は行いません。前払いがあるため、初回請求日・金額は別途確認します。</p>}
     <h4>保存済みの予定をどうするか</h4><p>日付だけで判断せず、前払いの対象期間と土地代などの混在を確認してください。変更前の金額・請求先は履歴に残ります。</p>

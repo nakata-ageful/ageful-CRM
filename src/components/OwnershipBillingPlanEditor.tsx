@@ -67,13 +67,13 @@ export function OwnershipBillingPlanEditor({projectId,oldOwner,newOwner,units:in
             <label>請求方法<select className="form-input" value={d.method} onChange={e=>patch(i,'method',e.target.value)}>
               <option>請求書</option>{!failed&&<option>口座振替</option>}
             </select></label>
-            <label>請求・振替予定日<input className="form-input" type="date" required value={d.scheduledDate} onChange={e=>patch(i,'scheduledDate',e.target.value)}/></label>
+            <label>請求・振替予定日<input className="form-input" type="date" max="9999-12-31" required value={d.scheduledDate} onChange={e=>patch(i,'scheduledDate',e.target.value)}/></label>
             <label>予定額（税込）<input className="form-input" inputMode="numeric" value={d.amount} onChange={e=>patch(i,'amount',e.target.value)}/></label>
           </div>
           <details className="ownership-billing-extra"><summary>詳細設定：対象期間・備考{(d.periodStart||d.periodEnd||d.note)?'（入力あり）':''}</summary>
           <div className="ownership-billing-fields">
-            <label>対象期間の開始（任意）<input className="form-input" type="date" value={d.periodStart} onChange={e=>patch(i,'periodStart',e.target.value)}/></label>
-            <label>対象期間の終了（任意）<input className="form-input" type="date" value={d.periodEnd} onChange={e=>patch(i,'periodEnd',e.target.value)}/></label>
+            <label>対象期間の開始（任意）<input className="form-input" type="date" max="9999-12-31" value={d.periodStart} onChange={e=>patch(i,'periodStart',e.target.value)}/></label>
+            <label>対象期間の終了（任意）<input className="form-input" type="date" max="9999-12-31" value={d.periodEnd} onChange={e=>patch(i,'periodEnd',e.target.value)}/></label>
           </div>
           <label>備考<textarea className="form-input" value={d.note} onChange={e=>patch(i,'note',e.target.value)}/></label>
           </details>

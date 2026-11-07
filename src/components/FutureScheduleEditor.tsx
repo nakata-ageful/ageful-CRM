@@ -40,7 +40,7 @@ export function FutureScheduleEditor({row,customers,units,events,onSave,onPeriod
   <label>保守期間の開始年 <input type="number" min={2000} max={2199} value={year} onChange={e=>{setYear(Number(e.target.value));setItems([]);setExcluded([]);setReviewed(false)}}/></label>
   {!individual&&<p>{(()=>{try{if(!row.contract)throw Error('契約未設定');const p=futureMaintenancePeriod(row.contract,year,cycleRules);return `保守期間：${p.periodStart} ～ ${p.periodEnd}`}catch(e){return e instanceof Error?e.message:'保守期間要確認'}})()}</p>}
   <label><input type="checkbox" checked={individual} onChange={e=>{setIndividual(e.target.checked);setItems([]);setReviewed(false)}}/>保守期間を個別指定する</label>
-  {individual&&<div><label>個別の保守開始日 <input type="date" value={periodStart} onChange={e=>{setPeriodStart(e.target.value);setYear(Number(e.target.value.slice(0,4)));setItems([]);setReviewed(false)}}/></label><label>個別の保守終了日 <input type="date" value={periodEnd} onChange={e=>{setPeriodEnd(e.target.value);setItems([]);setReviewed(false)}}/></label><p>この追加分だけの個別期間です。翌年以降の標準期間は「請求情報」の繰り返し設定で変更できます。予定の追加では過去の請求期間を変更しません。</p></div>}
+  {individual&&<div><label>個別の保守開始日 <input type="date" max="9999-12-31" value={periodStart} onChange={e=>{setPeriodStart(e.target.value);setYear(Number(e.target.value.slice(0,4)));setItems([]);setReviewed(false)}}/></label><label>個別の保守終了日 <input type="date" max="9999-12-31" value={periodEnd} onChange={e=>{setPeriodEnd(e.target.value);setItems([]);setReviewed(false)}}/></label><p>この追加分だけの個別期間です。翌年以降の標準期間は「請求情報」の繰り返し設定で変更できます。予定の追加では過去の請求期間を変更しません。</p></div>}
   <CustomerPicker label="追加分の請求先" value={recipient} onChange={value=>{setRecipient(value);setItems([]);setReviewed(false)}} customers={customers}/>{' '}<button onClick={preview}>追加できる予定を確認</button>
   {individual&&onPeriodSave&&own.some(u=>u.serviceYear===year)&&<section><p>{year}年の保存済み{own.filter(u=>u.serviceYear===year).length}回すべてに、この保守期間を指定します。発行・入金済みも含みますが、金額・請求先・入金日・元記録は変更しません。</p><label>期間変更の確認理由 <input value={periodReason} onChange={e=>setPeriodReason(e.target.value)}/></label><label><input type="checkbox" checked={periodConfirmed} onChange={e=>setPeriodConfirmed(e.target.checked)}/>上記の保存済み記録に適用することを確認しました</label><button disabled={!periodConfirmed||!periodReason.trim()||!isBillingDate(periodStart)||!isBillingDate(periodEnd)} onClick={()=>void savePeriod()}>保存済み記録の保守期間だけを保存</button></section>}
   <FormError message={error}/>{notice&&<p role="status">{notice}</p>}
@@ -48,7 +48,7 @@ export function FutureScheduleEditor({row,customers,units,events,onSave,onPeriod
   {items.map((i,n)=><div key={`${i.year}:${i.round}`} style={{padding:10,borderBottom:'1px solid #ddd'}}>
    <label><input type="checkbox" checked={i.include} onChange={e=>change(n,{include:e.target.checked})}/>第{i.round}回 ／ {i.method==='invoice'?'請求書':'口座振替'}</label>
    <p>{i.periodStart} ～ {i.periodEnd}</p>
-   <label>請求予定日（前払いなら前年も指定可） <input type="date" value={i.date} onChange={e=>change(n,{date:e.target.value})}/></label>{' '}
+   <label>請求予定日（前払いなら前年も指定可） <input type="date" max="9999-12-31" value={i.date} onChange={e=>change(n,{date:e.target.value})}/></label>{' '}
    <CustomerPicker label="請求先" value={String(i.recipientId)} onChange={value=>change(n,{recipientId:Number(value)})} customers={customers} allowClear={false}/>{' '}
    <label>予定額 <input type="number" min={0} step={1} value={i.amount??''} onChange={e=>change(n,{amount:e.target.value===''?null:Number(e.target.value)})}/></label>
    <p>期間途中の終了・再開や他費目の金額は確認してください。日割り・返金は自動計算しません。</p>

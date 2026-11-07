@@ -125,7 +125,7 @@ function Preview() {
         setStep('confirm')
       }}>
         {select('新しい所有者', newOwner, setNewOwner)}
-        <label className="form-group"><span className="form-label">所有者変更日</span><input required type="date" className="form-input" value={transferDate} onChange={e => setTransferDate(e.target.value)} /></label>
+        <label className="form-group"><span className="form-label">所有者変更日</span><input required type="date" max="9999-12-31" className="form-input" value={transferDate} onChange={e => setTransferDate(e.target.value)} /></label>
         <p>保守・請求条件：そのまま引き継ぐ（条件変更は今回の検証対象外）</p>
         <p>次の未発行の請求：{next?.scheduledDate}・{next?.roundLabel}・予定額 {fmtYen(annualAmount)}</p>
         {select('次回の請求先', nextRecipient, setNextRecipient)}

@@ -1178,7 +1178,7 @@ function ContractField({ label, type, value, onChange }: { label: string; type: 
       {label}
       <input
         className="form-input"
-        type={type}
+        type={type} max={type==='date'?'9999-12-31':type==='month'?'9999-12':undefined}
         style={{ padding: '4px 8px', fontSize: 12 }}
         value={value}
         onChange={e => onChange(e.target.value)}

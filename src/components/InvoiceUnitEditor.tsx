@@ -46,8 +46,8 @@ export function InvoiceUnitEditor({unit:initialUnit,recipientName,onSave,onClose
     {!issuing&&<p>確定額：{unit.frozenAmount===null?'金額要確認':fmtYen(unit.frozenAmount)}</p>}
     <FormError message={error}/>
     <form onSubmit={save}><fieldset disabled={busy} style={{border:0}}>
-      <label>{issuing?'請求日':'入金日'}<input type="date" required value={date} onChange={e=>setDate(e.target.value)}/></label>
-      {issuing&&<><label>入金予定日<input type="date" value={due} onChange={e=>setDue(e.target.value)}/></label>
+      <label>{issuing?'請求日':'入金日'}<input type="date" max="9999-12-31" required value={date} onChange={e=>setDate(e.target.value)}/></label>
+      {issuing&&<><label>入金予定日<input type="date" max="9999-12-31" value={due} onChange={e=>setDue(e.target.value)}/></label>
         {items.map((item,index)=><div key={index} className="editor-line-item">
           <label>明細名<input required value={item.name} onChange={e=>setItems(items.map((v,i)=>i===index?{...v,name:e.target.value}:v))}/></label>
           <label>金額（税込）<input required inputMode="numeric" value={item.amount} onChange={e=>setItems(items.map((v,i)=>i===index?{...v,amount:e.target.value}:v))}/></label>

@@ -36,7 +36,7 @@ export function createPowerOcr(signal:AbortSignal,onProgress:(s:string)=>void){
    let baseline:ReturnType<typeof parsePowerContract>|undefined
    if(tableRows.length&&pageText.includes('関西電力')&&!pageText.includes('九州電力')&&pageText.includes('電力受給契約内容のお知らせ')){
     try{baseline=parsePowerContract(toItems(),true)}catch{/* Incomplete OCR is handled by the normal parser after retry. */}
-    if(!baseline||['gridId','certifiedAt','pointId','supplyStart','changeDate','fitPrice','fitMonth'].some(k=>!baseline![k as keyof typeof baseline])){
+    if(!baseline||['gridId','certifiedAt','pointId','supplyStart','changeDate','priceAmount','fitMonth'].some(k=>!baseline![k as keyof typeof baseline])){
      onProgress('読み取れなかった表の項目を確認しています…')
      const readCell=async(rectangle:PowerCell)=>{
       const cell=await job('recognize',{image,options:{rectangle},output:{text:false,blocks:true}})
@@ -54,9 +54,9 @@ export function createPowerOcr(signal:AbortSignal,onProgress:(s:string)=>void){
       const initial=compact(lines.flatMap(l=>l.words.filter(w=>inCell(w,row.cells[0])).map(w=>w.text)).join(''))
       const name=nameOf(initial)??nameOf(await readCell(row.cells[0]))
       if(!name)continue
-      const key=name==='受給開始日'?'supplyStart':name==='特定契約日'?'changeDate':name==='買取単価'?'fitPrice':undefined
+      const key=name==='受給開始日'?'supplyStart':name==='特定契約日'?'changeDate':name==='買取単価'?'priceAmount':undefined
       if(key&&!baseline?.[key]){
-       const value=await readCell(row.cells[1]),valid=key==='fitPrice'?/^\d+(?:\.\d+)?円/.test(value)&&value.includes('消費税'):validDate(value)
+       const value=await readCell(row.cells[1]),valid=key==='priceAmount'?/^\d+(?:\.\d+)?円/.test(value)&&value.includes('消費税'):validDate(value)
        if(valid)pairs.push({label:name,labelCell:row.cells[0],valueCell:row.cells[1],value})
       }
       if(name==='認定ID'||name==='受電地点特定番号'||name==='受給最大電力'&&!baseline?.notes.includes('最大受電電力：')){

@@ -1,7 +1,8 @@
 import type {Project} from '../types'
 import {validCertificateDate,type CertificateText} from './meti-certificate'
 
-export type PowerContractData={provider:'kansai'|'kyushu';businessName:string;gridId:string;certifiedAt:string;pointId:string;customerNumber:string;supplyStart:string;changeDate:string;fitPrice:string;fitMonth:string;notes:string;ocr:boolean}
+export type PowerPriceTax='unknown'|'exclusive'|'inclusive8'|'inclusive10'
+export type PowerContractData={provider:'kansai'|'kyushu';businessName:string;gridId:string;certifiedAt:string;pointId:string;customerNumber:string;supplyStart:string;changeDate:string;priceAmount:string;priceTax:PowerPriceTax;fitPrice:string;fitMonth:string;notes:string;ocr:boolean}
 export const powerFields=[
  {key:'grid_id',source:'gridId',label:'設備ID',type:'text'},
  {key:'grid_certified_at',source:'certifiedAt',label:'認定日',type:'date'},
@@ -30,8 +31,22 @@ function date(text:string){
 }
 export function validPowerCustomerNumber(value:string){return value.length<=64&&/^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*(?:\([A-Za-z0-9]+\))?$/.test(value)&&!/^\d{2}(?:-\d{4}){5}$/.test(value)}
 function month(text:string){const m=compact(text).match(/(\d{4})年(\d{1,2})月/);const s=m?`${m[1]}-${m[2].padStart(2,'0')}`:'';return validCertificateDate(`${s}-01`)?s:''}
-/** User-specified conversion for the supported Kyushu form. Never round a price. */
-export function kyushuNetPrice(gross:string){if(!/^\d+(?:\.\d{1,2})?$/.test(gross))return '';const [a,b='']=gross.split('.');return String((Number(a)*100+Number(b.padEnd(2,'0')))/110)}
+/** Exact decimal arithmetic. The existing FIT column accepts integer yen only.
+ * Neither a nearby tariff nor a document/company/date is a tax-rate fallback. */
+export function powerPriceResult(amount:string,tax:PowerPriceTax):{net:string;error:string}{
+ if(!['exclusive','inclusive8','inclusive10'].includes(tax))return{net:'',error:'金額の種類を選んでください。FITはまだ反映しません。'}
+ if(!/^\d{1,6}(?:\.\d{1,6})?$/.test(amount))return{net:'',error:'PDFの単価を半角数字で入力してください。'}
+ const [whole,fraction='']=amount.split('.'),numerator=BigInt(whole+fraction)*100n,denominator=10n**BigInt(fraction.length)*BigInt(tax==='inclusive8'?108:tax==='inclusive10'?110:100)
+ if(numerator<=0n||numerator>denominator*1000n)return{net:'',error:'単価を確認してください。FITは1〜1,000円の範囲です。'}
+ if(numerator%denominator!==0n)return{net:'',error:'税抜単価が整数になりません。丸めずに、単価と税の種類を確認してください。'}
+ return{net:String(numerator/denominator),error:''}
+}
+function priceTaxFromText(text:string):PowerPriceTax{
+ const t=compact(text),exclusive=/税抜|税別|円に消費税.*加えた金額/.test(t),inclusive=/税込|内税/.test(t)
+ if(exclusive&&!inclusive)return'exclusive'
+ const rates=[...new Set([...t.matchAll(/(?:^|[^\d.])(8|10)%/g)].map(m=>m[1]))]
+ return inclusive&&!exclusive&&rates.length===1?(rates[0]==='8'?'inclusive8':'inclusive10'):'unknown'
+}
 export function powerNotes(existing:string|null|undefined,incoming:string){const old=existing??'',addition=incoming.trim();if(!addition||old.includes(addition))return old;return [old.trim(),addition].filter(Boolean).join('\n\n')}
 
 /** Read only a single supported contract page. Rows are reconstructed by position,
@@ -78,9 +93,8 @@ export function parsePowerContract(input:CertificateText[],ocr=false):PowerContr
  const changeDate=k?date(right('特定契約日').split('契約変更日')[0]):date(below('受給開始日'))
  const certifiedAt=k?date(row('認定ID')?.text.split('認定日')[1]??''):''
  const fitMonth=k?kansaiFitMonth(supplyStart):month(below('固定買取終了年月'))
- const priceRaw=(k?right('買取単価'):below('購入料金単価')).match(/^(\d+(?:\.\d+)?)円/)
- // Kansai explicitly states tax is added. A different tax format is not guessed.
- const fitPrice=k?(priceRaw&&right('買取単価').includes('消費税')?String(Number(priceRaw[1])):''):(!legacyKyushu&&priceRaw?kyushuNetPrice(priceRaw[1]):'')
+ const priceText=k?right('買取単価'):below('購入料金単価'),priceRaw=priceText.match(/^(\d+(?:\.\d+)?)円/)
+ const priceAmount=priceRaw?.[1]??'',priceTax=priceTaxFromText(priceText),fitPrice=powerPriceResult(priceAmount,priceTax).net
  const businessName=k?right('ご契約名義'):rows.filter(r=>r.text.endsWith('さま')&&r.y>(rows.find(r=>r.text.includes('電力受給契約のご案内'))?.y??0)).map(r=>r.text.replace(/さま$/,'')).join('')
  const site=k?right('発電設備設置場所'):below('発電場所')||below('受給地点(設備住所)')
  const max=(k?right('受給最大電力'):below('最大受電電力')||below('受給最大電力')).match(/^(\d{1,3}\.\d+)kW/i)?.[0]??''
@@ -90,13 +104,13 @@ export function parsePowerContract(input:CertificateText[],ocr=false):PowerContr
  const contactIndex=rows.findIndex(r=>k?r.text.startsWith('当社の連絡先'):r.text.includes('連絡先')&&r.text.length<15)
  const contactRows=contactIndex<0?[]:rows.slice(contactIndex,contactIndex+4)
  const contact=contactRows.map(r=>r.text).join('\n').replace(/^当社の連絡先[:：]?/,'').replace(/電話番号[:：]?/,'').split(/※|お問合せ/)[0].replace(/^[<〈＜].*?[>〉＞]\n?/,'').trim()
- const notes=[`【${k?'関西電力':'九州電力'} 契約書】`,site?`発電場所：${site}`:'',max?`最大受電電力：${max}`:'',[electrical,freq,volts].filter(Boolean).join('／'),legacyKyushu&&priceRaw?`購入料金単価（書類表記）：${priceRaw[1]}円（税区分未確認）`:'',contact?`電力会社連絡先：${contact}`:''].filter(Boolean).join('\n')
- return {provider,businessName,gridId,certifiedAt,pointId,customerNumber,supplyStart,changeDate,fitPrice,fitMonth,notes,ocr}
+ const notes=[`【${k?'関西電力':'九州電力'} 契約書】`,site?`発電場所：${site}`:'',max?`最大受電電力：${max}`:'',[electrical,freq,volts].filter(Boolean).join('／'),legacyKyushu&&priceRaw?`購入料金単価（書類表記）：${priceRaw[1]}円`:'',contact?`電力会社連絡先：${contact}`:''].filter(Boolean).join('\n')
+ return {provider,businessName,gridId,certifiedAt,pointId,customerNumber,supplyStart,changeDate,priceAmount,priceTax,fitPrice,fitMonth,notes,ocr}
 }
 
 export function powerContractRequest(project:Project,data:PowerContractData,selected:Set<string>):PowerContractRequest{
  const patch:PowerPatch={},before:PowerPatch={}
- for(const f of powerFields){if(!selected.has(f.key))continue;const v=data[f.source].trim();if(!v)throw Error(`${f.label}の読み取り内容を入力してください。`)
+ for(const f of powerFields){if(!selected.has(f.key))continue;const price=f.key==='fit_period'?powerPriceResult(data.priceAmount,data.priceTax):null;if(price?.error)throw Error(price.error);const v=(price?price.net:data[f.source]).trim();if(!v)throw Error(`${f.label}の読み取り内容を入力してください。`)
   if(f.type==='date'&&!validCertificateDate(v)||f.type==='month'&&!validCertificateDate(`${v}-01`))throw Error(`${f.label}を確認してください。`)
   if(f.key==='grid_id'&&!/^[A-Z0-9]{6,30}$/.test(v))throw Error('設備IDを半角英数字で確認してください。')
   if(f.key==='generation_point_id'&&!/^\d{2}(?:-\d{4}){5}$/.test(v))throw Error('受給地点番号は22桁の数字をハイフンで区切って入力してください。')

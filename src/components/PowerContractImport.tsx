@@ -2,7 +2,7 @@ import {useEffect,useLayoutEffect,useRef,useState} from 'react'
 import type {Customer,Project} from '../types'
 import {Modal} from './Modal'
 import {FormError} from './FormError'
-import {powerFields,powerContractRequest,powerNotes,kansaiFitMonth,type PowerContractData,type PowerContractRequest} from '../lib/power-contract'
+import {powerFields,powerContractRequest,powerNotes,kansaiFitMonth,powerPriceResult,type PowerContractData,type PowerContractRequest,type PowerPriceTax} from '../lib/power-contract'
 import {savePowerContract,PowerContractSaveError} from '../lib/power-contract-save'
 import {certificateSame} from '../lib/meti-certificate'
 import {customerDisplayName} from '../lib/customer-search'
@@ -15,7 +15,7 @@ export function PowerContractImport({project,customer,onClose,onSaved}:{project:
  const [closeConfirm,setCloseConfirm]=useState(false)
  const original=useRef<PowerContractData|null>(null),form=useRef<HTMLDivElement|null>(null)
  const returnTo=useRef<{focus:HTMLElement|null;scrollTop:number}|null>(null)
- const edited=!!data&&!!original.current&&(powerFields.some(f=>data[f.source]!==original.current![f.source])||data.notes!==original.current.notes)
+ const edited=!!data&&!!original.current&&(powerFields.some(f=>data[f.source]!==original.current![f.source])||data.notes!==original.current.notes||data.priceAmount!==original.current.priceAmount||data.priceTax!==original.current.priceTax)
  const hasDraft=edited||selected.size>0||confirmed||!!pending
  useLayoutEffect(()=>{
   if(closeConfirm||!returnTo.current)return
@@ -44,6 +44,10 @@ export function PowerContractImport({project,customer,onClose,onSaved}:{project:
   finally{if(!c.signal.aborted)setBusy(false)}
  }
  function change(key:keyof PowerContractData,value:string){setData(d=>d?{...d,[key]:value,...(key==='supplyStart'&&d.provider==='kansai'?{fitMonth:kansaiFitMonth(value)}:{})}:d);setConfirmed(false)}
+ function changePrice(amount:string,tax:PowerPriceTax){
+  setData(d=>d?{...d,priceAmount:amount,priceTax:tax,fitPrice:powerPriceResult(amount,tax).net}:d)
+  setSelected(old=>{const next=new Set(old);next.delete('fit_period');return next});setConfirmed(false)
+ }
  function toggle(key:string){setSelected(old=>{const next=new Set(old);if(next.has(key))next.delete(key);else next.add(key);return next});setConfirmed(false)}
  async function save(){if(lock.current||!data||!confirmed)return;let req:PowerContractRequest;try{req=pending??powerContractRequest(project,data,selected)}catch(e){setError((e as Error).message);return}
   lock.current=true;setSaving(true);setError('');setPending(req)
@@ -62,8 +66,17 @@ export function PowerContractImport({project,customer,onClose,onSaved}:{project:
    <p className="meti-instruction">内容を確認して、反映する項目にチェックしてください。</p>
    <div className="meti-comparison" aria-label="現在の登録内容と契約書の比較">
     <div className="meti-compare-head"><span>反映する項目</span><span>現在の登録内容</span><span>PDFから読み取った内容</span></div>
-    {fields.map(f=>{const current=String(project[f.key]??''),value=data[f.source],shown=f.type==='month'?current.slice(0,7):current,same=!!value&&certificateSame(shown,value)
-     return <div className="meti-compare-row" key={f.key}><label><input type="checkbox" checked={selected.has(f.key)} disabled={saving||!!pending||(!value||same)&&!selected.has(f.key)} onChange={()=>toggle(f.key)}/>{f.label}{same&&<small>一致</small>}</label><span className="meti-current">{shown||'未登録'}</span><label className="meti-extracted"><span className="meti-mobile-label">読み取り内容</span><input className="form-input" aria-label={`PDFの${f.label}`} type={f.type==='date'?'date':f.type==='month'?'month':'text'} min={f.type==='date'?'1900-01-01':f.type==='month'?'1900-01':undefined} max={f.type==='date'?'9999-12-31':f.type==='month'?'9999-12':undefined} inputMode={f.type==='number'?'decimal':undefined} value={value} disabled={saving||!!pending} placeholder="読み取れませんでした" onChange={e=>change(f.source,e.target.value)}/>{f.key==='fit_end_date'&&data.provider==='kansai'&&<small>受給開始日の20年後の翌月</small>}{f.key==='power_change_date'&&<small>{data.provider==='kyushu'?'書類の「受給開始日」':'書類の「特定契約日（受給契約日）」'}</small>}</label></div>
+    {fields.map(f=>{const current=String(project[f.key]??''),price=powerPriceResult(data.priceAmount,data.priceTax),value=f.key==='fit_period'?price.net:data[f.source],shown=f.type==='month'?current.slice(0,7):current,same=!!value&&certificateSame(shown,value)
+     if(f.key==='fit_period')return <div className="meti-compare-row" key={f.key}>
+      <label><input type="checkbox" checked={selected.has(f.key)} disabled={saving||!!pending||(!value||same)&&!selected.has(f.key)} onChange={()=>toggle(f.key)}/>{f.label}{same&&<small>一致</small>}</label>
+      <span className="meti-current">{shown?`${shown} 円／kWh`:'未登録'}</span>
+      <div className="meti-extracted power-price-fields">
+       <label>PDFの単価（円／kWh）<input className="form-input" aria-label="PDFの単価（円／kWh）" inputMode="decimal" value={data.priceAmount??''} disabled={saving||!!pending} placeholder="単価を入力" onChange={e=>changePrice(e.target.value,data.priceTax??'unknown')}/></label>
+       <label>金額の種類<select className="form-input" aria-label="金額の種類" value={data.priceTax??'unknown'} disabled={saving||!!pending} onChange={e=>changePrice(data.priceAmount??'',e.target.value as PowerPriceTax)}><option value="unknown">分からない・未選択</option><option value="exclusive">税抜</option><option value="inclusive8">税込8％</option><option value="inclusive10">税込10％</option></select></label>
+       <div className="power-price-result" aria-label="反映する税抜単価" aria-live="polite"><span>反映する税抜単価</span><strong>{value?`${value} 円／kWh`:'未確定'}</strong><small>{price.error||(data.priceTax==='exclusive'?'税抜のため、そのまま反映します。':`${data.priceAmount} ÷ ${data.priceTax==='inclusive8'?'1.08':'1.10'} = ${value}`)}</small></div>
+      </div>
+     </div>
+     return <div className="meti-compare-row" key={f.key}><label><input type="checkbox" checked={selected.has(f.key)} disabled={saving||!!pending||(!value||same)&&!selected.has(f.key)} onChange={()=>toggle(f.key)}/>{f.label}{same&&<small>一致</small>}</label><span className="meti-current">{shown||'未登録'}</span><label className="meti-extracted"><span className="meti-mobile-label">読み取り内容</span><input className="form-input" aria-label={`PDFの${f.label}`} type={f.type==='date'?'date':f.type==='month'?'month':'text'} min={f.type==='date'?'1900-01-01':f.type==='month'?'1900-01':undefined} max={f.type==='date'?'9999-12-31':f.type==='month'?'9999-12':undefined} value={value} disabled={saving||!!pending} placeholder="読み取れませんでした" onChange={e=>change(f.source,e.target.value)}/>{f.key==='fit_end_date'&&data.provider==='kansai'&&<small>受給開始日の20年後の翌月</small>}{f.key==='power_change_date'&&<small>{data.provider==='kyushu'?'書類の「受給開始日」':'書類の「特定契約日（受給契約日）」'}</small>}</label></div>
     })}
     <div className="meti-compare-row"><label><input type="checkbox" checked={selected.has('power_company_notes')} disabled={saving||!!pending||(!data.notes.trim()||powerNotes(project.power_company_notes,data.notes)===(project.power_company_notes??''))&&!selected.has('power_company_notes')} onChange={()=>toggle('power_company_notes')}/>電力会社の備考に追記</label><span className="meti-current">{project.power_company_notes||'未登録'}</span><label className="meti-extracted"><span className="meti-mobile-label">追記する内容</span><textarea className="form-input" rows={6} aria-label="契約書から備考に追記する内容" value={data.notes} disabled={saving||!!pending} onChange={e=>change('notes',e.target.value)}/><small>今ある備考は残します。読み取れなかった情報は、PDFを見ながら追記できます。</small></label></div>
    </div>

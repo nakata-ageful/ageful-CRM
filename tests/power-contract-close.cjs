@@ -14,19 +14,19 @@ function load(file,hooks,overrides,dom){
   return load(p+(fs.existsSync(p+'.ts')?'.ts':'.tsx'),hooks,overrides,dom)
  }});return m.exports
 }
-const sample={provider:'kansai',businessName:'合成顧客',gridId:'ZZ12345A67',certifiedAt:'2018-11-29',pointId:'06-1111-2222-3333-4444-5555',supplyStart:'2019-12-20',changeDate:'2023-06-27',fitPrice:'18',fitMonth:'2040-01',notes:'合成書類の備考',ocr:false}
+const sample={provider:'kansai',businessName:'合成顧客',gridId:'ZZ12345A67',certifiedAt:'2018-11-29',pointId:'06-1111-2222-3333-4444-5555',supplyStart:'2019-12-20',changeDate:'2023-06-27',priceAmount:'18',priceTax:'exclusive',fitPrice:'18',fitMonth:'2040-01',notes:'合成書類の備考',ocr:false}
 const walk=(e,p)=>Array.isArray(e)?e.flatMap(v=>walk(v,p)):!e?.props||e.props.style?.display==='none'?[]:[...(p(e)?[e]:[]),...walk(e.props.children,p)]
 const button=(t,name)=>{const b=walk(t,e=>e.type==='button'&&e.props.children===name)[0];assert.ok(b,'Button missing: '+name);return b}
 const field=(t,name)=>{const f=walk(t,e=>e.props['aria-label']===name)[0];assert.ok(f,'Field missing: '+name);return f}
 const checkbox=(t,label)=>{const l=walk(t,e=>e.type==='label'&&Array.isArray(e.props.children)&&e.props.children.some(c=>c===label))[0];assert.ok(l,'Checkbox missing: '+label);return walk(l,e=>e.type==='input'&&e.props.type==='checkbox')[0]}
-function harness(save){
+function harness(save,documentData=sample){
  let i=0,j=0,closed=0,saved=0,layout=[],runEffects=false,modalCleanup;const states=[],refs=[],listeners=new Map(),writes=[]
  class Element{constructor(){this.isConnected=true;this.scrollTop=150}focus(){doc.activeElement=this}contains(e){return e===input}closest(selector){return selector==='.modal-body'?body:box}}
  const doc={activeElement:null,addEventListener:(n,f)=>listeners.set(n,f),removeEventListener:(n,f)=>{if(listeners.get(n)===f)listeners.delete(n)}}
  const body=new Element(),box=new Element(),form=new Element(),input=new Element();doc.activeElement=input
  const hooks={useState(v){const n=i++;if(!(n in states))states[n]=typeof v==='function'?v():v;return[states[n],v=>states[n]=typeof v==='function'?v(states[n]):v]},useRef(v){return refs[j++]??(refs[j-1]={current:v})},useEffect(f){if(runEffects)modalCleanup=f()},useLayoutEffect(f){layout.push(f)}}
  class SaveError extends Error{constructor(m,uncertain){super(m);this.uncertain=uncertain}}
- const overrides={'../lib/power-contract-reader':{readPowerContract:async()=>({...sample})},'../lib/power-contract-save':{PowerContractSaveError:SaveError,savePowerContract:async req=>{writes.push(req);if(save)return save(req,SaveError)}}}
+ const overrides={'../lib/power-contract-reader':{readPowerContract:async()=>({...documentData})},'../lib/power-contract-save':{PowerContractSaveError:SaveError,savePowerContract:async req=>{writes.push(req);if(save)return save(req,SaveError)}}}
  const {PowerContractImport}=load('src/components/PowerContractImport.tsx',hooks,overrides,{Element,document:doc})
  const props={project:{id:1,customer_id:2,project_name:'合成発電所',fit_period:20},customer:{id:2,name:'合成顧客',is_corporate:false},onClose:()=>closed++,onSaved:()=>saved++}
  function render(){i=0;j=0;layout=[];const t=PowerContractImport(props);const surface=walk(t,e=>e.type==='div'&&e.props.className==='meti-import')[0];if(surface)surface.props.ref.current=form;for(const effect of layout)effect();return t}
@@ -37,15 +37,32 @@ function harness(save){
  let h=harness();h.closeVia('footer');assert.equal(h.closed(),1,'No draft closes without prompting')
  h=harness();await h.load();h.closeVia('x');assert.equal(h.closed(),1,'Reading alone is not a manual edit')
  for(const kind of ['footer','x','background','escape']){
-  h=harness();await h.load();field(h.render(),'PDFのFIT（税抜・円）').props.onChange({target:{value:'19'}});checkbox(h.render(),'FIT（税抜・円）').props.onChange();
+  h=harness();await h.load();field(h.render(),'PDFの単価（円／kWh）').props.onChange({target:{value:'19'}});checkbox(h.render(),'FIT（税抜・円）').props.onChange();
   h.closeVia(kind);assert.equal(h.closed(),0);assert.match(h.render().props.title,/保存せずに閉じ/)
   h.body.scrollTop=0;h.doc.activeElement=null;button(h.render(),'編集を続ける').props.onClick();const t=h.render()
-  assert.equal(field(t,'PDFのFIT（税抜・円）').props.value,'19');assert.equal(checkbox(t,'FIT（税抜・円）').props.checked,true);assert.equal(h.body.scrollTop,150);assert.equal(h.doc.activeElement,h.input,'Return restores the input focus');assert.equal(h.writes.length,0)
-  h.closeVia(kind);h.closeVia('escape');assert.equal(h.closed(),0);assert.equal(field(h.render(),'PDFのFIT（税抜・円）').props.value,'19','Escape dismisses the confirmation, not the draft')
+  assert.equal(field(t,'PDFの単価（円／kWh）').props.value,'19');assert.equal(checkbox(t,'FIT（税抜・円）').props.checked,true);assert.equal(h.body.scrollTop,150);assert.equal(h.doc.activeElement,h.input,'Return restores the input focus');assert.equal(h.writes.length,0)
+  h.closeVia(kind);h.closeVia('escape');assert.equal(h.closed(),0);assert.equal(field(h.render(),'PDFの単価（円／kWh）').props.value,'19','Escape dismisses the confirmation, not the draft')
   h.closeVia(kind);button(h.render(),'保存せずに閉じる').props.onClick();assert.equal(h.closed(),1);assert.equal(h.writes.length,0)
  }
- h=harness();await h.load();field(h.render(),'PDFのFIT（税抜・円）').props.onChange({target:{value:'19'}});field(h.render(),'PDFのFIT（税抜・円）').props.onChange({target:{value:'18'}});h.closeVia('footer');assert.equal(h.closed(),1,'Restoring the original value without selections is not dirty')
+ h=harness();await h.load();field(h.render(),'PDFの単価（円／kWh）').props.onChange({target:{value:'19'}});field(h.render(),'PDFの単価（円／kWh）').props.onChange({target:{value:'18'}});h.closeVia('footer');assert.equal(h.closed(),1,'Restoring the original value without selections is not dirty')
  h=harness();await h.load();checkbox(h.render(),'FIT（税抜・円）').props.onChange();h.closeVia('footer');assert.equal(h.closed(),0,'A selection alone is retained too')
+ // Actual form handlers: the user sees and explicitly selects the derived net.
+ for(const [amount,tax]of [['36','exclusive'],['38.88','inclusive8'],['39.60','inclusive10']]){
+  h=harness(undefined,{...sample,priceAmount:amount,priceTax:'unknown',fitPrice:''});await h.load()
+  assert.equal(checkbox(h.render(),'FIT（税抜・円）').props.disabled,true)
+  field(h.render(),'金額の種類').props.onChange({target:{value:tax}})
+  assert.ok(walk(h.render(),e=>e.type==='strong'&&e.props.children==='36 円／kWh').length)
+  checkbox(h.render(),'FIT（税抜・円）').props.onChange()
+  walk(h.render(),e=>e.type==='input'&&e.props.type==='checkbox').at(-1).props.onChange({target:{checked:true}})
+  await button(h.render(),'選んだ1項目を反映する').props.onClick()
+  assert.equal(h.writes.length,1);assert.equal(h.writes[0].patch.fit_period,36);assert.deepEqual(Object.keys(h.writes[0].patch),['fit_period'])
+ }
+ h=harness();await h.load();checkbox(h.render(),'FIT（税抜・円）').props.onChange()
+ walk(h.render(),e=>e.type==='input'&&e.props.type==='checkbox').at(-1).props.onChange({target:{checked:true}})
+ field(h.render(),'金額の種類').props.onChange({target:{value:'unknown'}})
+ assert.equal(checkbox(h.render(),'FIT（税抜・円）').props.checked,false);assert.equal(checkbox(h.render(),'FIT（税抜・円）').props.disabled,true)
+ assert.equal(walk(h.render(),e=>e.type==='input'&&e.props.type==='checkbox').at(-1).props.checked,false)
+ h.closeVia('footer');assert.equal(h.closed(),0,'Tax-only edits prompt on close');button(h.render(),'編集を続ける').props.onClick();assert.equal(field(h.render(),'金額の種類').props.value,'unknown');assert.equal(h.writes.length,0)
  let rejectSave,finishSave
  h=harness((_,SaveError)=>new Promise((resolve,reject)=>{rejectSave=()=>reject(new SaveError('結果未確認',true));finishSave=resolve}));await h.load()
  checkbox(h.render(),'FIT（税抜・円）').props.onChange();const confirm=walk(h.render(),e=>e.type==='input'&&e.props.type==='checkbox').at(-1);confirm.props.onChange({target:{checked:true}})

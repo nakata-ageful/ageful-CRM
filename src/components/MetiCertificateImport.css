@@ -12,6 +12,7 @@
 .meti-current{white-space:pre-wrap;overflow-wrap:anywhere;color:#475569}.meti-extracted{display:flex;flex-direction:column;gap:6px;min-width:0;overflow-wrap:anywhere}.meti-extracted label{display:flex;flex-direction:column;gap:5px}
 .meti-extracted .form-input{width:100%;min-width:0;box-sizing:border-box;resize:vertical}.meti-mobile-label{display:none}
 .meti-confirm{display:flex;gap:8px;align-items:flex-start;padding:10px 0}.meti-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.power-price-fields{gap:10px}.power-price-result{display:flex;flex-direction:column;gap:5px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;padding:10px;min-width:0;overflow-wrap:anywhere}.power-price-result>span{font-size:13px;color:#475569}.power-price-result>strong{font-size:18px;color:#0c4a6e}
 @media(max-width:700px){.meti-compare-head{display:none}.meti-compare-row{grid-template-columns:1fr;gap:8px}.meti-current:before{content:'現在：';color:#64748b}.meti-mobile-label{display:block;color:#64748b;font-size:12px}.meti-actions{position:sticky;bottom:-16px;background:white;padding:12px 0}.meti-import-heading{align-items:flex-start;flex-direction:column}}
 
 @media(max-width:700px){.modal-box:has(.meti-import){max-height:calc(100dvh - 32px)}.modal-box:has(.meti-import) .modal-body{padding:14px}.meti-file input{max-width:100%}.meti-actions .btn{white-space:nowrap}}

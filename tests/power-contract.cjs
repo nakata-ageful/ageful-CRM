@@ -1,7 +1,7 @@
 // Synthetic documents only. Customer PDFs and OCR output stay outside the repository.
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript');const modules={};function load(n){if(modules[n])return modules[n];const m={exports:{}};vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/lib/'+n+'.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{module:m,exports:m.exports,Date,Set,require:p=>load(p.replace('./',''))});return modules[n]=m.exports}const a=load('power-contract')
 for(const [s,want]of [['2019-12-20','2040-01'],['2020-01-31','2040-02'],['2024-02-29','2044-03'],['2023-02-29',''],['9990-01-01','']])assert.equal(a.kansaiFitMonth(s),want)
-assert.equal(a.kyushuNetPrice('19.8'),'18');assert.equal(a.kyushuNetPrice('19.80'),'18');assert.equal(a.kyushuNetPrice('19.81'),'18.009090909090908');assert.equal(a.kyushuNetPrice('19,8'),'')
+for(const [amount,tax,net]of [['36','exclusive','36'],['38.88','inclusive8','36'],['39.60','inclusive10','36'],['19.80','inclusive10','18'],['36.000000','exclusive','36']])assert.equal(a.powerPriceResult(amount,tax).net,net);for(const [amount,tax]of [['38.88','unknown'],['19.81','inclusive10'],['NaN','exclusive'],['0','exclusive'],['1001','exclusive'],['18.5','exclusive']])assert.ok(a.powerPriceResult(amount,tax).error)
 function fixture(provider='kansai'){
  const rows=provider==='kansai'?['関西電力送配電株式会社','再生可能エネルギー発電に関する電力受給契約内容のお知らせ','ご契約名義合成法人','受電地点特定番号06-1111-2222-3333-4444-5555','発電設備設置場所合成市テスト町1-2','認定IDZZ12345A67認定日2018年11月29日','受給開始日2019年12月20日接続契約日2018年8月16日','特定契約日2023年6月27日契約変更日2024年8月1日','受給最大電力49.5kW','買取単価18.00円に消費税等相当額を加えた金額','買取期間受給開始日以降最初の検針日240月','当社の連絡先：合成電気センター','電話番号:000-111-2222']:[]
  return rows.map((text,i)=>({text,x:50,y:800-i*22,width:480,page:1}))
@@ -14,7 +14,7 @@ assert.throws(()=>a.parsePowerContract([...f,{text:'09-1111-2222-3333-4444-5555'
 const p={id:1,customer_id:2,grid_id:null,fit_period:20,power_company_notes:'既存の文章',site_address:'変えない住所'},req=a.powerContractRequest(p,d,new Set(['fit_period','fit_end_date','power_company_notes']))
 assert.deepEqual(Object.keys(req.patch).sort(),['fit_end_date','fit_period','power_company_notes']);assert.equal(req.patch.fit_period,18);assert.equal(req.patch.fit_end_date,'2040-01-01');assert.match(req.patch.power_company_notes,/既存の文章/);assert.equal(a.powerNotes(req.patch.power_company_notes,d.notes),req.patch.power_company_notes)
 assert.throws(()=>a.powerContractRequest(p,d,new Set()),/選んで/)
-for(const value of ['18.5','NaN','-1','1001'])assert.throws(()=>a.powerContractRequest(p,{...d,fitPrice:value},new Set(['fit_period'])),/整数/)
+for(const value of ['18.5','NaN','-1','1001'])assert.throws(()=>a.powerContractRequest(p,{...d,priceAmount:value},new Set(['fit_period'])),/整数|単価/)
 assert.throws(()=>a.powerContractRequest(p,{...d,fitMonth:'2040-99'},new Set(['fit_end_date'])),/FIT期間/)
 assert.throws(()=>a.powerContractRequest(p,{...d,pointId:'123'},new Set(['generation_point_id'])),/22桁/)
 assert.equal(p.site_address,'変えない住所');assert.ok(!('customer_id'in req.patch));assert.ok(!('site_address'in req.patch));assert.ok(!('panel_kw'in req.patch))
@@ -33,7 +33,7 @@ console.log('PASS: FIT rule and month rollover, tax conversion without rounding,
  line([['連絡責任者',50]]);line([['合成顧客090-1111-2222さま',50]])
  line([['<連絡先>',50]]);line([['合成託送受付センター',50]]);line([['0800-111-2222',50]])
  const d=a.parsePowerContract(items,true)
- assert.equal(d.gridId,'ZZ54321B98');assert.equal(d.pointId,'09-1111-2222-3333-4444-5555');assert.equal(d.changeDate,'2023-02-01');assert.equal(d.supplyStart,'');assert.equal(d.certifiedAt,'');assert.equal(d.fitMonth,'2039-03');assert.equal(d.fitPrice,'18');assert.match(d.notes,/49.5kW/);assert.match(d.notes,/60Hz/);assert.match(d.notes,/0800-111-2222/);assert.doesNotMatch(d.notes,/090-1111-2222/)
+ assert.equal(d.gridId,'ZZ54321B98');assert.equal(d.pointId,'09-1111-2222-3333-4444-5555');assert.equal(d.changeDate,'2023-02-01');assert.equal(d.supplyStart,'');assert.equal(d.certifiedAt,'');assert.equal(d.fitMonth,'2039-03');assert.equal(d.fitPrice,'');assert.equal(d.priceAmount,'19.8');assert.equal(d.priceTax,'unknown');assert.match(d.notes,/49.5kW/);assert.match(d.notes,/60Hz/);assert.match(d.notes,/0800-111-2222/);assert.doesNotMatch(d.notes,/090-1111-2222/)
  console.log('PASS: Kyushu positional columns, crossed-out supply-date mapping, tax-exclusive price, FIT month, label OCR variation, utility/customer contact separation')
 }
 // New three-column scan, synthetic values: no transaction counter; customer
@@ -48,7 +48,7 @@ console.log('PASS: FIT rule and month rollover, tax conversion without rounding,
  line([['受給開始日',50],['固定買取終了年月',220],['購入料金単価(注1)',400]])
  line([['2024年5月8日',60],['2040年4月',230],['39.60円',410]])
  const d=a.parsePowerContract(items,true)
- assert.equal(d.gridId,'Z123456B78');assert.equal(d.pointId,'09-2222-3333-4444-5555-6666');assert.equal(d.changeDate,'2024-05-08');assert.equal(d.fitMonth,'2040-04');assert.equal(d.fitPrice,'36');assert.equal(d.supplyStart,'');assert.equal(d.certifiedAt,'')
+ assert.equal(d.gridId,'Z123456B78');assert.equal(d.pointId,'09-2222-3333-4444-5555-6666');assert.equal(d.changeDate,'2024-05-08');assert.equal(d.fitMonth,'2040-04');assert.equal(d.fitPrice,'');assert.equal(d.priceAmount,'39.60');assert.equal(d.priceTax,'unknown');assert.equal(d.supplyStart,'');assert.equal(d.certifiedAt,'')
  for(const bad of ['XZ123456B78','Z123456B789','Z12345GB78','Z123456B78Z'])assert.equal(a.parsePowerContract(items.map(i=>i.text==='Z123456B78'?{...i,text:bad}:i),true).gridId,'','Do not extract an ID substring or repair OCR characters')
  // Missing labels leave the associated value blank, rather than borrowing
  // an adjacent month, the issue date, or another unrelated number.
@@ -66,7 +66,7 @@ console.log('PASS: FIT rule and month rollover, tax conversion without rounding,
  line('平成27年1月14日',50,548);line('00070',220,548);line('38.88円',370,548)
  line('連絡先',50,490);line('合成営業所',50,468);line('0120-000-000',50,446)
  const old=a.parsePowerContract(items,true)
- assert.equal(old.fitPrice,'','Do not assume 10% tax for an old contract');assert.match(old.notes,/38.88円（税区分未確認）/);assert.equal(old.customerNumber,'04-123-456-78-0000123(51)');assert.equal(old.pointId,'');assert.equal(old.changeDate,'2015-01-14');assert.equal(old.fitMonth,'','Missing FIT end is not inferred');assert.match(old.notes,/45.900kW/)
+ assert.equal(old.fitPrice,'','Do not assume 10% tax for an old contract');assert.match(old.notes,/38.88円/);assert.equal(old.customerNumber,'04-123-456-78-0000123(51)');assert.equal(old.pointId,'');assert.equal(old.changeDate,'2015-01-14');assert.equal(old.fitMonth,'','Missing FIT end is not inferred');assert.match(old.notes,/45.900kW/)
  const customerReq=a.powerContractRequest({...p,customer_number:'000-old'},old,new Set(['customer_number']))
  assert.equal(customerReq.before.customer_number,'000-old');assert.equal(customerReq.patch.customer_number,old.customerNumber);assert.deepEqual(Object.keys(customerReq.patch),['customer_number'])
  assert.equal(a.parsePowerContract([...items,{text:'お客様番号99-12345',x:50,y:430,width:100,page:1}]).customerNumber,'','Ambiguous labels never choose one')
@@ -75,4 +75,22 @@ console.log('PASS: FIT rule and month rollover, tax conversion without rounding,
  const inline=a.parsePowerContract([...f,{text:'お客様番号:001-234-567',x:50,y:200,width:300,page:1}]);assert.equal(inline.customerNumber,'001-234-567')
  for(const [input,want]of [['平成31年4月30日','2019-04-30'],['令和元年5月1日','2019-05-01'],['平成31年5月1日',''],['平成27年2月30日','']])assert.equal(a.parsePowerContract(items.map(i=>i.text==='平成27年1月14日'?{...i,text:input}:i)).changeDate,want)
  console.log('PASS: labelled customer numbers, leading zeros and suffix preserved, old utility form/era dates, no point-ID guessing, ambiguous/missing labels blank, explicit selected-field patch only')
+}
+// Tax belongs to the read price cell, not the provider, current date or tariff year.
+{
+ const withPrice=text=>a.parsePowerContract(f.map(i=>i.text.startsWith('買取単価')?{...i,text:'買取単価'+text}:i))
+ for(const [text,tax,net]of [['36円(税抜)','exclusive','36'],['38.88円(税込8%)','inclusive8','36'],['39.60円(税込10%)','inclusive10','36'],['38.88円(税込)','unknown',''],['38.88円','unknown',''],['38.88円(税込8%または10%)','unknown',''],['38.88円(税抜・税込8%)','unknown','']]){
+  const result=withPrice(text);assert.equal(result.priceTax,tax,text);assert.equal(result.fitPrice,net,text)
+ }
+ const uncertain=withPrice('38.88円')
+ assert.throws(()=>a.powerContractRequest(p,{...uncertain,fitPrice:'36'},new Set(['fit_period'])),/金額の種類/,'A cached/forged net price must not bypass tax selection')
+ const eight={...uncertain,priceTax:'inclusive8',fitPrice:'999'}
+ assert.equal(a.powerContractRequest(p,eight,new Set(['fit_period'])).patch.fit_period,36,'Recompute selected net from amount and tax')
+ assert.equal(a.powerContractRequest(p,uncertain,new Set(['grid_id'])).patch.grid_id,'ZZ12345A67','Unknown tax does not block other selected fields')
+ for(const tax of ['exclusive','inclusive8','inclusive10'])for(const net of [1,12,18,21,27,32,36,40,1000]){
+  const cents=net*(tax==='inclusive8'?108:tax==='inclusive10'?110:100),amount=`${Math.floor(cents/100)}.${String(cents%100).padStart(2,'0')}`
+  assert.equal(a.powerPriceResult(amount,tax).net,String(net),'Exact decimal conversion without floating-point rounding')
+ }
+ for(const [amount,tax]of [['38.88','inclusive10'],['39.60','inclusive8'],['36.000001','exclusive'],['-36','exclusive'],['1e2','exclusive'],['1,000','exclusive'],['36','bad'],['','exclusive']])assert.ok(a.powerPriceResult(amount,tax).error)
+ console.log('PASS: 8%/10%/exclusive exact conversion, unknown/contradictory tax not inferred, other fields independent, cached net ignored and no rounding')
 }

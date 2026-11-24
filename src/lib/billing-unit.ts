@@ -7,6 +7,7 @@ export type BillingUnit = {
   serviceYear: number
   roundLabel: string
   method: '請求書' | '口座振替'
+  originalMethod?: 'invoice' | 'direct_debit'
   scheduledDate: string | null
   recipientId: number | null
   /** Stored payer decision, not inferred from the current project owner. */

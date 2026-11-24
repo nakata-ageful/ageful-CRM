@@ -47,6 +47,13 @@ const due=legacyScheduleSetupItems([debit],new Map([[2,10]]),[],'2026-09-20')
 assert.deepEqual(plain(due.map(x=>[x.date,x.method])),[['2026-09-15','direct_debit']])
 const handled={...debit,records:[{id:1,contract_id:1,year:2026,billing_scheduled_date:'2026-09-15',billing_date:null,payment_due_date:null,received_date:'2026-09-16',line_items:null,payments:null,maintenance_record:null,escort_record:null,transfer_failed:false,status:'入金済'}]}
 assert.equal(legacyScheduleSetupItems([handled],new Map([[2,10]]),[],'2026-09-20').length,0)
+const debitRecipients=new Map([[2,10]])
+assert.deepEqual(plain(legacyScheduleSetupItems([debit],debitRecipients,[],'2026-11-14','2026-09-20').map(x=>x.date)),['2026-10-15'],
+ 'A previous month stays actionable, while pre-cutover and future dates stay out of the result list')
+const recovered={...stored,projectId:2,roundLabel:'10月分',scheduledDate:'2026-10-15',lifecycle:'received',
+ originalMethod:'direct_debit',collectionState:'succeeded',receivedOn:'2026-10-22'}
+assert.equal(legacyScheduleSetupItems([debit],debitRecipients,[recovered],'2026-11-14','2026-09-20').length,0,
+ 'A debit collected through a replacement invoice stays resolved')
 const multiple=legacyScheduleSetupReview([{...row,contract_count:2}],recipients,[],'2026-09-20')
 assert.equal(multiple.items.length,0);assert.match(multiple.issues[0].reason,/契約が複数/)
 assert.equal(multiple.issues[0].category,'action_required')

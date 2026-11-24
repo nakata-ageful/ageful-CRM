@@ -1,14 +1,15 @@
+import {debitScheduleReminder} from './debit-schedule-reminder'
 import type {BillingRow} from '../types'
 import {annualBillableTotalInc,computeUpcomingInvoices,toIsoDate,withdrawalAmount,invoiceAmount} from './billing'
 import {isBillingDate} from './billing-unit'
 import {managementActiveOn,type ManagementEvent} from './management-lifecycle'
 import type {BillingUnit} from './billing-unit'
-import {debitScheduleReminder} from './debit-schedule-reminder'
+import {maintenancePeriod} from './maintenance-period-label'
 import {cycleRuleForYear,cycleCompatibility,cycleInvoiceDate,futureMaintenancePeriod,type BillingCycleRule} from './billing-cycle'
 import {inspectCandidatePeriod} from './billing-period-coverage'
 import {invoiceOccurrenceYear,invoicePeriodChoiceRequired,invoicePeriodChoiceReason} from './invoice-occurrence'
 
-type StoredUnit={project_id:number;service_year?:number;recipient_customer_id:number;recipient_source?:string;collection_method:string;scheduled_date:string|null;lifecycle:string;planned_amount:number|null;round_number?:number|null;service_month?:number|null;period_start?:string|null;period_end?:string|null;removed_at?:string|null}
+type StoredUnit={original_method?:string;collection_state?:string;project_id:number;service_year?:number;recipient_customer_id:number;recipient_source?:string;collection_method:string;scheduled_date:string|null;lifecycle:string;planned_amount:number|null;round_number?:number|null;service_month?:number|null;period_start?:string|null;period_end?:string|null;removed_at?:string|null}
 export type CoverageCandidate={projectId:number;recipientId:number;method:'invoice'|'direct_debit';date:string;round:number;amount:number;status:'missing'|'matches'|'handled'|'review'|'overdue';reason?:string;serviceYear?:number;periodStart?:string;periodEnd?:string;periodChoiceRequired?:boolean}
 export type ScheduleSetupItem=CoverageCandidate&{projectName:string;customerName:string}
 export type ScheduleSetupIssue={
@@ -73,9 +74,9 @@ export function inspectFutureBillingCoverage(rows:readonly BillingRow[],recipien
         // not evidence that another year/round or a long maintenance range was paid.
         let debitYear=y,debitRound=m
         if(method==='direct_debit')try{
-          const anchor=futureMaintenancePeriod(c,y,rules)
+          const anchor=maintenancePeriod(c.maintenance_start_date,y)
           if(item.date<anchor.periodStart)debitYear--
-          const period=futureMaintenancePeriod(c,debitYear,rules)
+          const period=maintenancePeriod(c.maintenance_start_date,debitYear)
           debitRound=(y-debitYear)*12+m-Number(period.periodStart.slice(5,7))+1
         }catch{/* Legacy debit source may have a calendar year rather than a period anchor. */}
         const occurrenceDate=item.date
@@ -89,12 +90,19 @@ export function inspectFutureBillingCoverage(rows:readonly BillingRow[],recipien
           const withoutMaintenance={...c,billing_item_flags:{...c.billing_item_flags,annual_maintenance:false}}
           amount=method==='invoice'?invoiceAmount(withoutMaintenance,item.round,serviceYear!=null&&cycleInvoiceDate(c,serviceYear,rules)?1:days.length):withdrawalAmount(withoutMaintenance,m)
         }
+        if(method==='direct_debit'){
+          const savedRound=own.filter(u=>!u.removed_at
+            && (u.collection_method==='direct_debit'||u.original_method==='direct_debit'||u.collection_state==='failed')
+            && ((u.service_year===debitYear&&u.round_number===debitRound)
+              || (u.service_month===m&&u.scheduled_date===occurrenceDate)))
+          if(savedRound.length===1&&(savedRound[0].scheduled_date!==occurrenceDate||savedRound[0].collection_method!=='direct_debit'))continue
+        }
         const matching=units.filter(u=>!u.removed_at&&u.project_id===row.project_id&&u.scheduled_date===item.date)
         let status:CoverageCandidate['status']='missing',reason:string|undefined
         if(matching.length){
           const u=matching[0]
           const periodMatches=!periodStart||!u.period_start&&!u.period_end&&(serviceYear==null||!cycleInvoiceDate(c,serviceYear,rules))||u.period_start===periodStart&&u.period_end===periodEnd
-          const sameRound=(method==='invoice'?u.round_number===item.round:u.service_month===m)&&(serviceYear==null||u.service_year===serviceYear)&&periodMatches
+          const sameRound=(method==='invoice'?u.round_number===item.round:u.service_month===m||u.service_year===debitYear&&u.round_number===debitRound)&&(serviceYear==null||u.service_year===serviceYear)&&periodMatches
           if(matching.length===1&&sameRound&&u.collection_method===method&&['fixed','issued','received'].includes(u.lifecycle))status='handled'
           else if(matching.length===1&&sameRound&&u.lifecycle==='planned'&&u.collection_method===method
             &&(u.recipient_customer_id===recipientId||u.recipient_source==='override')&&u.planned_amount===amount)status='matches'
@@ -155,7 +163,7 @@ export function legacyScheduleSetupReview(rows:readonly BillingRow[],recipients:
  const startMonth=today.slice(0,7)
  const unsafe=rows.filter(r=>(r.contract_count??(r.contract?1:0))!==1)
  const safe=rows.filter(r=>!unsafe.includes(r))
- const stored:StoredUnit[]=units.map((u):StoredUnit=>({project_id:u.projectId,service_year:u.serviceYear,recipient_customer_id:u.recipientId??0,recipient_source:u.recipientSource,
+ const stored:StoredUnit[]=units.map((u:BillingUnit & {collectionState?:string}):StoredUnit=>({original_method:u.originalMethod,collection_state:u.collectionState,project_id:u.projectId,service_year:u.serviceYear,recipient_customer_id:u.recipientId??0,recipient_source:u.recipientSource,
   collection_method:u.method==='請求書'?'invoice':'direct_debit',scheduled_date:u.scheduledDate,lifecycle:u.lifecycle,planned_amount:u.plannedAmount??null,
   round_number:/^第(\d+)回$/.test(u.roundLabel)?Number(u.roundLabel.slice(1,-1)):null,
   service_month:/^\d+月分$/.test(u.roundLabel)?Number(u.roundLabel.slice(0,-2)):null,period_start:u.periodStart,period_end:u.periodEnd,removed_at:u.removedAt}))
@@ -169,7 +177,7 @@ export function legacyScheduleSetupReview(rows:readonly BillingRow[],recipients:
    const first=new Date(Date.UTC(fromYear,fromMonth-1+offset,1))
    const monthKey=`${first.getUTCFullYear()}-${String(first.getUTCMonth()+1).padStart(2,'0')}`
    const past=inspectFutureBillingCoverage(safe,recipients,stored,monthKey,Math.min(24,elapsed-offset),managementEvents,rules)
-   overdue.push(...past.candidates.filter(c=>c.method==='invoice'&&c.date>=cutoverOn&&c.status!=='matches'&&c.status!=='handled'))
+   overdue.push(...past.candidates.filter(c=>c.date>=cutoverOn&&c.status!=='matches'&&c.status!=='handled'))
   }
  }
  const overdueReason='切替後の請求予定日を過ぎています。未発行か記録漏れか、別日に変更した回がないか確認してください（自動発行なし）'
@@ -177,8 +185,7 @@ export function legacyScheduleSetupReview(rows:readonly BillingRow[],recipients:
   ?{...c,status:'overdue' as const,reason:overdueReason}:c)
  // A saved row on the expected date is not automatically safe.  Keep amount,
  // method and recipient mismatches visible instead of silently hiding them.
- const items=candidates.filter(c=>c.status!=='matches'&&c.status!=='handled'&&(c.method==='invoice'||c.date.startsWith(startMonth)))
-  .filter(c=>c.method!=='direct_debit'||debitScheduleReminder(safe.find(r=>r.project_id===c.projectId)!,today))
+ const items=candidates.filter(c=>c.status!=='matches'&&c.status!=='handled'&&(c.method==='invoice'||c.date<=today&&debitScheduleReminder(safe.find(r=>r.project_id===c.projectId)!,c.date)))
   .map(c=>{const row=safe.find(r=>r.project_id===c.projectId)!;return {...c,projectName:row.project_name,customerName:row.customer_name}})
   .sort((a,b)=>a.date.localeCompare(b.date)||a.projectId-b.projectId)
  const issues:ScheduleSetupIssue[]=[...unsafe.map(row=>({projectId:row.project_id,projectName:row.project_name,

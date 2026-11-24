@@ -32,7 +32,7 @@ export function BillingOverviewTable({ data, units = [], candidates = [], mode, 
       const routine=!!candidate&&!!onRecordCandidate&&!!canRecordCandidate?.(candidate)
       const amount = unit ? resolveUnitAmount(unit) : { amount: candidate!.amount, basis: candidate!.method==='direct_debit'?'振替予定額':'請求予定額' }
       const status = candidate ? candidate.periodChoiceRequired?'請求する年を確認':candidate.status === 'review' ? '請求記録を確認' : candidate.status === 'overdue' ? '期限超過・要確認'
-        : candidate.date < today ? '予定日経過・要確認' : routine?'請求予定':'要確認' : billingUnitStatusLabel(unit!)
+        : candidate.method==='direct_debit'&&routine ? '結果未確認' : candidate.date < today ? '予定日経過・要確認' : routine?'請求予定':'要確認' : billingUnitStatusLabel(unit!)
       const period = unit?.periodStart && unit.periodEnd ? `${unit.periodStart} ～ ${unit.periodEnd}` : unit ? `${unit.serviceYear}年（保守期間未確認）` : candidate?.periodStart&&candidate.periodEnd?`${candidate.periodStart} ～ ${candidate.periodEnd}（設定から表示）`:'対象の保守期間を確認してください'
       const canIssue = unit && isEditableInvoicePlan(unit) && unit.recipientId != null
       const canCollect = unit?.method === '請求書' && unit.lifecycle === 'issued' && !unit.receivedOn
@@ -40,7 +40,7 @@ export function BillingOverviewTable({ data, units = [], candidates = [], mode, 
       return <tr key={key} data-unit-id={unit?.id} data-candidate-key={candidate ? key : undefined}>
         <td>{onViewDetail ? <button type="button" className="link-btn" onClick={() => onViewDetail(projectId)}>{name}</button> : name}
           {unit?.method === '口座振替' && <small>口座振替</small>}</td>
-        <td>{candidate ? <>{candidate.customerName}<small className={routine?'':'billing-overview-warning'}>{routine?'発行時に確認':'請求先・保守期間を確認'}</small></>
+        <td>{candidate ? <>{candidate.customerName}<small className={routine?'':'billing-overview-warning'}>{routine?(candidate.method==='direct_debit'?'結果の記録時に確認':'発行時に確認'):'請求先・保守期間を確認'}</small></>
           : unit!.recipientId == null ? <span className="billing-overview-warning">請求先要確認</span> : data.recipientName(unit!.recipientId)}</td>
         <td title={`保守期間：${period}`}>{candidate ? `第${candidate.round}回` : unit!.roundLabel === '保存済み単回記録' ? '回数要確認' : unit!.roundLabel}
           {unit && <small>{unit.serviceYear}年</small>}{candidate?.periodChoiceRequired?<small>対象年を確認</small>:candidate?.serviceYear&&<small>{candidate.serviceYear}年分</small>}</td>
@@ -50,7 +50,7 @@ export function BillingOverviewTable({ data, units = [], candidates = [], mode, 
         <td className="billing-overview-money"><strong>{amount.amount == null ? '金額要確認' : fmtYen(amount.amount)}</strong>
           {amount.amount != null && amount.basis !== '確定額' && <small>{amount.basis}</small>}</td>
         <td><div className="billing-overview-actions">
-          {routine&&<button type="button" className="btn btn-main btn-sm" onClick={()=>onRecordCandidate!(candidate!)}>発行内容を記録</button>}
+          {routine&&<button type="button" className="btn btn-main btn-sm" onClick={()=>onRecordCandidate!(candidate!)}>{candidate!.method==='direct_debit'?'振替結果を記録':'発行内容を記録'}</button>}
           {onEdit && unit && (canIssue || canCollect) && <button type="button" className="btn btn-main btn-sm" onClick={() => onEdit({ unitId: unit.id, mode: 'invoice' })}>{canCollect ? '入金日を記録' : '発行内容を記録'}</button>}
           {onEdit && canDebit && <button type="button" className="btn btn-main btn-sm" onClick={() => onEdit({ unitId: unit.id, mode: 'debit' })}>振替結果を記録</button>}
           {onEdit && unit && !canIssue && isEditableInvoicePlan(unit) && data.recipients && <button type="button" className="btn btn-sm" onClick={() => onEdit({ unitId: unit.id, mode: 'plan' })}>請求先を設定</button>}

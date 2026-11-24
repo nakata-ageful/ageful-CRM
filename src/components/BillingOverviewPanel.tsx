@@ -24,15 +24,17 @@ function OverviewSection({ title, count, color, collapsed = false, children }: {
 }
 
 /** Cross-project work list. Classification, saved payer and amount rules are unchanged. */
-export function BillingOverviewPanel({ data, today, onViewDetail, setupItems = [], setupIssues = [], onSave, debitProjects = [], routineInvoices=[],onAddRoutine }: {
+export function BillingOverviewPanel({ data, today, onViewDetail, setupItems = [], setupIssues = [], onSave, debitProjects = [], routineInvoices=[],automaticDebits=[],onAddRoutine }: {
   data: BillingHistoryData; today: string; onViewDetail?: (projectId: number) => void
   setupItems?: readonly ScheduleSetupItem[]; setupIssues?: readonly ScheduleSetupIssue[]
   onSave?: (request: InvoiceWriteRequest) => Promise<unknown>; debitProjects?: readonly DebitOverviewProject[]
-  routineInvoices?:readonly RoutineInvoiceContext[];onAddRoutine?:AddRoutineInvoice
+  routineInvoices?:readonly RoutineInvoiceContext[];automaticDebits?:readonly RoutineInvoiceContext[];onAddRoutine?:AddRoutineInvoice
 }) {
   const overview = buildBillingOverview(data.units, today)
   const [editor, setEditor] = useState<OverviewEditor | null>(null)
   const [routine,setRoutine]=useState<RoutineInvoiceContext|null>(null)
+  const [recordingDebit,setRecordingDebit]=useState<RoutineInvoiceContext|null>(null)
+  const debitMap=new Map(automaticDebits.map(context=>[`${context.contract.project_id}:${context.item.date}`,context]))
   const [routineBusy,setRoutineBusy]=useState(false)
   const routineMap=new Map(routineInvoices.map(c=>[routineInvoiceKey(c.contract.project_id,c.item),c]))
   const editingUnit = data.units.find(unit => !unit.removedAt&&unit.id === editor?.unitId)
@@ -45,8 +47,12 @@ export function BillingOverviewPanel({ data, today, onViewDetail, setupItems = [
   const movedItems = new Set<ScheduleSetupItem>([...nearTermCandidates, ...debitChecks])
   const remainingItems = setupItems.filter(item => !movedItems.has(item))
   const tableProps = { data, today, onViewDetail, onEdit: onSave ? setEditor : undefined,
-    canRecordCandidate:(item:ScheduleSetupItem)=>routineMap.has(routineInvoiceKey(item.projectId,item)),
-    onRecordCandidate:onAddRoutine&&onSave&&data.recipients?(item:ScheduleSetupItem)=>setRoutine(routineMap.get(routineInvoiceKey(item.projectId,item))??null):undefined }
+    canRecordCandidate:(item:ScheduleSetupItem)=>item.method==='direct_debit'
+      ?debitMap.has(`${item.projectId}:${item.date}`):!!onAddRoutine&&routineMap.has(routineInvoiceKey(item.projectId,item)),
+    onRecordCandidate:onSave&&data.recipients?(item:ScheduleSetupItem)=>{
+      if(item.method==='direct_debit')setRecordingDebit(debitMap.get(`${item.projectId}:${item.date}`)??null)
+      else setRoutine(routineMap.get(routineInvoiceKey(item.projectId,item))??null)
+    }:undefined }
   const closeEditor = () => setEditor(null)
   const issueList = (issues: readonly ScheduleSetupIssue[]) => <ul className="billing-overview-issues">{issues.map(issue => <li key={`${issue.projectId}:${issue.code}`}>
     <span><strong>{issue.projectName}</strong><small>{issue.reason}</small></span>
@@ -93,6 +99,9 @@ export function BillingOverviewPanel({ data, today, onViewDetail, setupItems = [
     {routine&&onAddRoutine&&onSave&&data.recipients&&<Modal title={`${data.projectName(routine.contract.project_id)}：発行内容を記録`} width={720} closeDisabled={routineBusy} onClose={()=>setRoutine(null)}><div className="standard-editor">
       <RoutineInvoiceEditor context={routine} recipients={data.recipients} onAdd={onAddRoutine} onSave={onSave} onBusyChange={setRoutineBusy} onClose={()=>setRoutine(null)}/>
     </div></Modal>}
+    {recordingDebit&&onSave&&<Modal title="振替結果を記録" width={720} onClose={()=>setRecordingDebit(null)}>
+      <div className="standard-editor"><ManualDebitEditor automaticDebit={recordingDebit} recipientName={data.recipientName} onSave={onSave} onClose={()=>setRecordingDebit(null)} /></div>
+    </Modal>}
     {editingUnit && onSave && <Modal title={`${data.projectName(editingUnit.projectId)}：${editor?.mode === 'plan' ? '請求先・予定を設定' : editor?.mode === 'debit' ? '振替結果を記録' : editingUnit.lifecycle === 'issued' ? '入金日を記録' : '発行内容を記録'}`} width={720} onClose={closeEditor}>
       <div className="standard-editor">{editor?.mode === 'plan' && data.recipients ? <InvoicePlanEditor key={editingUnit.id} unit={editingUnit} recipients={data.recipients} onSave={onSave} onClose={closeEditor} />
         : editor?.mode === 'debit' ? <ManualDebitEditor key={editingUnit.id} unit={editingUnit} recipientName={data.recipientName} onSave={onSave} onClose={closeEditor} />

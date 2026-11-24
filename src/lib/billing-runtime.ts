@@ -40,7 +40,14 @@ async function operation<T>(reload:()=>Promise<T>){
   const scope=`${new URL(import.meta.env.VITE_SUPABASE_URL).host}:${data.user.id}`
   return {scope,journal:durableBillingOperation({storage:localStorage,scope,operationId:()=>crypto.randomUUID(),reload,
     definitelyRejected:e=>!!e&&typeof e==='object'&&'code'in e&&['P0001','23514','23503','23502','22P02','22007','22008','42501'].includes(String(e.code)),
-    write:async(id,request)=>{const {error}=await supabase!.rpc('billing_runtime_write',{p_key:id,p_request:request});if(error)throw Object.assign(new Error(error.message),{code:error.code})},
+    write:async(id,request)=>{
+      const value=request.value as {automaticDebit?:unknown}|undefined
+      const automaticDebit=request.action==='invoice'&&!!value?.automaticDebit
+      const rpc=automaticDebit?'record_automatic_debit_result':'billing_runtime_write'
+      const {error}=await supabase!.rpc(rpc,{p_key:id,p_request:request})
+      if(automaticDebit&&error?.code==='PGRST202')throw Object.assign(new Error('振替結果の保存機能は準備中です。'),{code:'P0001'})
+      if(error)throw Object.assign(new Error(error.message),{code:error.code})
+    },
   })}
 }
 export async function saveBillingRuntime<T>(request:Record<string,unknown>|null,reload:()=>Promise<T>){

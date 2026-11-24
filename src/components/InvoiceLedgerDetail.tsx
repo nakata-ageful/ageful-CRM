@@ -1,3 +1,4 @@
+import { automaticDebitContext } from '../lib/automatic-debit'
 import { useEffect, useState } from 'react'
 import { InvoiceUnitEditor } from './InvoiceUnitEditor'
 import { isEditableInvoicePlan, isBillingDate, billingUnitStatusLabel, resolveUnitAmount, type BillingUnit } from '../lib/billing-unit'
@@ -105,11 +106,13 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
     ||!!contract&&detailPlanCount(contract)>1||!!candidatePeriod&&candidatePeriod.units.length>0)
   const [adding,setAdding]=useState<{after:EditorMode|null;adjust?:boolean}|null>(null)
   const [created,setCreated]=useState<{projectId:number;item:MaintenanceScheduleItem;after:EditorMode|null}|null>(null)
+  const [recordingDebit,setRecordingDebit]=useState<ReturnType<typeof automaticDebitContext>>(null)
+  const directDebit=contract&&candidate?automaticDebitContext(contract,candidate,data):null
   const [recording,setRecording]=useState<ReturnType<typeof routineInvoiceContext>>(null)
   const [recordingBusy,setRecordingBusy]=useState(false)
   const routine=contract&&candidate?routineInvoiceContext(contract,candidate,data,today??new Date().toLocaleDateString('sv-SE')):null
   const canRecord=!!routine&&!!onAddRoutine&&!!onSave&&!!data.recipients
-  useEffect(()=>{setFocusedId(null);setEditor(null);setAdding(null);setCreated(null);setRecording(null);setRemoval(null);setNotice('')},[projectId])
+  useEffect(()=>{setFocusedId(null);setEditor(null);setAdding(null);setCreated(null);setRecordingDebit(null);setRecording(null);setRemoval(null);setNotice('')},[projectId])
   useEffect(()=>{
     if(!created)return
     if(created.projectId!==projectId){setCreated(null);return}
@@ -129,6 +132,9 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
       {focusedId&&candidate&&<button type="button" className="btn btn-sub btn-sm" onClick={()=>{setFocusedId(null);setEditor(null)}}>今回・次回の請求に戻る</button>}
       {candidate&&canCreate&&<button type="button" className="btn btn-sub btn-sm" onClick={()=>setAdding({after:null})}>＋ 請求・振替予定を追加</button>}
     </div></div>
+    {recordingDebit&&onSave&&<Modal title="振替結果を記録" width={720} onClose={()=>setRecordingDebit(null)}>
+      <div className="standard-editor"><ManualDebitEditor automaticDebit={recordingDebit} recipientName={data.recipientName} onSave={onSave} onClose={()=>setRecordingDebit(null)} /></div>
+    </Modal>}
     <div className="invoice-detail-columns">
     <div className="invoice-detail-main">
     {!focused ? <div className="card invoice-current-card">
@@ -147,7 +153,7 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
         {candidate.reviewReason&&<p className="billing-overview-notice" role="alert">{candidate.recipientId>0?'保守期間要確認：':''}{candidate.reviewReason}</p>}
         {!candidate.periodStart&&!candidate.periodChoiceRequired&&<p className="invoice-reference-help">「保守情報」で保守開始日を確認してください。委託契約の開始日とは別の項目です。</p>}
         {candidate.periodChoiceRequired&&onReviewPeriod&&<div className="invoice-current-actions"><button type="button" className="btn btn-main" onClick={onReviewPeriod}>請求する年を設定</button></div>}
-        {canCreate&&<div className="invoice-current-actions">{canRecord&&<button type="button" className="btn btn-main" onClick={()=>setRecording(routine)}>発行内容を記録</button>}{!canRecord&&!candidate.reviewReason&&<button type="button" className="btn btn-main" onClick={()=>setAdding({after:candidate.method==='direct_debit'?'debit':'invoice'})}>{candidate.method==='direct_debit'?'振替結果を記録':'発行内容を記録'}</button>}<button type="button" className={candidate.reviewReason?'btn btn-main':'btn'} onClick={()=>setAdding({after:null,adjust:true})}>{candidate.reviewReason?'予定を確認・調整':'今回の予定を変更'}</button></div>}
+        {canCreate&&<div className="invoice-current-actions">{canRecord&&<button type="button" className="btn btn-main" onClick={()=>setRecording(routine)}>発行内容を記録</button>}{directDebit&&onSave&&<button type="button" className="btn btn-main" onClick={()=>setRecordingDebit(directDebit)}>振替結果を記録</button>}{!directDebit&&!canRecord&&!candidate.reviewReason&&candidate.method==='invoice'&&<button type="button" className="btn btn-main" onClick={()=>setAdding({after:'invoice'})}>発行内容を記録</button>}<button type="button" className={candidate.reviewReason?'btn btn-main':'btn'} onClick={()=>setAdding({after:null,adjust:true})}>{candidate.reviewReason?'予定を確認・調整':'今回の予定を変更'}</button></div>}
       </>:<p className="invoice-reference-help">{units.length?'表示できる次回の予定がありません。「請求情報」の設定と保存済み記録を確認してください。':'この発電所の請求記録はまだありません。「請求情報」で請求方法・予定日を確認してください。'}</p>}
       {!!contract?.notes&&<div className="invoice-current-lines"><h3>備考</h3><p style={{whiteSpace:'pre-wrap'}}>{contract.notes}</p></div>}
     </div> : (() => {

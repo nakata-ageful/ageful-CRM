@@ -41,6 +41,7 @@ export function billingUnitFromStorage(row: Record<string, unknown>): BillingUni
   if(removedAt!==null&&(!['issued','received'].includes(String(lifecycle))||row.issued_on===null&&row.received_on===null))throw Error('削除済み記録の請求・入金実績が不正です')
   return { id: String(integer('id',1)), projectId: integer('project_id',1), serviceYear: year,
     roundLabel: month !== null ? `${month}月分` : round !== null ? `第${round}回` : '保存済み単回記録',
+    ...(row.original_method==='invoice'||row.original_method==='direct_debit'?{originalMethod:row.original_method}:{}),
     method: row.collection_method === 'invoice' ? '請求書' : '口座振替',
     scheduledDate: date('scheduled_date'), issuedOn: date('issued_on'), receivedOn: date('received_on'),paymentDueOn:date('payment_due_on'),
     recipientId: row.recipient_customer_id === null ? null : integer('recipient_customer_id',1),

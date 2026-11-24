@@ -1,3 +1,5 @@
+import { automaticDebitContext } from '../lib/automatic-debit'
+import { detailPlanCandidate } from '../lib/billing-detail-plan'
 import { useState } from 'react'
 import type { BillingRow, AnnualRecord, PaymentEntry } from '../types'
 import { updateAnnualRecord, createAnnualRecord, deleteAnnualRecord } from '../lib/actions'
@@ -39,6 +41,16 @@ export function Billing(props: Props) {
         recipientId:item.recipientId,amount:item.amount,periodStart:item.periodStart??null,periodEnd:item.periodEnd??null},props.billingHistory!,today)
       return context?[context]:[]
     })
+    const automaticDebits = setup.items.flatMap(item => {
+      if (item.method !== 'direct_debit' || item.status !== 'missing') return []
+      const contract = props.rows.find(row => row.project_id === item.projectId)?.contract
+      if (!contract) return []
+      const candidate = detailPlanCandidate(contract, item.recipientId, props.billingHistory!.units, item.date,
+        events, props.billingHistory!.cycleRules)
+      if (!candidate || candidate.date !== item.date) return []
+      const context = automaticDebitContext(contract, candidate, props.billingHistory!)
+      return context ? [context] : []
+    })
     const debitProjects = props.rows.filter(row => row.contract?.billing_method === '口座振替'
       && (row.contract_count ?? 1) === 1 && managementActiveOn(events, row.project_id, 'all', today)).map(row => {
         const contract = managementActiveOn(events, row.project_id, 'maintenance', today) ? row.contract
@@ -48,7 +60,7 @@ export function Billing(props: Props) {
       })
     return <BillingOverviewPanel data={props.billingHistory} today={today} onViewDetail={props.onViewDetail}
       setupItems={setup.items} setupIssues={setup.issues} debitProjects={debitProjects} onSave={props.onSaveInvoice}
-      routineInvoices={routineInvoices} onAddRoutine={props.onAddRoutine}/>
+      automaticDebits={automaticDebits} routineInvoices={routineInvoices} onAddRoutine={props.onAddRoutine}/>
   }
   return <LegacyBilling {...props} />
 }

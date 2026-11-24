@@ -15,14 +15,13 @@ const unknown={...unpaid,id:'5',projectId:3,frozenAmount:null}
 const history={units:[base,paid,unpaid,old,unknown],recipientName:id=>id===1?'旧所有者A':'新所有者B',projectName:id=>`検証発電所${id}`,plannedAmount:()=>999999,recipients:[{id:1,name:'旧所有者A'},{id:2,name:'新所有者B'}]}
 const candidates=Array.from({length:24},(_,i)=>({projectId:10+i,projectName:`未保存発電所${i}`,customerName:'現在の顧客',recipientId:2,method:'invoice',date:i===0?'2026-11-01':'2026-12-01',round:1,amount:55000,status:'missing'}))
 const props={data:history,today:'2026-10-03',setupItems:candidates,onViewDetail:noSave,onSave:noSave,
- setupIssues:[{projectId:50,projectName:'要設定発電所',category:'action_required',code:'other',reason:'予定日要確認'}],
- debitProjects:[{projectId:56,projectName:'常時振替発電所',customerName:'現在の顧客',days:'25日',amount:10110}]}
+ setupIssues:[{projectId:50,projectName:'要設定発電所',category:'action_required',code:'other',reason:'予定日要確認'}]}
 const before=JSON.stringify({units:history.units,candidates})
 const html=render(Panel,props)
 assert.ok(!html.includes('請求履歴')&&!html.includes('billing-history-summary'),'Detail/history panels must not recur in overview')
 assert.ok(html.indexOf('未入金（2件）')<html.indexOf('今月・来月・再来月の請求予定（25件）'))
 assert.equal((html.match(/data-candidate-key=/g)||[]).length,24,'No display truncation, including more than 12 on one date')
-for(const title of ['口座振替（1件）','入金済（1件）','請求設定要確認（1件）']){
+for(const title of ['口座振替（0件）','入金済（1件）','請求設定要確認（1件）']){
  const escaped=title.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')
  assert.ok(new RegExp('<details class="card billing-overview-section [^"]+"><summary><span>'+escaped+'</span>').test(html),
    'Secondary section must be an actual closed disclosure: '+title)
@@ -65,6 +64,8 @@ assert.deepEqual(ids(switchOverview.unpaid),['3'])
 assert.equal(switchOverview.totals.unpaidAmount,165000)
 const switchedHtml=render(Panel,{...props,setupItems:[],data:{...history,units}})
 assert.ok(switchedHtml.includes('未入金（3件）'))
+assert.ok(switchedHtml.includes('口座振替（1件）')&&switchedHtml.includes('保存済みの振替予定（1件）'))
+assert.ok(!switchedHtml.includes('口座振替の発電所（常時）'))
 assert.equal((switchedHtml.match(/data-unit-id="switched"/g)||[]).length,1)
 const switchRow=switchedHtml.match(/<tr data-unit-id="switched">.*?<\/tr>/)?.[0]
 for(const label of ['振替不能・請求書未発行','予定額（合計対象外）','発行内容を記録','2026-12-01'])assert.ok(switchRow?.includes(label),label)

@@ -14,7 +14,6 @@ import {RoutineInvoiceEditor} from './RoutineInvoiceEditor'
 
 import {routineInvoiceKey,type AddRoutineInvoice,type RoutineInvoiceContext} from '../lib/routine-invoice'
 
-export type DebitOverviewProject = { projectId: number; projectName: string; customerName: string; days: string; amount: number }
 function OverviewSection({ title, count, color, collapsed = false, children }: {
   title: string; count: number; color: string; collapsed?: boolean; children: ReactNode
 }) {
@@ -24,10 +23,10 @@ function OverviewSection({ title, count, color, collapsed = false, children }: {
 }
 
 /** Cross-project work list. Classification, saved payer and amount rules are unchanged. */
-export function BillingOverviewPanel({ data, today, onViewDetail, setupItems = [], setupIssues = [], onSave, debitProjects = [], routineInvoices=[],automaticDebits=[],onAddRoutine }: {
+export function BillingOverviewPanel({ data, today, onViewDetail, setupItems = [], setupIssues = [], onSave, routineInvoices=[],automaticDebits=[],onAddRoutine }: {
   data: BillingHistoryData; today: string; onViewDetail?: (projectId: number) => void
   setupItems?: readonly ScheduleSetupItem[]; setupIssues?: readonly ScheduleSetupIssue[]
-  onSave?: (request: InvoiceWriteRequest) => Promise<unknown>; debitProjects?: readonly DebitOverviewProject[]
+  onSave?: (request: InvoiceWriteRequest) => Promise<unknown>
   routineInvoices?:readonly RoutineInvoiceContext[];automaticDebits?:readonly RoutineInvoiceContext[];onAddRoutine?:AddRoutineInvoice
 }) {
   const overview = buildBillingOverview(data.units, today)
@@ -76,13 +75,11 @@ export function BillingOverviewPanel({ data, today, onViewDetail, setupItems = [
       <BillingOverviewTable {...tableProps} units={overview.upcoming} candidates={nearTermCandidates} mode="upcoming" />
 
     </OverviewSection>
-    <OverviewSection title="口座振替" count={new Set([...debitProjects.map(p => p.projectId), ...debitChecks.map(p => p.projectId), ...overview.debitPlans.map(p => p.projectId)]).size} color="purple" collapsed>
+    <OverviewSection title="口座振替" count={debitChecks.length + overview.debitPlans.length} color="purple" collapsed>
       <p className="billing-overview-help">銀行の振替結果を確認して記録します。</p>
       {!!debitChecks.length && <><h4 className="billing-overview-subtitle">口座振替の結果を確認（{debitChecks.length}件）</h4><BillingOverviewTable {...tableProps} candidates={debitChecks} mode="review" /></>}
       {!!overview.debitPlans.length && <><h4 className="billing-overview-subtitle">保存済みの振替予定（{overview.debitPlans.length}件）</h4><BillingOverviewTable {...tableProps} units={overview.debitPlans} mode="review" /></>}
-      {!!debitProjects.length && <><h4 className="billing-overview-subtitle">口座振替の発電所（常時）</h4><div className="billing-overview-scroll"><table className="billing-overview-table"><thead><tr><th>発電所</th><th>現在の顧客</th><th>振替日</th><th className="billing-overview-money">今月の振替予定額（税込）</th><th className="billing-overview-operation">操作</th></tr></thead>
-        <tbody>{debitProjects.map(project => <tr key={project.projectId}><td>{onViewDetail ? <button type="button" className="link-btn" onClick={() => onViewDetail(project.projectId)}>{project.projectName}</button> : project.projectName}</td><td>{project.customerName}<small>各回の請求先は詳細で確認</small></td><td>{project.days || '日付要確認'}</td><td className="billing-overview-money"><strong>{fmtYen(project.amount)}</strong><small>振替予定額</small></td><td>{onViewDetail && <button type="button" className="btn btn-sub btn-sm" onClick={() => onViewDetail(project.projectId)}>詳細</button>}</td></tr>)}</tbody></table></div></>}
-      {!debitChecks.length && !overview.debitPlans.length && !debitProjects.length && <p className="billing-overview-empty">口座振替の対象はありません。</p>}
+      {!debitChecks.length && !overview.debitPlans.length && <p className="billing-overview-empty">確認する振替結果や保存済みの振替予定はありません。</p>}
     </OverviewSection>
     <OverviewSection title="入金済" count={overview.received.length} color="green" collapsed><BillingOverviewTable {...tableProps} units={overview.received} mode="received" /></OverviewSection>
     {([['表示期間より前の予定', overview.overduePlans], ['日付要確認', overview.undatedPlans], ['それ以降の予定', overview.laterPlans], ['記録要確認', overview.review]] as const)

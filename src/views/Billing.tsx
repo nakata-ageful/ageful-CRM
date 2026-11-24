@@ -11,7 +11,6 @@ import { BillingOverviewPanel } from '../components/BillingOverviewPanel'
 import type { BillingHistoryData } from '../components/BillingHistorySection'
 import {legacyScheduleSetupReview} from '../lib/billing-cutover-coverage'
 import type { InvoiceWriteRequest } from '../lib/invoice-write-session'
-import { managementActiveOn } from '../lib/management-lifecycle'
 import {routineInvoiceContext,type AddRoutineInvoice} from '../lib/routine-invoice'
 
 type Props = {
@@ -51,15 +50,8 @@ export function Billing(props: Props) {
       const context = automaticDebitContext(contract, candidate, props.billingHistory!)
       return context ? [context] : []
     })
-    const debitProjects = props.rows.filter(row => row.contract?.billing_method === '口座振替'
-      && (row.contract_count ?? 1) === 1 && managementActiveOn(events, row.project_id, 'all', today)).map(row => {
-        const contract = managementActiveOn(events, row.project_id, 'maintenance', today) ? row.contract
-          : {...row.contract!, billing_item_flags: {...row.contract?.billing_item_flags, annual_maintenance: false}}
-        return { projectId: row.project_id, projectName: row.project_name, customerName: row.customer_name,
-          days: (row.contract?.billing_schedule_days ?? []).join('・'), amount: withdrawalAmount(contract, Number(today.slice(5, 7))) }
-      })
     return <BillingOverviewPanel data={props.billingHistory} today={today} onViewDetail={props.onViewDetail}
-      setupItems={setup.items} setupIssues={setup.issues} debitProjects={debitProjects} onSave={props.onSaveInvoice}
+      setupItems={setup.items} setupIssues={setup.issues} onSave={props.onSaveInvoice}
       automaticDebits={automaticDebits} routineInvoices={routineInvoices} onAddRoutine={props.onAddRoutine}/>
   }
   return <LegacyBilling {...props} />

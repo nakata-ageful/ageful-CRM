@@ -48,6 +48,35 @@ const buttons=nodes(tree,e=>e.type==='button')
 buttons.find(b=>b.props.children==='発行内容を記録').props.onClick();buttons.find(b=>b.props.children==='入金日を記録').props.onClick()
 assert.deepEqual(JSON.parse(JSON.stringify(edits)),[{unitId:'1',mode:'invoice'},{unitId:'3',mode:'invoice'}])
 assert.equal(buttons.filter(b=>b.props.children==='発行内容を記録').length,1,'Unconfirmed candidates and paid rows cannot be issued')
+const switched={...base,id:'switched',projectId:7,collectionState:'failed',plannedAmount:44000}
+const historicalSwitch={...switched,id:'historical-switch',scheduledDate:'2024-12-01',serviceYear:2024}
+const normalDebit={...base,id:'normal-debit',method:'口座振替',collectionState:'pending'}
+const cancelledSwitch={...switched,id:'cancelled-switch',lifecycle:'cancelled'}
+const deletedSwitch={...switched,id:'deleted-switch',removedAt:'2026-10-03T00:00:00Z'}
+const units=[base,normalDebit,switched,historicalSwitch,cancelledSwitch,deletedSwitch,unpaid]
+const {buildBillingOverview}=load('src/lib/billing-overview.ts')
+const switchOverview=buildBillingOverview(units,props.today)
+const ids=bucket=>Array.from(bucket,u=>u.id)
+assert.deepEqual(ids(switchOverview.debitSwitchAwaitingIssue),['switched','historical-switch'])
+assert.deepEqual(ids(switchOverview.upcoming),['1'])
+assert.equal(switchOverview.overduePlans.length,0)
+assert.deepEqual(ids(switchOverview.debitPlans),['normal-debit'])
+assert.deepEqual(ids(switchOverview.unpaid),['3'])
+assert.equal(switchOverview.totals.unpaidAmount,165000)
+const switchedHtml=render(Panel,{...props,setupItems:[],data:{...history,units}})
+assert.ok(switchedHtml.includes('未入金（3件）'))
+assert.equal((switchedHtml.match(/data-unit-id="switched"/g)||[]).length,1)
+const switchRow=switchedHtml.match(/<tr data-unit-id="switched">.*?<\/tr>/)?.[0]
+for(const label of ['振替不能・請求書未発行','予定額（合計対象外）','発行内容を記録','2026-12-01'])assert.ok(switchRow?.includes(label),label)
+const afterSwitchIssue={...switched,...unpaid,id:'switched',collectionState:'pending',frozenAmount:44000}
+const afterIssue=buildBillingOverview([afterSwitchIssue],props.today)
+assert.equal(afterIssue.debitSwitchAwaitingIssue.length,0)
+assert.deepEqual(ids(afterIssue.unpaid),['switched'])
+assert.equal(afterIssue.totals.unpaidAmount,44000)
+const afterReceipt=buildBillingOverview([{...afterSwitchIssue,collectionState:'succeeded',lifecycle:'received',receivedOn:'2026-10-02'}],props.today)
+assert.equal(afterReceipt.unpaid.length,0)
+assert.deepEqual(ids(afterReceipt.received),['switched'])
+assert.equal(afterReceipt.totals.receivedAmount,44000)
 const source=fs.readFileSync(path.join(root,'src/App.tsx'),'utf8'),billing=source.slice(source.indexOf("{view === 'billing'"))
 assert.ok(billing.includes("onSaveInvoice={billingHistory?request=>saveRuntime({action:'invoice',value:request})"),'List uses the existing durable atomic writer')
 const panelSource=fs.readFileSync(path.join(root,'src/components/BillingOverviewPanel.tsx'),'utf8')

@@ -8,6 +8,7 @@ export type BillingUnit = {
   roundLabel: string
   method: '請求書' | '口座振替'
   originalMethod?: 'invoice' | 'direct_debit'
+  collectionState?: 'pending' | 'succeeded' | 'failed' | 'not_applicable'
   scheduledDate: string | null
   recipientId: number | null
   /** Stored payer decision, not inferred from the current project owner. */
@@ -72,6 +73,10 @@ export function resolveUnitAmount(unit: BillingUnit, _legacyEstimate?: () => num
 export function isEditableInvoicePlan(unit: BillingUnit): boolean {
   return isActiveBillingUnit(unit) && unit.method === '請求書' && unit.lifecycle === 'planned'
     && !unit.issuedOn && !unit.receivedOn && !unit.frozenAt && unit.frozenAmount == null
+}
+
+export function isDebitSwitchAwaitingIssue(unit: BillingUnit): boolean {
+  return unit.collectionState === 'failed' && isEditableInvoicePlan(unit)
 }
 
 export function upcomingInvoiceUnits(units: readonly BillingUnit[]): BillingUnit[] {

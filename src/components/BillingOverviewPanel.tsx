@@ -40,9 +40,11 @@ export function BillingOverviewPanel({ data, today, onViewDetail, setupItems = [
   const editingUnit = data.units.find(unit => !unit.removedAt&&unit.id === editor?.unitId)
   const noBillingCandidates = setupIssues.filter(issue => issue.category === 'no_billing_candidate')
   const actionRequired = setupIssues.filter(issue => issue.category === 'action_required')
+  const unpaidDisplay = [...overview.debitSwitchAwaitingIssue, ...overview.unpaid]
+  const scheduledInvoices = [...overview.upcoming, ...overview.debitSwitchAwaitingIssue]
   const nearTermCandidates = setupItems.filter(item => item.method === 'invoice' && overview.months.includes(item.date.slice(0, 7))
     && (item.status === 'missing' || item.status === 'overdue')
-    && !overview.upcoming.some(unit => unit.projectId === item.projectId && unit.scheduledDate === item.date))
+    && !scheduledInvoices.some(unit => unit.projectId === item.projectId && unit.scheduledDate === item.date))
   const debitChecks = setupItems.filter(item => item.method === 'direct_debit')
   const movedItems = new Set<ScheduleSetupItem>([...nearTermCandidates, ...debitChecks])
   const remainingItems = setupItems.filter(item => !movedItems.has(item))
@@ -69,7 +71,7 @@ export function BillingOverviewPanel({ data, today, onViewDetail, setupItems = [
         {!!overview.olderUnpaidTotals.unknownActualCount && ` 金額要確認：${overview.olderUnpaidTotals.unknownActualCount}件。金額不明分は合計に含みません。`}</p>
       <BillingOverviewTable {...tableProps} units={overview.olderUnpaid} mode="unpaid" />
     </OverviewSection>}
-    <OverviewSection title="未入金" count={overview.unpaid.length} color="red"><BillingOverviewTable {...tableProps} units={overview.unpaid} mode="unpaid" /></OverviewSection>
+    <OverviewSection title="未入金" count={unpaidDisplay.length} color="red"><BillingOverviewTable {...tableProps} units={unpaidDisplay} mode="unpaid" /></OverviewSection>
     <OverviewSection title="今月・来月・再来月の請求予定" count={overview.upcoming.length + nearTermCandidates.length} color="blue">
       <BillingOverviewTable {...tableProps} units={overview.upcoming} candidates={nearTermCandidates} mode="upcoming" />
 

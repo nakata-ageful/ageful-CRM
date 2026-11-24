@@ -1,5 +1,5 @@
 import type { BillingHistoryData } from './BillingHistorySection'
-import { billingUnitStatusLabel, isEditableInvoicePlan, resolveUnitAmount, type BillingUnit } from '../lib/billing-unit'
+import { billingUnitStatusLabel, isDebitSwitchAwaitingIssue, isEditableInvoicePlan, resolveUnitAmount, type BillingUnit } from '../lib/billing-unit'
 import type { ScheduleSetupItem } from '../lib/billing-cutover-coverage'
 import { fmtYen } from '../lib/utils'
 
@@ -12,22 +12,26 @@ export function BillingOverviewTable({ data, units = [], candidates = [], mode, 
   mode: OverviewMode; today: string; onViewDetail?: (id: number) => void; onEdit?: (editor: OverviewEditor) => void
   canRecordCandidate?:(candidate:ScheduleSetupItem)=>boolean;onRecordCandidate?:(candidate:ScheduleSetupItem)=>void
 }) {
+  const showDebitSwitches = mode === 'unpaid' && units.some(isDebitSwitchAwaitingIssue)
   const rows = [
-    ...units.map(unit => ({ key: `unit:${unit.id}`, unit, candidate: undefined, projectId: unit.projectId,
-      date: (mode === 'received' ? unit.receivedOn : mode === 'unpaid' ? unit.issuedOn : unit.scheduledDate) ?? '' })),
+    ...units.map(unit => {
+      const awaitingIssue = showDebitSwitches && isDebitSwitchAwaitingIssue(unit)
+      const date = mode === 'received' ? unit.receivedOn : mode === 'unpaid' && !awaitingIssue ? unit.issuedOn : unit.scheduledDate
+      return { key: `unit:${unit.id}`, unit, candidate: undefined, projectId: unit.projectId, awaitingIssue, date: date ?? '' }
+    }),
     ...candidates.map(candidate => ({ key: `candidate:${candidate.projectId}:${candidate.date}:${candidate.round}:${candidate.method}`,
-      unit: undefined, candidate, projectId: candidate.projectId, date: candidate.date })),
+      unit: undefined, candidate, projectId: candidate.projectId, awaitingIssue: false, date: candidate.date })),
   ].sort((a, b) => {
     const dateOrder = (a.date || '9999').localeCompare(b.date || '9999')
-    return (mode === 'received' ? -dateOrder : dateOrder) || a.projectId - b.projectId || a.key.localeCompare(b.key)
+    return Number(b.awaitingIssue) - Number(a.awaitingIssue) || (mode === 'received' ? -dateOrder : dateOrder) || a.projectId - b.projectId || a.key.localeCompare(b.key)
   })
   if (!rows.length) return <p className="billing-overview-empty">{mode === 'upcoming' ? 'この期間の請求書予定はありません。' : mode === 'unpaid' ? '未入金の請求はありません。' : mode === 'received' ? '入金済の記録はありません。' : '対象の記録はありません。'}</p>
-  const dateTitle = mode === 'received' ? '請求・振替日' : mode === 'unpaid' ? '請求日' : '予定日'
+  const dateTitle = mode === 'received' ? '請求・振替日' : mode === 'unpaid' ? (showDebitSwitches ? '請求日・振替予定日' : '請求日') : '予定日'
   return <div className="billing-overview-scroll"><table className={`billing-overview-table${mode === 'upcoming' ? ' billing-overview-table-compact' : ''}`}>
     <thead><tr><th>発電所</th><th>請求先</th><th className="billing-overview-round">回数</th><th className="billing-overview-date">{dateTitle}</th>
-      <th className="billing-overview-date">{mode === 'received' ? '入金日' : mode === 'unpaid' ? '入金予定日' : '状態'}</th>
+      <th className="billing-overview-date">{mode === 'received' ? '入金日' : mode === 'unpaid' ? (showDebitSwitches ? '入金予定日・状態' : '入金予定日') : '状態'}</th>
       <th className="billing-overview-money">金額（税込）</th><th className="billing-overview-operation">操作</th></tr></thead>
-    <tbody>{rows.map(({ key, unit, candidate, projectId }) => {
+    <tbody>{rows.map(({ key, unit, candidate, projectId, awaitingIssue }) => {
       const name = candidate?.projectName ?? data.projectName(projectId)
       const routine=!!candidate&&!!onRecordCandidate&&!!canRecordCandidate?.(candidate)
       const amount = unit ? resolveUnitAmount(unit) : { amount: candidate!.amount, basis: candidate!.method==='direct_debit'?'振替予定額':'請求予定額' }
@@ -44,11 +48,11 @@ export function BillingOverviewTable({ data, units = [], candidates = [], mode, 
           : unit!.recipientId == null ? <span className="billing-overview-warning">請求先要確認</span> : data.recipientName(unit!.recipientId)}</td>
         <td title={`保守期間：${period}`}>{candidate ? `第${candidate.round}回` : unit!.roundLabel === '保存済み単回記録' ? '回数要確認' : unit!.roundLabel}
           {unit && <small>{unit.serviceYear}年</small>}{candidate?.periodChoiceRequired?<small>対象年を確認</small>:candidate?.serviceYear&&<small>{candidate.serviceYear}年分</small>}</td>
-        <td className="billing-overview-date-value">{mode === 'unpaid' || mode === 'received' ? unit?.issuedOn ?? '—' : unit?.scheduledDate ?? candidate?.date ?? '日付要確認'}</td>
-        <td className={mode === 'unpaid' || mode === 'received' ? 'billing-overview-date-value' : undefined}>{mode === 'unpaid' ? unit?.paymentDueOn ?? '—' : mode === 'received' ? unit?.receivedOn ?? '—'
+        <td className="billing-overview-date-value">{awaitingIssue ? unit?.scheduledDate ?? '—' : mode === 'unpaid' || mode === 'received' ? unit?.issuedOn ?? '—' : unit?.scheduledDate ?? candidate?.date ?? '日付要確認'}</td>
+        <td className={mode === 'unpaid' || mode === 'received' ? 'billing-overview-date-value' : undefined}>{awaitingIssue ? '振替不能・請求書未発行' : mode === 'unpaid' ? unit?.paymentDueOn ?? '—' : mode === 'received' ? unit?.receivedOn ?? '—'
           : <span className={candidate&&!routine ? 'billing-overview-warning' : ''} title={candidate?.reason}>{status}</span>}</td>
         <td className="billing-overview-money"><strong>{amount.amount == null ? '金額要確認' : fmtYen(amount.amount)}</strong>
-          {amount.amount != null && amount.basis !== '確定額' && <small>{amount.basis}</small>}</td>
+          {amount.amount != null && amount.basis !== '確定額' && <small>{awaitingIssue ? '予定額（合計対象外）' : amount.basis}</small>}</td>
         <td><div className="billing-overview-actions">
           {routine&&<button type="button" className="btn btn-main btn-sm" onClick={()=>onRecordCandidate!(candidate!)}>{candidate!.method==='direct_debit'?'振替結果を記録':'発行内容を記録'}</button>}
           {onEdit && unit && (canIssue || canCollect) && <button type="button" className="btn btn-main btn-sm" onClick={() => onEdit({ unitId: unit.id, mode: 'invoice' })}>{canCollect ? '入金日を記録' : '発行内容を記録'}</button>}

@@ -1,4 +1,4 @@
-import { isBillingDate,isActiveBillingUnit, type BillingUnit } from './billing-unit'
+import { isBillingDate,isActiveBillingUnit, isDebitSwitchAwaitingIssue, type BillingUnit } from './billing-unit'
 import { copyJson } from './billing-json'
 import { summarizeBillingHistory } from './billing-history'
 
@@ -13,7 +13,8 @@ export function buildBillingOverview(source: readonly BillingUnit[], today: stri
     return `${year+Math.floor(offset/12)}-${String(offset%12+1).padStart(2,'0')}`
   })
   const planned=units.filter(u=>u.lifecycle==='planned'&&!u.issuedOn&&!u.receivedOn)
-  const invoices=planned.filter(u=>u.method==='請求書')
+  const debitSwitchAwaitingIssue=planned.filter(isDebitSwitchAwaitingIssue)
+  const invoices=planned.filter(u=>u.method==='請求書'&&!isDebitSwitchAwaitingIssue(u))
   // A future service year can already be invoiced/paid this December. Never drop
   // its unpaid obligation just because maintenance starts next year.
   const active=units.filter(u=>u.serviceYear>=year-1&&u.lifecycle!=='cancelled'&&u.lifecycle!=='review_required')
@@ -22,7 +23,7 @@ export function buildBillingOverview(source: readonly BillingUnit[], today: stri
   const olderUnpaid=units.filter(u=>u.serviceYear<year-1&&!u.receivedOn&&u.lifecycle!=='received'
     &&u.lifecycle!=='cancelled'&&u.lifecycle!=='review_required'&&(u.lifecycle==='issued'||u.lifecycle==='fixed'||!!u.issuedOn))
   const allUnpaid=[...unpaid,...olderUnpaid]
-  return { months, upcoming: invoices.filter(u=>u.scheduledDate&&months.includes(u.scheduledDate.slice(0,7))),
+  return { months, debitSwitchAwaitingIssue, upcoming: invoices.filter(u=>u.scheduledDate&&months.includes(u.scheduledDate.slice(0,7))),
     overduePlans:invoices.filter(u=>u.scheduledDate&&u.scheduledDate<`${months[0]}-01`),
     undatedPlans:invoices.filter(u=>!u.scheduledDate), laterPlans:invoices.filter(u=>u.scheduledDate&&u.scheduledDate.slice(0,7)>months[2]),
     debitPlans:planned.filter(u=>u.method==='口座振替'), received, unpaid, olderUnpaid, allUnpaid,

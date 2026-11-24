@@ -37,7 +37,7 @@ export function ManualDebitEditor({unit:initialUnit,automaticDebit,recipientName
         ...(automaticDebit?{automaticDebit}:{})});onClose()
     }catch(e){setError(errorDetail(e)||formErrorText(e))}finally{lock.current=false;setBusy(false)}
   }
-  return <section className="card"><h3>{debitOccurrenceLabel(item?.date??unit?.scheduledDate)}：{correcting?'振替記録を訂正':'振替結果を記録'}</h3>
+  return <section className="card"><h3>{debitOccurrenceLabel(item?.date??unit?.scheduledDate)}：{correcting?'振替記録を訂正':'請求書に切替'}</h3>
     {correcting?<p>訂正前の内容と理由を履歴に残します。</p>:<p>銀行で振替不能を確認した回を、請求書払いに切り替えます。</p>}
     <p>請求先：{recipientId===null?'要確認':recipientName(recipientId)} ／ {correcting?'確定額':'振替予定額'}：{amount==null?'要確認':fmtYen(amount)}</p>
     {item&&<p>保守期間：{item.periodStart} ～ {item.periodEnd}</p>}
@@ -49,6 +49,6 @@ export function ManualDebitEditor({unit:initialUnit,automaticDebit,recipientName
         <button type="button" onClick={()=>setItems([...items,{name:'',amount:''}])}>明細を追加</button></>
         :<p>元の請求先・予定額を維持して同じ回を切り替えます。切替後、別途発行した請求書の内容を記録してください。</p>}
       <label>確認内容・理由<textarea required value={reason} onChange={e=>setReason(e.target.value)}/></label>
-      <div className="editor-footer"><button type="button" className="btn btn-sub" onClick={onClose}>キャンセル</button><button type="submit" className="btn btn-main" disabled={!reason.trim()}>{busy?'保存中…':correcting?'訂正内容を保存':'請求書へ切替'}</button></div>
+      <div className="editor-footer"><button type="button" className="btn btn-sub" onClick={onClose}>キャンセル</button><button type="submit" className="btn btn-main" disabled={!reason.trim()}>{busy?'保存中…':correcting?'訂正内容を保存':'請求書に切替'}</button></div>
     </fieldset></form></section>
 }

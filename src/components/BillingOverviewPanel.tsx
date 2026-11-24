@@ -98,10 +98,10 @@ export function BillingOverviewPanel({ data, today, onViewDetail, setupItems = [
     {routine&&onAddRoutine&&onSave&&data.recipients&&<Modal title={`${data.projectName(routine.contract.project_id)}：発行内容を記録`} width={720} closeDisabled={routineBusy} onClose={()=>setRoutine(null)}><div className="standard-editor">
       <RoutineInvoiceEditor context={routine} recipients={data.recipients} onAdd={onAddRoutine} onSave={onSave} onBusyChange={setRoutineBusy} onClose={()=>setRoutine(null)}/>
     </div></Modal>}
-    {recordingDebit&&onSave&&<Modal title="振替結果を記録" width={720} onClose={()=>setRecordingDebit(null)}>
+    {recordingDebit&&onSave&&<Modal title="請求書に切替" width={720} onClose={()=>setRecordingDebit(null)}>
       <div className="standard-editor"><ManualDebitEditor automaticDebit={recordingDebit} recipientName={data.recipientName} onSave={onSave} onClose={()=>setRecordingDebit(null)} /></div>
     </Modal>}
-    {editingUnit && onSave && <Modal title={`${data.projectName(editingUnit.projectId)}：${editor?.mode === 'plan' ? '請求先・予定を設定' : editor?.mode === 'debit' ? '振替結果を記録' : editingUnit.lifecycle === 'issued' ? '入金日を記録' : '発行内容を記録'}`} width={720} onClose={closeEditor}>
+    {editingUnit && onSave && <Modal title={`${data.projectName(editingUnit.projectId)}：${editor?.mode === 'plan' ? '請求先・予定を設定' : editor?.mode === 'debit' ? '請求書に切替' : editingUnit.lifecycle === 'issued' ? '入金日を記録' : '発行内容を記録'}`} width={720} onClose={closeEditor}>
       <div className="standard-editor">{editor?.mode === 'plan' && data.recipients ? <InvoicePlanEditor key={editingUnit.id} unit={editingUnit} recipients={data.recipients} onSave={onSave} onClose={closeEditor} />
         : editor?.mode === 'debit' ? <ManualDebitEditor key={editingUnit.id} unit={editingUnit} recipientName={data.recipientName} onSave={onSave} onClose={closeEditor} />
         : <InvoiceUnitEditor key={editingUnit.id} unit={editingUnit} recipientName={data.recipientName} onSave={onSave} onClose={closeEditor} />}</div>

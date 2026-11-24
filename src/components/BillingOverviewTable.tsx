@@ -54,9 +54,9 @@ export function BillingOverviewTable({ data, units = [], candidates = [], mode, 
         <td className="billing-overview-money"><strong>{amount.amount == null ? '金額要確認' : fmtYen(amount.amount)}</strong>
           {amount.amount != null && amount.basis !== '確定額' && <small>{awaitingIssue ? '予定額（合計対象外）' : amount.basis}</small>}</td>
         <td><div className="billing-overview-actions">
-          {routine&&<button type="button" className="btn btn-main btn-sm" onClick={()=>onRecordCandidate!(candidate!)}>{candidate!.method==='direct_debit'?'振替結果を記録':'発行内容を記録'}</button>}
+          {routine&&<button type="button" className="btn btn-main btn-sm" onClick={()=>onRecordCandidate!(candidate!)}>{candidate!.method==='direct_debit'?'請求書に切替':'発行内容を記録'}</button>}
           {onEdit && unit && (canIssue || canCollect) && <button type="button" className="btn btn-main btn-sm" onClick={() => onEdit({ unitId: unit.id, mode: 'invoice' })}>{canCollect ? '入金日を記録' : '発行内容を記録'}</button>}
-          {onEdit && canDebit && <button type="button" className="btn btn-main btn-sm" onClick={() => onEdit({ unitId: unit.id, mode: 'debit' })}>振替結果を記録</button>}
+          {onEdit && canDebit && <button type="button" className="btn btn-main btn-sm" onClick={() => onEdit({ unitId: unit.id, mode: 'debit' })}>請求書に切替</button>}
           {onEdit && unit && !canIssue && isEditableInvoicePlan(unit) && data.recipients && <button type="button" className="btn btn-sm" onClick={() => onEdit({ unitId: unit.id, mode: 'plan' })}>請求先を設定</button>}
           {onViewDetail && !routine && !(onEdit && unit && (canIssue || canCollect || canDebit || (isEditableInvoicePlan(unit) && data.recipients))) && <button type="button" className="btn btn-sub btn-sm" aria-label={`${name}の請求詳細を開く`} onClick={() => onViewDetail(projectId)}>{candidate ? '予定を確認' : '詳細'}</button>}
           {routine&&onViewDetail&&<button type="button" className="btn btn-sub btn-sm" onClick={()=>onViewDetail(projectId)}>詳細</button>}

@@ -132,7 +132,7 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
       {focusedId&&candidate&&<button type="button" className="btn btn-sub btn-sm" onClick={()=>{setFocusedId(null);setEditor(null)}}>今回・次回の請求に戻る</button>}
       {candidate&&canCreate&&<button type="button" className="btn btn-sub btn-sm" onClick={()=>setAdding({after:null})}>＋ 請求・振替予定を追加</button>}
     </div></div>
-    {recordingDebit&&onSave&&<Modal title="振替結果を記録" width={720} onClose={()=>setRecordingDebit(null)}>
+    {recordingDebit&&onSave&&<Modal title="請求書に切替" width={720} onClose={()=>setRecordingDebit(null)}>
       <div className="standard-editor"><ManualDebitEditor automaticDebit={recordingDebit} recipientName={data.recipientName} onSave={onSave} onClose={()=>setRecordingDebit(null)} /></div>
     </Modal>}
     <div className="invoice-detail-columns">
@@ -153,7 +153,7 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
         {candidate.reviewReason&&<p className="billing-overview-notice" role="alert">{candidate.recipientId>0?'保守期間要確認：':''}{candidate.reviewReason}</p>}
         {!candidate.periodStart&&!candidate.periodChoiceRequired&&<p className="invoice-reference-help">「保守情報」で保守開始日を確認してください。委託契約の開始日とは別の項目です。</p>}
         {candidate.periodChoiceRequired&&onReviewPeriod&&<div className="invoice-current-actions"><button type="button" className="btn btn-main" onClick={onReviewPeriod}>請求する年を設定</button></div>}
-        {canCreate&&<div className="invoice-current-actions">{canRecord&&<button type="button" className="btn btn-main" onClick={()=>setRecording(routine)}>発行内容を記録</button>}{directDebit&&onSave&&<button type="button" className="btn btn-main" onClick={()=>setRecordingDebit(directDebit)}>振替結果を記録</button>}{!directDebit&&!canRecord&&!candidate.reviewReason&&candidate.method==='invoice'&&<button type="button" className="btn btn-main" onClick={()=>setAdding({after:'invoice'})}>発行内容を記録</button>}<button type="button" className={candidate.reviewReason?'btn btn-main':'btn'} onClick={()=>setAdding({after:null,adjust:true})}>{candidate.reviewReason?'予定を確認・調整':'今回の予定を変更'}</button></div>}
+        {canCreate&&<div className="invoice-current-actions">{canRecord&&<button type="button" className="btn btn-main" onClick={()=>setRecording(routine)}>発行内容を記録</button>}{directDebit&&onSave&&<button type="button" className="btn btn-main" onClick={()=>setRecordingDebit(directDebit)}>請求書に切替</button>}{!directDebit&&!canRecord&&!candidate.reviewReason&&candidate.method==='invoice'&&<button type="button" className="btn btn-main" onClick={()=>setAdding({after:'invoice'})}>発行内容を記録</button>}<button type="button" className={candidate.reviewReason?'btn btn-main':'btn'} onClick={()=>setAdding({after:null,adjust:true})}>{candidate.reviewReason?'予定を確認・調整':'今回の予定を変更'}</button></div>}
       </>:<p className="invoice-reference-help">{units.length?'表示できる次回の予定がありません。「請求情報」の設定と保存済み記録を確認してください。':'この発電所の請求記録はまだありません。「請求情報」で請求方法・予定日を確認してください。'}</p>}
       {!!contract?.notes&&<div className="invoice-current-lines"><h3>備考</h3><p style={{whiteSpace:'pre-wrap'}}>{contract.notes}</p></div>}
     </div> : (() => {
@@ -194,7 +194,7 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
               {onSave && <div className="invoice-current-actions">
                 {canIssue && <button className="btn btn-main" type="button" onClick={() => openEditor(focused, 'invoice')}>発行内容を記録</button>}
                 {canCollect && <button className="btn btn-main" type="button" onClick={() => openEditor(focused, 'invoice')}>入金日を記録</button>}
-                {canRecordDebit && <button className="btn btn-main" type="button" onClick={() => openEditor(focused, 'debit')}>振替結果を記録</button>}
+                {canRecordDebit && <button className="btn btn-main" type="button" onClick={() => openEditor(focused, 'debit')}>請求書に切替</button>}
                 {canEditPlan && <button className="btn" type="button" onClick={() => openEditor(focused, 'plan')}>{focused.recipientId == null ? '請求先・予定を設定' : '予定を変更'}</button>}
                 {canCorrectInvoice && <button className="btn" type="button" onClick={() => openEditor(focused, 'correction')}>この記録を訂正</button>}
                 {canCorrectDebit && <button className="btn" type="button" onClick={() => openEditor(focused, 'debit')}>この記録を訂正</button>}
@@ -202,7 +202,7 @@ export function InvoiceLedgerDetail({ data, projectId, onSave, maintenanceStartD
               </div>}
             </div>
 
-        {editingUnit && onSave && <Modal title={editor?.mode==='correction'?'請求・入金記録を訂正':editor?.mode==='plan'?'請求予定を編集':editor?.mode==='debit'?'振替結果を記録':editingUnit.lifecycle==='issued'?'入金日を記録':'発行内容を記録'} width={720} onClose={closeEditor}><div className="standard-editor">
+        {editingUnit && onSave && <Modal title={editor?.mode==='correction'?'請求・入金記録を訂正':editor?.mode==='plan'?'請求予定を編集':editor?.mode==='debit'?(editingUnit.lifecycle==='received'?'振替記録を訂正':'請求書に切替'):editingUnit.lifecycle==='issued'?'入金日を記録':'発行内容を記録'} width={720} onClose={closeEditor}><div className="standard-editor">
           {editor?.mode === 'correction' && data.recipients
             ? <InvoiceCorrectionEditor key={`correction-${editingUnit.id}`} unit={editingUnit} recipients={data.recipients} onSave={onSave} onClose={closeEditor} />
             : editor?.mode === 'debit'

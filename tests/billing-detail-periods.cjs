@@ -31,7 +31,7 @@ assert.equal(reference.amount,10110);assert.equal(reference.date,'2026-10-25');a
 assert.equal(reference.periodStart,'2026-01-01');assert.equal(reference.periodEnd,'2026-12-31')
 const history={units:[],recipientName:()=> '山﨑 真佑子',projectName:()=> '西予市新城⑨',plannedAmount:()=>999999,recipients:[{id:7,name:'山﨑 真佑子'}]}
 const html=renderToStaticMarkup(React.createElement(InvoiceLedgerDetail,{data:history,projectId:56,contract,currentRecipientId:7,maintenanceStartDate:contract.maintenance_start_date,onAddSchedule:noSave,onSave:noSave,today:'2026-10-03'}))
-for(const text of ['10,110','2026-10-25','2026-01-01 ～ 2026-12-31','振替予定額','未登録','今回の予定を変更','振替結果を記録','初年度現金回収','保存済みの請求・入金記録はありません'])assert.ok(html.includes(text),text)
+for(const text of ['10,110','2026-10-25','2026-01-01 ～ 2026-12-31','振替予定額','未登録','今回の予定を変更','請求書に切替','初年度現金回収','保存済みの請求・入金記録はありません'])assert.ok(html.includes(text),text)
 assert.ok(!html.includes('999,999')&&!html.includes('357,600'),'Excluded maintenance must not become a billable reference')
 const groupedHtml=renderToStaticMarkup(React.createElement(InvoiceLedgerDetail,{data:{...history,units},projectId:56,maintenanceStartDate:'2022-07-14',onSave:noSave}))
 assert.equal((groupedHtml.match(/class="invoice-period-group"/g)||[]).length,1)
